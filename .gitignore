@@ -1,0 +1,23 @@
+# Generated media — large, binary, fully regenerable from manifest.json +
+# source_audio + the pipeline scripts in shorts_pipeline2/. Not worth
+# tracking in git; back these up separately (e.g. Drive) if needed.
+*/audio/*
+!*/audio/.gitkeep
+
+*/source_audio/*
+!*/source_audio/.gitkeep
+
+*/images/*
+!*/images/.gitkeep
+
+*/videos/*
+!*/videos/.gitkeep
+
+*/output/*
+!*/output/.gitkeep
+
+# OS / editor cruft
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
