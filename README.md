@@ -13,46 +13,57 @@ It does NOT hold its own copies of `auto_split_scenes*.py`,
 added there (like the Stage 3 timestamped-script export) benefits every
 channel immediately, instead of drifting across duplicated copies.
 
-## Assumed layout
+## Actual layout
 
 ```
-parent-folder/
-├── shorts_pipeline2/              <- pipeline scripts (unchanged, shared)
-│   ├── auto_split_scenes_v1_stage3_export.py
-│   ├── generate_source_audio.py
-│   ├── stitch_video.py
-│   ├── generate_cta_card.py
-│   └── generate_audio.py          <- Aeonium/That's Why specific (manifest-driven)
-└── interested_indian_pipeline/    <- this folder
-    ├── ep01/
-    ├── ep02/
+C:\Bakcup_Asus\
+├── Aeonium_Glow\
+│   └── shorts_pipeline2\          <- pipeline scripts (unchanged, shared)
+│       ├── auto_split_scenes_v1_stage3_export.py
+│       ├── generate_source_audio.py
+│       ├── stitch_video.py
+│       ├── generate_cta_card.py
+│       └── generate_audio.py       <- Aeonium/That's Why specific (manifest-driven)
+└── interested_indian_pipeline\     <- this folder (sibling to Aeonium_Glow, not inside it)
+    ├── ep01\
+    ├── ep02\
     └── ...
 ```
 
-If your actual folder names differ, adjust the relative paths (`../shorts_pipeline2/...`)
-in the commands below accordingly.
+`interested_indian_pipeline` sits next to `Aeonium_Glow`, not inside it —
+since that folder is named after a specific other channel, nesting an
+unrelated project underneath it would be confusing. This means the
+relative path from `shorts_pipeline2` back to this folder is **two**
+levels up (`..\..\`), not one.
+
+If your actual folders differ, adjust the paths below accordingly.
 
 ## Running pipeline scripts against an episode here
 
-Since scripts are invoked from `shorts_pipeline2/` but need to operate on
-a project folder that lives *outside* it, point `--project` at a relative
-path that reaches back out to this folder:
+Since scripts are invoked from `shorts_pipeline2\` but need to operate on
+a project folder that lives outside it, point `--project` at a path that
+reaches back out to this folder. Two ways to do that — pick whichever
+you find less error-prone:
 
+**Relative path** (run from inside `shorts_pipeline2\`):
 ```
-cd shorts_pipeline2
+cd C:\Bakcup_Asus\Aeonium_Glow\shorts_pipeline2
 
 python generate_source_audio.py --list-voices
-python generate_source_audio.py --project ../interested_indian_pipeline/ep01 \
-    --script ../interested_indian_pipeline/ep01/script_south_india_tax_devolution.txt \
-    --voice en-US-AndrewNeural --preview 2
+python generate_source_audio.py --project ..\..\interested_indian_pipeline\ep01 --script ..\..\interested_indian_pipeline\ep01\script_south_india_tax_devolution.txt --voice en-US-AndrewNeural --preview 2
 
-python generate_source_audio.py --project ../interested_indian_pipeline/ep01 \
-    --script ../interested_indian_pipeline/ep01/script_south_india_tax_devolution.txt \
-    --voice en-US-AndrewNeural --out narration.mp3
+python generate_source_audio.py --project ..\..\interested_indian_pipeline\ep01 --script ..\..\interested_indian_pipeline\ep01\script_south_india_tax_devolution.txt --voice en-US-AndrewNeural --out narration.mp3
 
-python auto_split_scenes_v1_stage3_export.py --audio narration.mp3 \
-    --project ../interested_indian_pipeline/ep01 \
-    --video-type LongVideo --fragment-max-seconds 6
+python auto_split_scenes_v1_stage3_export.py --audio narration.mp3 --project ..\..\interested_indian_pipeline\ep01 --video-type LongVideo --fragment-max-seconds 6
+```
+
+**Absolute path** (avoids counting `..\` levels by hand — usually easier on Windows):
+```
+cd C:\Bakcup_Asus\Aeonium_Glow\shorts_pipeline2
+
+python generate_source_audio.py --project C:\Bakcup_Asus\interested_indian_pipeline\ep01 --script C:\Bakcup_Asus\interested_indian_pipeline\ep01\script_south_india_tax_devolution.txt --voice en-US-AndrewNeural --out narration.mp3
+
+python auto_split_scenes_v1_stage3_export.py --audio narration.mp3 --project C:\Bakcup_Asus\interested_indian_pipeline\ep01 --video-type LongVideo --fragment-max-seconds 6
 ```
 
 All the pipeline scripts already write output relative to `--project`, so
