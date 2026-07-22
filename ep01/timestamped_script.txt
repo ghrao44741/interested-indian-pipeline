@@ -1,0 +1,90 @@
+[00:00] Karnataka contributes nearly 9% of India's GDP with about 5% of its population.
+[00:06] For every rupee it sends to the union government in taxes, it gets back roughly 15 pace.
+[00:12] Tamil Nadu, Kerala, Telangana, and Andhra Pradesh face versions of the same arithmetic.
+[00:18] The states doing the most economically are the ones losing the most fiscally.
+[00:22] That is not an accident of geography. It is the output of a formula. To understand why, you have to start with Article 280 of the Constitution.
+[00:31] It created the Finance Commission, a body reconstituted every five years to decide how the union government splits its tax revenue with the states.
+[00:40] This is not a courtesy. It is a structural necessity. Under India's constitutional design, the union collects the bulk of major taxes, income tax, corporation tax, GST.
+[00:52] States carry most of the spending responsibility, health, education, policing, rural infrastructure.
+[00:59] Someone has to bridge that gap. The Finance Commission is that bridge. Every commission answers two questions. First, how much of the shared tax pool goes to states as a whole, the vertical share.
+[01:10] Second, how that pool is split between individual states, the horizontal share.
+[01:16] The first question is about the union versus the states.
+[01:19] The second is about states versus each other. And it's the second question that produces the paradox playing out in Bengaluru, Chennai, and Thiruvananthapuram right now.
+[01:29] The 14th Finance Commission, submitted in 2015, set the vertical share at 42%, the highest it had ever been.
+[01:37] States cheered, but the horizontal formula behind that pool was already shifting in a direction the southern states would come to regret.
+[01:45] The 15th Finance Commission, covering 2021 to 2026, brought that shift into sharp focus.
+[01:52] It lowered the vertical share slightly to 41%.
+[01:56] More consequentially, it changed how population was counted.
+[01:59] Every finance commission needs a population figure to help decide who needs more money.
+[02:04] For decades, that figure came from the 1971 census, frozen deliberately.
+[02:10] Why freeze it? Because using a current census would reward states with high birth rates and effectively find states that had successfully brought population growth under control.
+[02:20] Kerala, Tamil Nadu, and Karnataka had done exactly that.
+[02:24] Starting in the 1970s, these states ran aggressive family planning programs, decades before the rest of the country followed.
+[02:32] By the 2000s, their fertility rates had dropped near or below replacement level.
+[02:37] Uttar Pradesh and Bihar had not made the same progress.
+[02:40] The 15th Finance Commission was told, under its terms of reference, to use the 2011 census instead of the 1971 figures.
+[02:49] That single instruction, buried in a government notification, is the mechanism behind the entire dispute.
+[02:56] Once 2011 population data entered the formula, states with larger, faster-growing populations gained share.
+[03:04] States that had spent 40 years suppressing their birth rates lost it.
+[03:07] The numbers make the mechanism concrete. Under the 14th Finance Commission, Karnataka's share of the divisible tax pool was 4.713%.
+[03:15] Under the 15th, it fell to 3.647%. That is a drop of roughly 23% in the state's allocation,
+[03:25] translating into a cumulative shortfall state officials have put above 80,000 crore rupees across the award period.
+[03:32] Kerala lost roughly a quarter of a percentage point of the pool as well, a smaller sounding number that still runs into thousands of crores annually.
+[03:41] Uttar Pradesh, by contrast, retained the largest single share of any state,
+[03:46] at nearly 18 percent, and Bihar's allocation continued to rank second nationally in absolute terms.
+[03:53] Why did southern states lose out specifically? The formula the 15th Commission used weighted several factors together.
+[04:00] Population at 15 percent. Area at 15 percent. Forest and ecology cover at 10%. Income distance at 45%, meant to give more to states with lower per capita income relative to the richest state.
+[04:14] Demographic performance at 12.5%, meant to reward states with lower fertility rates, intended as a partial correction for the population shift.
+[04:24] tax and fiscal effort at 2.5%.
+[04:27] On paper, the Demographic Performance Criterion looks like it should have protected the southern states.
+[04:32] In practice, its weight was too small to offset the switch to 2011 population data and the Income Distance Criterion, the largest single factor,
+[04:42] worked against states like Karnataka and Tamil Nadu precisely because their higher per capita income made them look less in need of support under the formula's own logic.
+[04:52] A state can generate more GST, house more corporate headquarters, and post stronger growth, and still come out behind in this calculation,
+[05:00] because the formula treats income level as evidence of lower need rather than evidence of contribution.
+[05:06] This is where the political reaction becomes explainable rather than just loud.
+[05:11] In 2024, the Chief Ministers of Karnataka, Kerala, Tamil Nadu, and Telangana appeared together in Delhi to protest the devolution formula,
+[05:20] an unusual show of coordinated action across states governed by different parties.
+[05:25] Karnataka's Chief Minister, Siddharma Yaa, has repeatedly cited the 15-pays figure in public forums,
+[05:32] framing it not as an abstract fiscal grievance, but as a direct penalty for responsible governance.
+[05:38] Kerala's former finance minister, Thomas Isaac, made a similar argument years earlier, when the shift to 2011 population data was first proposed,
+[05:47] warning that it would punish exactly the states that had done what national population policy asked of them.
+[05:53] The union government's counter-argument follows constitutional logic rather than political convenience.
+[05:59] The Finance Commission's mandate is not to reward efficient states.
+[06:03] It is to equalize fiscal capacity across a union with enormous income disparities between states.
+[06:09] Uttar Pradesh's per capita income is a fraction of Karnataka's.
+[06:13] Bihar's is lower still. If devolution followed contribution rather than need, poorer states would fall further behind, and the union would stop functioning as a union in any meaningful sense.
+[06:25] Both positions are internally consistent. They are simply optimizing for different things, one for reward, one for redistribution, and the formula can only pick one weighting at a time.
+[06:37] There's a second layer to this that rarely makes it into the political rhetoric.
+[06:41] Devolution isn't the only channel of transfer.
+[06:44] The union also distributes centrally sponsored schemes, discretionary grants, and disaster and revenue deficit grants,
+[06:52] and those channels operate under separate, less transparent rules.
+[06:56] A state can lose share in the formal finance commission formula and still receive compensating amounts through other routes,
+[07:02] which is part of why the union describes the net picture as more balanced than the raw devolution percentages suggest,
+[07:09] while state governments describe those other channels as unpredictable and politically discretionary rather than a stable entitlement they can plan a budget around.
+[07:18] The introduction of GST in 2017 added a further complication.
+[07:24] Before GST, states had independent power to set and collect certain taxes.
+[07:29] GST folded most of that into a single national pool, administered jointly but collected centrally,
+[07:36] then redistributed through the GST Council rather than the Finance Commission.
+[07:40] States gave up fiscal autonomy in exchange for a promised compensation mechanism, guaranteed for five years, which expired in 2022.
+[07:49] Southern states, again disproportionately consumption and services heavy in their tax base,
+[07:55] argue that the post-compensation GST regime compounds the same devolution problem,
+[08:00] reducing their independent revenue tools just as the Finance Commission formula was already working against them.
+[08:06] The 16th Finance Commission, constituted in November 2023 under the chairmanship of Irvin Panagria,
+[08:13] is now working through the same tensions for the award period beginning April 2026.
+[08:19] Early indications suggest the vertical share will again be held near 41% and several states, including Karnataka,
+[08:26] have submitted formal proposals asking for the income distance waiting to be reduced
+[08:31] and replaced with a criterion based on each state's direct contribution to national GDP.
+[08:37] Preliminary estimates already show Karnataka's inter-SE share moving upward again, from 3.647% to just over 4%.
+[08:46] though still below its 14th Commission level, suggesting the formula is drifting back toward the states it took share away from without fully reversing course.
+[08:56] What this dispute really exposes isn't a flaw in the Finance Commission.
+[09:00] It's the underlying tension the Constitution built in on purpose.
+[09:04] A single national tax pool distributed by formula will always create winners and losers,
+[09:11] because no formula can simultaneously reward economic performance and correct for economic inequality.
+[09:17] Every five years, a new commission sits down, adjusts the weights, and shifts the outcome in one direction or the other.
+[09:25] The state's on the losing side of that adjustment change.
+[09:28] But the argument itself, contribution versus need, has been running since Article 280 was first drafted.
+[09:34] So the paradox from the beginning of this video isn't really a paradox at all.
+[09:39] It's the visible output of a formula working exactly as constructed, redistributing revenue away from the states that grew fastest and toward the states that grew slowest,
+[09:48] because growing slower was, in the framework's own terms, defined as needing more.
+[09:54] Karnataka's 15 pays on the rupee isn't a bureaucratic error.
+[09:58] It's the constitutional bargain of a diverse union, written into a spreadsheet and recalculated every five years.

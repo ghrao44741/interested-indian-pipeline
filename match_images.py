@@ -1,0 +1,402 @@
+"""
+match_images.py — Match unnamedimage files to their correct shot filenames.
+
+When images arrive from Flo (or any generator) without proper SCENE-XXX.png /
+group-XX.png names, drop them into {project}/images/ and run this script.
+
+It will:
+  1. Scan images/ for files that don't match the expected naming convention
+  2. Compare them visually against the unmatched shots using Claude vision
+  3. Output a rename suggestion table
+  4. Optionally rename the files with --apply
+
+Usage:
+    # Suggest renames (dry run)
+    python match_images.py --project ep01
+
+    # Actually rename the files
+    python match_images.py --project ep01 --apply
+
+    # Show suggestions for a specific unnamed file
+    python match_images.py --project ep01 --file "slide_07.png"
+
+Requirements:
+    pip install anthropic
+    ANTHROPIC_API_KEY in .env or environment
+"""
+
+import argparse
+import base64
+import json
+import os
+import re
+import shutil
+import sys
+import time
+from pathlib import Path
+
+try:
+    import anthropic
+except ImportError:
+    print("❌ anthropic package not found. Run: pip install anthropic")
+    sys.exit(1)
+
+PROMPTS_FILE = "image_prompts_one_line_per_prompt.md"
+MODEL        = "claude-haiku-4-5-20251001"   # fast + cheap for matching
+DELAY        = 0.3   # seconds between API calls
+
+# Regex patterns for correctly-named files
+VALID_NAME_PATTERNS = [
+    re.compile(r"^SCENE-\d{3}\.(png|jpg|jpeg|webp)$", re.IGNORECASE),
+    re.compile(r"^group-\d{2}\.(png|jpg|jpeg|webp)$", re.IGNORECASE),
+]
+
+
+def is_correctly_named(filename: str) -> bool:
+    return any(p.match(filename) for p in VALID_NAME_PATTERNS)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PARSE PROMPTS FILE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def parse_prompts(md_path: str) -> list[dict]:
+    shots = []
+    with open(md_path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line.startswith("**SHOT"):
+                continue
+            shot_m    = re.search(r"\*\*SHOT (\d+)\*\*", line)
+            fname_m   = re.search(r"`([^`]+\.png)`", line)
+            narr_m    = re.search(r'NARRATION:\s*"([^"]+)"', line)
+            prompt_m  = re.search(r"PROMPT:\s*(.+?)\s*OVERLAY:", line)
+            overlay_m = re.search(r"OVERLAY:\s*(.+?)\s*CUE:", line)
+            if not shot_m or not fname_m:
+                continue
+            shots.append({
+                "shot":      f"SHOT {shot_m.group(1).zfill(2)}",
+                "filename":  fname_m.group(1),
+                "narration": narr_m.group(1) if narr_m else "",
+                "prompt":    prompt_m.group(1) if prompt_m else "",
+                "overlay":   overlay_m.group(1) if overlay_m else "",
+            })
+    return shots
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LOAD API KEY
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def load_api_key(script_dir: Path) -> str:
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if key:
+        return key
+    env_file = script_dir / ".env"
+    if env_file.exists():
+        for line in env_file.read_text().splitlines():
+            line = line.strip()
+            if line.startswith("ANTHROPIC_API_KEY="):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return ""
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MATCH ONE IMAGE AGAINST CANDIDATE SHOTS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def build_candidates_text(candidates: list[dict]) -> str:
+    """Format candidate shots as a numbered list for the prompt."""
+    lines = []
+    for i, s in enumerate(candidates, 1):
+        lines.append(
+            f"{i}. {s['shot']} → save as `{s['filename']}`\n"
+            f"   Narration: \"{s['narration']}\"\n"
+            f"   Visual: {s['prompt']}\n"
+            f"   Overlay text: {s['overlay']}"
+        )
+    return "\n\n".join(lines)
+
+
+def match_image(client: anthropic.Anthropic, image_path: Path,
+                candidates: list[dict]) -> dict:
+    """
+    Send an image to Claude with a list of candidate shots.
+    Returns {match_index, filename, shot, confidence, reason}
+    match_index is 1-based into candidates list, or 0 if no match found.
+    """
+    ext = image_path.suffix.lower()
+    media_map = {".png": "image/png", ".jpg": "image/jpeg",
+                 ".jpeg": "image/jpeg", ".webp": "image/webp"}
+    media_type = media_map.get(ext, "image/png")
+
+    with open(image_path, "rb") as f:
+        img_b64 = base64.standard_b64encode(f.read()).decode("utf-8")
+
+    candidates_text = build_candidates_text(candidates)
+
+    prompt = f"""\
+You are matching an image to its correct shot in a video essay about Indian fiscal federalism
+(Finance Commission devolution formula, South Indian states, Karnataka tax share, etc.).
+
+The image was generated by an AI image tool but was not saved with its correct filename.
+Your job is to identify which shot below this image belongs to.
+
+CANDIDATE SHOTS:
+{candidates_text}
+
+Look at the image carefully and identify which candidate it best matches based on:
+- The visual content described in "Visual"
+- Any text visible in the image matching "Overlay text"
+- The subject matter fitting "Narration"
+
+Respond with ONLY valid JSON:
+{{
+  "match_index": <1-based integer from the list above, or 0 if none match>,
+  "confidence": "high" | "medium" | "low",
+  "reason": "one sentence explaining what in the image matched the chosen shot",
+  "visible_text": "any text you can read in the image (numbers, labels, etc.)"
+}}
+
+If you genuinely cannot match the image to any candidate (completely different topic,
+blank image, watermark-only, etc.), set match_index to 0.
+"""
+
+    response = client.messages.create(
+        model=MODEL,
+        max_tokens=256,
+        messages=[{
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": media_type,
+                        "data": img_b64,
+                    },
+                },
+                {"type": "text", "text": prompt},
+            ],
+        }],
+    )
+
+    raw = response.content[0].text.strip()
+    raw = re.sub(r"^```(?:json)?\s*", "", raw)
+    raw = re.sub(r"\s*```$", "", raw)
+
+    try:
+        result = json.loads(raw)
+        idx = int(result.get("match_index", 0))
+        if 1 <= idx <= len(candidates):
+            matched = candidates[idx - 1]
+            return {
+                "match_index":  idx,
+                "filename":     matched["filename"],
+                "shot":         matched["shot"],
+                "confidence":   result.get("confidence", "low"),
+                "reason":       result.get("reason", ""),
+                "visible_text": result.get("visible_text", ""),
+            }
+        else:
+            return {
+                "match_index":  0,
+                "filename":     None,
+                "shot":         None,
+                "confidence":   "low",
+                "reason":       result.get("reason", "No match found"),
+                "visible_text": result.get("visible_text", ""),
+            }
+    except (json.JSONDecodeError, ValueError):
+        return {
+            "match_index":  0,
+            "filename":     None,
+            "shot":         None,
+            "confidence":   "low",
+            "reason":       f"[JSON parse error — raw: {raw[:100]}]",
+            "visible_text": "",
+        }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MAIN
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Match unnamed images to their correct SCENE-XXX / group-XX filenames"
+    )
+    parser.add_argument("--project", required=True,
+                        help="Project folder (e.g. ep01)")
+    parser.add_argument("--apply", action="store_true",
+                        help="Actually rename the files (default is dry run)")
+    parser.add_argument("--file", default=None,
+                        help="Match a specific file only (e.g. --file slide_07.png)")
+    parser.add_argument("--confidence", choices=["high", "medium", "low"],
+                        default="medium",
+                        help="Only auto-rename matches at this confidence or above "
+                             "(default: medium). Low-confidence matches are always listed "
+                             "but not renamed even with --apply.")
+    args = parser.parse_args()
+
+    script_dir  = Path(__file__).parent
+    project_dir = (
+        Path(args.project) if Path(args.project).is_absolute()
+        else (script_dir / args.project).resolve()
+    )
+    images_dir = project_dir / "images"
+
+    if not project_dir.is_dir():
+        print(f"❌ Project folder not found: {project_dir}")
+        sys.exit(1)
+    if not images_dir.is_dir():
+        print(f"❌ images/ folder not found: {images_dir}")
+        sys.exit(1)
+
+    # ── load API key ───────────────────────────────────────────────────────────
+    api_key = load_api_key(script_dir)
+    if not api_key:
+        print("❌ ANTHROPIC_API_KEY not set in environment or .env")
+        sys.exit(1)
+    client = anthropic.Anthropic(api_key=api_key)
+
+    # ── parse all expected shots ───────────────────────────────────────────────
+    prompts_path = project_dir / PROMPTS_FILE
+    if not prompts_path.exists():
+        print(f"❌ {PROMPTS_FILE} not found in {project_dir}")
+        sys.exit(1)
+    all_shots = parse_prompts(str(prompts_path))
+
+    # ── find unmatched images (wrong name) ────────────────────────────────────
+    all_images = sorted(
+        f for f in images_dir.iterdir()
+        if f.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}
+    )
+
+    if args.file:
+        unmatched_images = [images_dir / args.file]
+        if not unmatched_images[0].exists():
+            print(f"❌ File not found: {unmatched_images[0]}")
+            sys.exit(1)
+    else:
+        unmatched_images = [f for f in all_images if not is_correctly_named(f.name)]
+
+    # ── find which expected filenames are already present ─────────────────────
+    existing_names = {f.name.lower() for f in all_images if is_correctly_named(f.name)}
+    missing_shots  = [s for s in all_shots
+                      if s["filename"].lower() not in existing_names]
+
+    # ── report header ──────────────────────────────────────────────────────────
+    print(f"\n{'═' * 60}")
+    print(f"Image Matcher — {project_dir.name}")
+    print(f"  Unnamed files found : {len(unmatched_images)}")
+    print(f"  Missing shot images : {len(missing_shots)}")
+    print(f"  Mode               : {'APPLY (will rename)' if args.apply else 'DRY RUN (no changes)'}")
+    print(f"{'═' * 60}\n")
+
+    if not unmatched_images:
+        print("✓ No unnamed files found in images/ — all files are correctly named.")
+        return
+
+    if not missing_shots:
+        print("✓ All expected images are already present — nothing to match against.")
+        print(f"  Unnamed files: {[f.name for f in unmatched_images]}")
+        return
+
+    # ── matching loop ──────────────────────────────────────────────────────────
+    # We pass ALL missing shots as candidates for each image.
+    # This allows Claude to pick from any unmatched shot, and we track
+    # which shots have been claimed to avoid double-assigning.
+    claimed_shots    = set()   # filenames already claimed by a match
+    results          = []
+    CONFIDENCE_RANK  = {"high": 3, "medium": 2, "low": 1}
+    min_rank         = CONFIDENCE_RANK[args.confidence]
+
+    for i, img_path in enumerate(unmatched_images, 1):
+        # Only offer shots not yet claimed
+        candidates = [s for s in missing_shots if s["filename"] not in claimed_shots]
+        if not candidates:
+            print(f"[{i:02d}/{len(unmatched_images)}] {img_path.name}  — no remaining candidates")
+            results.append({"image": img_path, "match": None, "reason": "No candidates left"})
+            continue
+
+        print(f"[{i:02d}/{len(unmatched_images)}] {img_path.name}  ", end="", flush=True)
+        match = match_image(client, img_path, candidates)
+
+        if match["filename"]:
+            conf_icon = {"high": "🟢", "medium": "🟡", "low": "🔴"}.get(match["confidence"], "?")
+            print(f"→ {match['filename']}  {conf_icon} {match['confidence'].upper()}")
+            print(f"   {match['reason']}")
+            if match["visible_text"]:
+                print(f"   Visible text: {match['visible_text']}")
+            claimed_shots.add(match["filename"])
+        else:
+            print("→ NO MATCH")
+            print(f"   {match['reason']}")
+
+        results.append({"image": img_path, "match": match})
+
+        if i < len(unmatched_images):
+            time.sleep(DELAY)
+
+    # ── rename summary ─────────────────────────────────────────────────────────
+    print(f"\n{'─' * 60}")
+    print("RENAME SUGGESTIONS\n")
+
+    to_rename   = []
+    skipped     = []
+
+    for r in results:
+        m = r.get("match")
+        if not m or not m["filename"]:
+            skipped.append(r)
+            continue
+        rank = CONFIDENCE_RANK.get(m["confidence"], 0)
+        if rank >= min_rank:
+            to_rename.append(r)
+        else:
+            skipped.append(r)
+
+    for r in to_rename:
+        m          = r["match"]
+        src        = r["image"]
+        dst        = src.parent / m["filename"]
+        conf_icon  = {"high": "🟢", "medium": "🟡", "low": "🔴"}.get(m["confidence"], "?")
+        action     = "RENAMED" if args.apply else "WILL RENAME"
+        print(f"  {conf_icon} {src.name}  →  {m['filename']}  [{m['shot']}]  ({action})")
+        if args.apply:
+            if dst.exists():
+                print(f"     ⚠️  {m['filename']} already exists — skipping to avoid overwrite")
+            else:
+                src.rename(dst)
+
+    if skipped:
+        print(f"\n  Low-confidence / unmatched (not renamed):")
+        for r in skipped:
+            m = r.get("match")
+            if m and m["filename"]:
+                print(f"  🔴 {r['image'].name}  →  {m['filename']}?  (low confidence — verify manually)")
+            else:
+                print(f"  ✗  {r['image'].name}  →  no match found")
+
+    # ── unmatched shots still missing ─────────────────────────────────────────
+    renamed_filenames = {r["match"]["filename"] for r in to_rename if r.get("match")}
+    still_missing     = [s for s in missing_shots if s["filename"] not in renamed_filenames
+                         and s["filename"] not in claimed_shots]
+
+    if still_missing:
+        print(f"\n  Still missing ({len(still_missing)} shots need images):")
+        for s in still_missing:
+            print(f"    {s['shot']} → {s['filename']}")
+
+    print(f"\n{'═' * 60}")
+    if args.apply and to_rename:
+        print(f"✓ Renamed {len(to_rename)} file(s).")
+        print(f"  Run review_images.py next to check quality.")
+    elif to_rename:
+        print(f"  Dry run complete. Re-run with --apply to rename {len(to_rename)} file(s).")
+    print(f"{'═' * 60}\n")
+
+
+if __name__ == "__main__":
+    main()

@@ -16,6 +16,21 @@
 */output/*
 !*/output/.gitkeep
 
+# Secrets
+.env
+
+# BGM / audio assets (large media — store separately)
+bgm.mp3
+ep01/bgm.mp3
+ep01/bgm_orig.mp3
+common/cta/*.mp3
+
+# Large GeoJSON data files (one-time download, not code)
+*.geojson
+
+# Manifest backups (noise — keep only current manifest.json)
+ep01/manifest_backup_*.json
+
 # OS / editor cruft
 __pycache__/
 *.pyc
