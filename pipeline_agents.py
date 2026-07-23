@@ -216,12 +216,14 @@ class ReviewAgent:
             recs.append(f"Remove or rephrase: {', '.join(found_banned)}")
 
         # Rule: questions (at least 1 per 7 sentences)
-        sentences = re.split(r'[.!?]+', text)
-        sentences = [s.strip() for s in sentences if s.strip()]
-        questions = [s for s in sentences if s.endswith("?") or "?" in s]
-        q_ratio = len(questions) / max(len(sentences), 1)
+        # Count '?' in the raw text — splitting on [.!?] consumes delimiters so endswith('?') never fires.
+        question_count = text.count("?")
+        # Approximate sentence count from full stops + exclamations + questions
+        sentence_count = text.count(".") + text.count("!") + question_count
+        sentence_count = max(sentence_count, 1)
+        q_ratio = question_count / sentence_count
         if q_ratio < 0.08:
-            issues.append(f"Too few questions: {len(questions)} in {len(sentences)} sentences (need ~1 per 6–7)")
+            issues.append(f"Too few questions: {question_count} questions in ~{sentence_count} sentences (need ~1 per 6–7)")
             recs.append("Add more rhetorical questions to break up the narration")
 
         # Claude quality check
@@ -1211,6 +1213,8 @@ class OrchestratorAgent:
         self.state["data"].update({"title": title, "slug": slug, "script_path": str(script_path)})
         self._save_state()
 
+        self._print_script_preview(script_text)
+
         answer = self._checkpoint(
             "Script ready.\n"
             "  [enter] Accept  |  edit  (opens Notepad)  |  redo  (regenerate)"
@@ -1220,6 +1224,88 @@ class OrchestratorAgent:
             input("  Press ENTER after editing...")
         elif answer == "redo":
             self._stage_script()
+
+    def _print_script_preview(self, script_text: str):
+        """Print a human-readable script QA summary before the checkpoint."""
+        sep = "  " + "─" * 58
+
+        # ── Hook (first paragraph) ───────────────────────────────
+        paragraphs = [p.strip() for p in script_text.split("\n\n") if p.strip()]
+        hook = paragraphs[0] if paragraphs else ""
+        close = paragraphs[-1] if len(paragraphs) > 1 else ""
+
+        print(f"\n{sep}")
+        print("  SCRIPT PREVIEW")
+        print(sep)
+
+        # ── Quick stats ──────────────────────────────────────────
+        wc = len(script_text.split())
+        q_count = script_text.count("?")
+        sent_count = max(script_text.count(".") + script_text.count("!") + q_count, 1)
+        q_ratio = q_count / sent_count
+        found_banned = [w for w in BANNED_WORDS if w in script_text.lower()]
+
+        wc_flag    = "✓" if 1800 <= wc <= 3000 else "✗"
+        q_flag     = "✓" if q_ratio >= 0.08 else "⚠"
+        ban_flag   = "✓" if not found_banned else "✗"
+
+        print(f"  {wc_flag}  Words   : {wc}  (target 2,000–2,800)")
+        print(f"  {q_flag}  Questions: {q_count} / ~{sent_count} sentences  ({q_ratio:.0%})")
+        print(f"  {ban_flag}  Banned  : {', '.join(found_banned) if found_banned else 'none'}")
+
+        # ── Hook ────────────────────────────────────────────────
+        print(f"\n  ── HOOK (first paragraph) ──")
+        # Word-wrap at 70 chars
+        words = hook.split()
+        line, lines = [], []
+        for w in words:
+            if sum(len(x) + 1 for x in line) + len(w) > 70:
+                lines.append("  " + " ".join(line))
+                line = [w]
+            else:
+                line.append(w)
+        if line:
+            lines.append("  " + " ".join(line))
+        print("\n".join(lines[:6]))  # cap at 6 lines
+        if len(lines) > 6:
+            print("  ...")
+
+        # ── Close ───────────────────────────────────────────────
+        if close and close != hook:
+            print(f"\n  ── CLOSE (last paragraph) ──")
+            words = close.split()
+            line, lines = [], []
+            for w in words:
+                if sum(len(x) + 1 for x in line) + len(w) > 70:
+                    lines.append("  " + " ".join(line))
+                    line = [w]
+                else:
+                    line.append(w)
+            if line:
+                lines.append("  " + " ".join(line))
+            print("\n".join(lines[:4]))
+            if len(lines) > 4:
+                print("  ...")
+
+        # ── Claude one-liner ─────────────────────────────────────
+        print(f"\n  ── AI TONE CHECK ──")
+        try:
+            tone = self.review_agent._claude_assess(
+                "In ONE sentence (max 25 words), assess this script's opening paragraph for: "
+                "first-person voice, hook strength, and humor. Be blunt.\n\n"
+                f"OPENING:\n{hook[:500]}"
+            )
+            verdict = tone.get("issues", [""])[0] or f"Score {tone.get('score', '?')}/10"
+            # If score is good, show a positive note instead
+            score = tone.get("score", 0)
+            recs = tone.get("recommendations", [])
+            print(f"  Score : {score}/10")
+            if recs:
+                print(f"  Note  : {recs[0]}")
+        except Exception:
+            pass
+
+        print(f"{sep}\n")
 
     def _stage_voice(self):
         gen_audio = PIPELINE_DIR / "generate_source_audio.py"
