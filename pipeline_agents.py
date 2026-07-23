@@ -1326,8 +1326,17 @@ class OrchestratorAgent:
         python = str(WHISPERX_PYTHON) if WHISPERX_PYTHON.exists() else sys.executable
         if not WHISPERX_PYTHON.exists():
             print(f"  ⚠ WhisperX venv not found at {WHISPERX_PYTHON} — using current Python (may fail)")
+        # Find the generated audio file in source_audio/
+        audio_dir = self.project_dir / "source_audio"
+        mp3s = sorted(audio_dir.glob("*.mp3")) if audio_dir.exists() else []
+        if not mp3s:
+            raise FileNotFoundError(f"No .mp3 found in {audio_dir} — run voice stage first")
+        audio_path = mp3s[0]
         self._run_cmd(
-            [python, str(split), "--project", str(self.project_dir), "--video-type", "LongVideo"],
+            [python, str(split),
+             "--audio",      str(audio_path),
+             "--project",    str(self.project_dir),
+             "--video-type", "LongVideo"],
             cwd=SHORTS_DIR, label=split.name
         )
 
