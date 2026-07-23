@@ -211,4 +211,132 @@ Confirmed **safe to switch Shorts over to the stage3_export version** — it's a
 ## Notes / Decisions
 - (add anything that changes scope, tone, or topic here as we go)
 
+---
+
+## Session — Voice Style, Visual Overhaul, Image Pipeline, Mascot Design
+
+### Channel Voice — CHANNEL_DNA Rewrite (pipeline_agents.py)
+- Rewrote `CHANNEL_DNA` to match justaFLAM's first-person conversational voice:
+  - Narrator is "I", audience is "you". Direct, occasionally self-deprecating.
+  - Humor mandate: every 2–3 paragraphs must include one of: modern analogy, self-aware observation, deadpan understatement, or gentle audience poke.
+  - Jargon rule: NEVER use a policy term without immediately translating it in plain language.
+  - Banned words: "genuinely", "honestly", "straightforward" (flags in script reviewer — TODO: fix false positives, Task #12).
+- Added `_print_script_preview` to `_stage_script`: shows word count, question ratio, banned words, hook + close paragraphs, and a one-line Claude tone-check.
+
+### Visual Style — generate_image_prompts.py
+- Rewrote `SYSTEM_PROMPT` from minimalist doodle → flat digital cartoon:
+  - Background: warm cream (#FAF7F2), pale sky blue, or soft yellow — NOT stark white
+  - Mascot: chubby round cartoon character, big round amber glasses, thick eyebrows, short stubby arms — NOT a stick figure
+  - Maps: color-coded with DISTINCT colors per region, bold black borders, labeled callout boxes
+  - Photo inserts: where real context helps, describe as a blended overlay
+  - Charts: colorful, each bar/segment a different region color
+  - Mandatory opener: `"Flat digital cartoon illustration, warm cream background,"`
+  - Mandatory ender: `"bold outlines, vibrant colors, 16:9"`
+
+### EP01 Restart — Article 356
+- Old EP01 (tax devolution) renamed to `ep01_v1`
+- New EP01 topic: "What Happens When The President Fires A State Government?" (Article 356 / President's Rule)
+- Script: `script_the_clause_that_makes_the_president_ask_the_govern.txt` — 1885 words, justaFLAM voice
+- Audio: `source_audio/narration.mp3` — 12.1 minutes, en-US-JennyNeural ✓
+- WhisperX split: was running on CPU at end of session (status unknown — check manifest.json)
+
+### Pipeline Bug Fixes (pipeline_agents.py)
+All found and fixed during EP01 test run:
+- `_review_topics`: row parser used `startswith("|")` — failed when table rows have no leading pipe. Fixed to `"|" in s`.
+- `_claude_assess`: `json.loads("")` crash on empty API response. Fixed with retry loop (2 retries, exponential backoff).
+- `duckduckgo_search` renamed to `ddgs`: dual-import with fallback added.
+- Question counter always 0: `re.split(r'[.!?]+')` consumed `?` so ratio was 0. Fixed with `text.count("?")`.
+- Voice stage: passed `--out-dir` (wrong). Fixed to `--project` + `--script`.
+- WhisperX not in main Python: added `WHISPERX_PYTHON` constant routing `_stage_split` to correct venv.
+- `_stage_split` missing `--audio`: finds mp3 in `source_audio/`, passes filename only (not full path — avoids path doubling).
+- `--device cuda` on CPU-only torch: fixed to pass `--device cpu`.
+- `pydub` ImportError in voice reviewer: catches ImportError separately, warns, passes with score ≥ 7.
+
+### Thumbnail System — Dark / Light / Auto Themes
+- `generate_thumbnail.py` updated with `THEMES` dict:
+  - `dark`: deep navy (#0C1828) bg, white text, amber accent — odd episodes
+  - `light`: warm cream (#FAF7F2) bg, dark brown text, crimson accent — even episodes
+  - `auto`: parses episode number from folder name, alternates automatically
+- New `--theme dark|light|auto` CLI argument (default: `auto`)
+- `pipeline_agents.py` `_stage_thumbnail` updated to pass `--theme auto`
+- Effect: channel grid shows alternating dark/light checkerboard pattern
+
+### Mascot Design — The Interested Indian
+- **Design formula** (based on justaFLAM analysis): anchor mascot + real geography background + 2-line huge text + one specific shocking stat
+- **Mascot locked**: chubby round Indian cartoon character, amber round glasses, spiky dark hair, warm tan skin (#D4A85C), cream kurta, off-white pajama trousers with gathered ankles, simple leather sandals
+- **4 expressions**: NEUTRAL, SHOCKED, CONFUSED, SMUG — on single reference sheet
+- **Reference image URL**: `https://rqkumunldqvmynqxibca.supabase.co/storage/v1/object/public/generated-images/adhoc-1784824975374.png`
+- **Local file**: `mascot_reference.png` (download via PowerShell Invoke-WebRequest if missing)
+- **Session ID**: `d9d31dea-1095-4a70-b57e-9c0de7eaca7b` (for AIBMM continuity)
+- **Thumbnail tested**: both dark and light versions generated via GPT Image 2 (AIBMM MCP)
+
+### channel_config.json (new)
+Central config file committed to repo:
+- Channel name, handle, tagline
+- Mascot reference URL + local path + description + locked date
+- Thumbnail theme system documentation
+- Image pipeline routing table (which script handles which scene type)
+- Pexels API key env var name
+
+### Image Pipeline — 4-Type Scene Architecture
+Scene types and their dedicated generators:
+
+| Type | Script | Method |
+|---|---|---|
+| mascot / general | `generate_images_aibmm.py` | OpenAI GPT Image 2, mascot reference via images.edit() |
+| map | `generate_india_map.py` | geopandas + real GeoJSON (accurate geography) |
+| chart / stat | `generate_chart.py` | matplotlib (bar, timeline, stat card, pie) |
+| photo | `search_pexels.py` | Pexels API, free, commercial OK |
+
+Classification: `generate_images_aibmm.py` auto-classifies each scene from prompt keywords and skips non-mascot types with a pointer to the right script.
+
+### generate_india_map.py — Major Update
+- Background changed: dark navy → warm cream (#FAF7F2) with pale blue ocean
+- States now color-coded by region (North/South/East/West/Central/NE) — muted palette
+- Highlighted states: crimson bold border + white name label with colored stroke
+- Auto-downloads GeoJSON on first run → cached at `data/india_states.geojson`
+- New flags: `--title`, `--callout`, `--project`, `--shot`, `--all-labels`
+- `--geojson` now optional (defaults to cached file)
+- Backward compatible: `--highlight` still comma-separated, `--out` still works
+
+### search_pexels.py (new)
+- Searches Pexels API for photo-type scenes
+- Auto-extracts keywords from narration text (capitalised proper nouns)
+- Downloads best landscape result, crops/resizes to 1280×720 PNG
+- `--query` for single search, `--project` for batch (all photo scenes)
+- `--preview` to see results without downloading
+- API key: `PEXELS_API_KEY` in `.env` ✓ tested and working
+
+### generate_chart.py (new)
+Chart types:
+- `bar` — horizontal/vertical bar chart, one color per bar from channel palette
+- `stat` — big number callout card (e.g. "91 / Article 356 impositions")
+- `timeline` — horizontal year-based event timeline, alternating above/below labels
+- `pie` — pie chart with percentage labels
+All use warm cream background, channel color palette. `--example` flag prints sample JSON.
+Bug found and fixed during test: `axhline` doesn't accept `transform` kwarg.
+
+### generate_images_aibmm.py — Rewritten for OpenAI
+- Was: placeholder AIBMM REST API (fake endpoint)
+- Now: uses `openai` Python library directly with `gpt-image-2` model
+- Mascot scenes: `client.images.edit()` with `mascot_reference.png` as style anchor
+- General scenes: `client.images.generate()` with style prefix
+- Output: 1536×1024 from API → cropped/resized to 1280×720 PNG
+- `--test` flag: generates one test image to verify key + mascot reference
+- API key: `OPENAI_API_KEY` in `.env` ✓ tested and working
+
+### API Keys in .env
+```
+PEXELS_API_KEY=...   ✓ confirmed working
+OPENAI_API_KEY=...   ✓ confirmed working
+```
+
+### Pending Tasks
+- #11 Install CUDA PyTorch in transcription-tools venv (WhisperX: 40min → 3min)
+- #12 Fix banned word false positives ("genuinely"/"honestly" in conversational context)
+- #13 Tune question ratio threshold (5-6 questions in 1800 words should not fail)
+- #14 Review EP01 images once pipeline completes
+- #15 Build notification agent
+- #16 Build analytics feedback loop
+- EP01 pipeline: check if WhisperX finished (manifest.json?), resume from prompts stage if yes
 
