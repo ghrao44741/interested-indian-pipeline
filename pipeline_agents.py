@@ -145,9 +145,18 @@ class ReviewAgent:
         ideas_text = ctx.get("topic_ideas", "")
         issues, recs = [], []
 
-        # Rule: count table rows
-        rows = [l for l in ideas_text.splitlines() if l.strip().startswith("|") and not l.strip().startswith("| #")]
-        rows = [r for r in rows if "---" not in r]
+        # Rule: count table rows — tolerant of both "| 1 | ..." and "1 | ..." formats
+        rows = []
+        for line in ideas_text.splitlines():
+            s = line.strip()
+            if not s or "---" in s:
+                continue
+            # Skip header row (e.g. "# | Video Title | ..." or "| # | ...")
+            if s.startswith("# ") or s.startswith("| #"):
+                continue
+            # Count any line with pipe separators as a data row
+            if "|" in s:
+                rows.append(s)
         if len(rows) < 5:
             issues.append(f"Only {len(rows)} topic ideas generated (need 5)")
             recs.append("Regenerate with explicit instruction to produce exactly 5 ideas")
@@ -582,23 +591,32 @@ class ReviewAgent:
 
     # ── Claude quality assessor ────────────────────────────────────────────────
 
-    def _claude_assess(self, prompt: str) -> dict:
-        """Call Claude for qualitative review. Returns {score, issues, recommendations}."""
-        try:
-            response = self.client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=512,
-                system=(
-                    "You are a quality reviewer for 'The Interested Indian' YouTube channel. "
-                    "When asked to review content, respond ONLY with valid JSON in this exact format:\n"
-                    '{"score": <int 0-10>, "issues": ["issue1", ...], "recommendations": ["rec1", ...]}\n'
-                    "Be specific and actionable. No other text."
-                ),
-                messages=[{"role": "user", "content": prompt}],
-            )
-            return json.loads(response.content[0].text.strip())
-        except Exception as e:
-            return {"score": 7, "issues": [f"Review call failed: {e}"], "recommendations": []}
+    def _claude_assess(self, prompt: str, max_retries: int = 2) -> dict:
+        """Call Claude for qualitative review. Returns {score, issues, recommendations}.
+        Retries up to max_retries times on empty response or JSON parse failure."""
+        last_err = None
+        for attempt in range(max_retries + 1):
+            try:
+                response = self.client.messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=512,
+                    system=(
+                        "You are a quality reviewer for 'The Interested Indian' YouTube channel. "
+                        "When asked to review content, respond ONLY with valid JSON in this exact format:\n"
+                        '{"score": <int 0-10>, "issues": ["issue1", ...], "recommendations": ["rec1", ...]}\n'
+                        "Be specific and actionable. No other text."
+                    ),
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                text = response.content[0].text.strip()
+                if not text:
+                    raise ValueError("Empty response from Claude assess")
+                return json.loads(text)
+            except Exception as e:
+                last_err = e
+                if attempt < max_retries:
+                    time.sleep(2 ** attempt)   # 1s, 2s backoff
+        return {"score": 7, "issues": [f"Review call failed: {last_err}"], "recommendations": []}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
