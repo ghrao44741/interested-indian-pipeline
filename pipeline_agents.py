@@ -1334,7 +1334,7 @@ class OrchestratorAgent:
         audio_path = mp3s[0]
         self._run_cmd(
             [python, str(split),
-             "--audio",      str(audio_path),
+             "--audio",      audio_path.name,   # filename only — script prepends source_audio/ itself
              "--project",    str(self.project_dir),
              "--video-type", "LongVideo"],
             cwd=SHORTS_DIR, label=split.name
