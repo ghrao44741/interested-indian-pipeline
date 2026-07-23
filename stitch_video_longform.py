@@ -62,6 +62,21 @@ Place mascot_config.json inside the project folder:
 
 Mascot PNGs must have transparent backgrounds. Rendered at 180px height.
 ──────────────────────────────────────────────────────────
+BRAND / PAD COLOR (optional)
+──────────────────────────────────────────────────────────
+Place brand.json inside the project folder (or one level up, shared
+across a channel's episode folders):
+
+{
+  "pad_color": "#1C1C1A"
+}
+
+Used wherever ffmpeg has to pad or letterbox a clip to fit the frame
+(scale/pad on video sources, or non-Ken-Burns static clips like the CTA
+card). If no brand.json is found in either location, falls back to
+DEFAULT_PAD_COLOR below — so this is safe to skip until you've decided
+on a project's actual color.
+──────────────────────────────────────────────────────────
 """
 
 import argparse
@@ -87,6 +102,9 @@ BGM_VOLUME        = 0.08          # slightly quieter than Shorts (0.10) — more
 RESOLUTION        = "1920x1080"   # landscape long-form
 KEN_BURNS_ENABLED = True
 KEN_BURNS_ZOOM_RATIO = 1.08       # 8% zoom — subtle, same as Shorts
+DEFAULT_PAD_COLOR = "0xFAF7F2"    # fallback if no brand.json is found — historically That's Why's
+                                  # color, carried over here by copy-paste. Add brand.json with this
+                                  # project's real color; this default doesn't change until you do.
 
 MASCOT_HEIGHT_PX  = 180           # mascot scaled to this height at 1080p
 MASCOT_PADDING_PX = 30            # padding from edge
@@ -172,6 +190,41 @@ def find_video_source(project_dir: str, scene_id: str,
     return None, None
 
 
+def normalize_hex_for_ffmpeg(hex_color: str) -> str:
+    """Accept '#RRGGBB', '0xRRGGBB', or bare 'RRGGBB' — return '0xRRGGBB' for ffmpeg."""
+    h = hex_color.strip().lstrip("#")
+    if h.lower().startswith("0x"):
+        h = h[2:]
+    return f"0x{h.upper()}"
+
+
+def load_pad_color(project_dir: str, default_hex: str) -> str:
+    """
+    Look for brand.json's "pad_color" field, checking {project_dir}/brand.json
+    first, then {project_dir}/../brand.json (a channel-level file shared across
+    all of that channel's episode folders — useful for Interested Indian's
+    sibling-repo layout). Falls back to default_hex if neither exists, either
+    is missing the pad_color key, or either fails to parse.
+    """
+    candidates = [
+        os.path.join(project_dir, "brand.json"),
+        os.path.normpath(os.path.join(project_dir, "..", "brand.json")),
+    ]
+    for path in candidates:
+        if not os.path.exists(path):
+            continue
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                brand = json.load(f)
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"  ⚠️  Could not read {path}: {e} — trying next fallback")
+            continue
+        hex_color = brand.get("pad_color")
+        if hex_color:
+            return normalize_hex_for_ffmpeg(hex_color)
+    return default_hex
+
+
 def find_cta(project_dir: str) -> tuple:
     """
     Look for shared CTA assets at {project}/../common/cta/.
@@ -204,7 +257,7 @@ def load_mascot_config(project_dir: str) -> dict:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def build_clip_from_video(scene_id: str, video_path: str, audio_path: str,
-                           audio_duration: float, tmp_dir: str) -> str:
+                           audio_duration: float, tmp_dir: str, pad_color: str = DEFAULT_PAD_COLOR) -> str:
     """Render a scene clip from an animated .mp4 source (loops if shorter)."""
     clip_path = os.path.join(tmp_dir, f"{scene_id}.mp4")
     cmd = [
@@ -216,7 +269,7 @@ def build_clip_from_video(scene_id: str, video_path: str, audio_path: str,
         "-pix_fmt", "yuv420p",
         "-vf", (
             "scale=1920:1080:force_original_aspect_ratio=decrease:force_divisible_by=2,"
-            "pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=0xFAF7F2,setsar=1"
+            f"pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color={pad_color},setsar=1"
         ),
         "-t", str(audio_duration + 0.5),
         "-r", str(FPS), clip_path,
@@ -231,7 +284,8 @@ def build_clip_from_video(scene_id: str, video_path: str, audio_path: str,
 def build_clip_from_image(scene_id: str, image_path: str, audio_path: str,
                            audio_duration: float, tmp_dir: str,
                            scene_index: int = 0,
-                           force_static: bool = False) -> str:
+                           force_static: bool = False,
+                           pad_color: str = DEFAULT_PAD_COLOR) -> str:
     """
     Render a scene clip from a still image.
     With KEN_BURNS_ENABLED: upscales to 3840×2160 (2× headroom for landscape)
@@ -251,7 +305,7 @@ def build_clip_from_image(scene_id: str, image_path: str, audio_path: str,
     else:
         vf_chain = (
             "scale=1920:1080:force_original_aspect_ratio=decrease:force_divisible_by=2,"
-            "pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color=0xFAF7F2,setsar=1"
+            f"pad=1920:1080:(ow-iw)/2:(oh-ih)/2:color={pad_color},setsar=1"
         )
 
     cmd = [
@@ -410,10 +464,13 @@ def run_stitch(project_dir: str, include_cta: bool = True) -> str:
     mascot_dir    = os.path.join(project_dir, mascot_config.get("mascot_dir", "mascots"))
     mascot_scenes = mascot_config.get("scenes", {})
 
+    pad_color = load_pad_color(project_dir, DEFAULT_PAD_COLOR)
+
     print(f"Project   : {project_dir}")
     print(f"Title     : {manifest.get('title', '—')}")
     print(f"Scenes    : {len(scenes)}")
     print(f"Resolution: {RESOLUTION}")
+    print(f"Pad color : {pad_color}" + ("" if pad_color != DEFAULT_PAD_COLOR else "  (default — add brand.json for this project's real color)"))
     print(f"Ken Burns : {'on' if KEN_BURNS_ENABLED else 'off'}  ({KEN_BURNS_ZOOM_RATIO}× zoom)")
     print(f"BGM       : {'✓ ' + bgm_path if os.path.exists(bgm_path) else '✗ none'}")
     if mascot_scenes:
@@ -506,14 +563,16 @@ def run_stitch(project_dir: str, include_cta: bool = True) -> str:
             if plan["source_type"] == "video":
                 clip = build_clip_from_video(
                     plan["id"], plan["source_path"],
-                    plan["audio_path"], aud_duration, tmp_dir
+                    plan["audio_path"], aud_duration, tmp_dir,
+                    pad_color=pad_color
                 )
             else:
                 clip = build_clip_from_image(
                     plan["id"], plan["source_path"],
                     plan["audio_path"], aud_duration, tmp_dir,
                     scene_index=i,
-                    force_static=plan.get("force_static", False)
+                    force_static=plan.get("force_static", False),
+                    pad_color=pad_color
                 )
 
             # Optional mascot overlay

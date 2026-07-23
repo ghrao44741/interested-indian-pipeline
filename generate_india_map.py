@@ -1,297 +1,146 @@
 """
-generate_india_map.py — Generate accurate India state-highlight maps from GeoJSON.
+generate_india_map.py
+The Interested Indian — Accurate State/Region Highlight Map Generator
 
-Renders state outline maps in The Interested Indian's minimalist doodle style:
-warm cream background (#FAF7F2), black ink line art, flat colour fills.
+Why this exists: text-to-image models (Gemini/Imagen included) do not have
+reliable spatial reasoning for precise geography. They will draw an India
+outline that looks right at a glance, but place a specific state's shape
+or position incorrectly — Karnataka shown in the wrong part of the
+peninsula, borders that don't match neighbors, etc. This is not a prompt
+wording problem; it's a fundamental limitation of how these models
+generate images. Since half of this channel's content lives or dies on
+"is that state where it's supposed to be," maps should not be generated
+by a diffusion model at all.
 
-Usage:
-    # Download GeoJSON first (one-time):
-    Invoke-WebRequest -Uri "https://raw.githubusercontent.com/geohacker/india/master/state/india_state.geojson" -OutFile "india_states.geojson"
+This script renders maps directly from real Indian state boundary data
+(GeoJSON, sourced from geohacker/india — a commonly used public dataset
+derived from GADM administrative boundaries), so placement and shape are
+always correct. Output matches the channel's existing visual style: dark
+charcoal background, bold black outlines, flat high-contrast color blocks
+— no gradients, no drop shadows, no textures. Text-free by design (per
+the Stage 3 convention of generating base backgrounds text-free, with
+labels/arrows added in post-production).
 
-    # List available state names in the dataset
-    python generate_india_map.py --list-states
+SETUP (run once):
+    pip install geopandas shapely matplotlib
 
-    # Single group — all same colour
-    python generate_india_map.py --states "Tamil Nadu,Kerala,Andhra Pradesh" --color orange --out ep01/images/SCENE-XXX.png
+USAGE — single state highlighted:
+    python generate_india_map.py --geojson india_states.geojson \\
+        --highlight Karnataka --out ep01/images/map_karnataka.png
 
-    # Per-state colours (KEY=value pairs, comma-separated)
-    python generate_india_map.py \
-        --state-colors "Tamil Nadu=teal,Kerala=green,Andhra Pradesh=yellow" \
-        --labels \
-        --out ep01/images/SCENE-003.png
+USAGE — multiple states, same highlight color (e.g. "the southern states"):
+    python generate_india_map.py --geojson india_states.geojson \\
+        --highlight "Karnataka,Tamil Nadu,Kerala,Andhra Pradesh,Telangana" \\
+        --out ep01/images/map_south_states.png
 
-    # Two-group comparison (e.g. south vs north)
-    python generate_india_map.py \
-        --group1 "Karnataka,Tamil Nadu,Kerala" --color1 orange \
-        --group2 "Uttar Pradesh,Bihar" --color2 grey \
-        --out ep01/images/SCENE-XXX.png
+USAGE — comparison map, two groups in different colors (e.g. gainers vs losers):
+    python generate_india_map.py --geojson india_states.geojson \\
+        --highlight "Karnataka,Tamil Nadu,Kerala" --highlight-color "#8B0000" \\
+        --highlight2 "Uttar Pradesh,Bihar" --highlight2-color "#1E4D2B" \\
+        --out ep01/images/map_comparison.png
 
-    # Add state name labels to any mode
-    python generate_india_map.py --states "Karnataka" --labels --out ep01/images/SCENE-XXX.png
-
-Requirements:
-    pip install matplotlib shapely
-    GeoJSON: india_states.geojson in same folder (or pass --geojson path)
-
-Note on state names:
-    The geohacker/india dataset uses pre-reorganisation names.
-    Telangana (carved from Andhra Pradesh in 2014) may not exist separately.
-    Run --list-states to verify. If missing, use "Andhra Pradesh" to cover both.
+State names must match the GeoJSON's NAME_1 field exactly (run with
+--list-states to see all valid names/spellings — note some differ from
+current usage, e.g. "Orissa" not "Odisha", "Uttaranchal" not "Uttarakhand",
+and undivided "Jammu and Kashmir", since this dataset predates several
+state renames/splits).
 """
 
 import argparse
-import json
 import sys
-from pathlib import Path
 
-try:
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    from matplotlib.patches import PathPatch
-    from matplotlib.path import Path as MplPath
-except ImportError:
-    print("❌ matplotlib not found. Run: pip install matplotlib")
-    sys.exit(1)
+import geopandas as gpd
+import matplotlib.pyplot as plt
 
-try:
-    from shapely.geometry import shape, MultiPolygon, Polygon
-    from shapely.ops import unary_union
-except ImportError:
-    print("❌ shapely not found. Run: pip install shapely")
-    sys.exit(1)
-
-# ── Style ──────────────────────────────────────────────────────────────────────
-BG_COLOR     = "#FAF7F2"   # warm cream white
-LINE_COLOR   = "#1A1A1A"   # near-black ink
-DEFAULT_FILL = "#E8E4DF"   # unhighlighted states
-LINE_WIDTH   = 0.7
-LABEL_SIZE   = 7           # font size for state labels
-
-COLOR_MAP = {
-    "orange": "#E8763A",
-    "grey":   "#9E9E9E",
-    "blue":   "#5B8DB8",
-    "green":  "#6BAA75",
-    "teal":   "#3D9C9C",
-    "red":    "#C0392B",
-    "yellow": "#F0C040",
-    "purple": "#9B59B6",
-}
-
-FIG_W, FIG_H = 12.0, 6.75
-DPI = 160
-
-GEOJSON_DEFAULT = "india_states.geojson"
+BACKGROUND = "#1A2B4C"  # Interested Indian's finalized brand background (deep navy)
+BASE_FILL = "#2A2A2A"
+OUTLINE = "#000000"
+DEFAULT_HIGHLIGHT = "#8B0000"   # crimson, per brand palette
 
 
-# ── GeoJSON helpers ────────────────────────────────────────────────────────────
-
-def load_geojson(path: str) -> list:
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return data["features"]
-
-
-def get_name(feature: dict) -> str:
-    props = feature["properties"]
-    for key in ("NAME_1", "ST_NM", "name", "STATE", "Name"):
-        val = props.get(key)
-        if val:
-            return str(val).strip()
-    return ""
+def load_states(geojson_path: str):
+    gdf = gpd.read_file(geojson_path)
+    if "NAME_1" not in gdf.columns:
+        print(f"\n✗ Unexpected GeoJSON structure — no NAME_1 field found in {geojson_path}")
+        sys.exit(1)
+    return gdf
 
 
-def list_states(features: list):
-    names = sorted(get_name(f) for f in features)
-    print(f"State/UT names in dataset ({len(names)} total):\n")
-    for n in names:
-        print(f"  {n}")
+def validate_states(gdf, requested: list, label: str):
+    valid_names = set(gdf["NAME_1"].unique())
+    unknown = [s for s in requested if s not in valid_names]
+    if unknown:
+        print(f"\n✗ Unknown state name(s) in --{label}: {unknown}")
+        print(f"  Run with --list-states to see valid names for this GeoJSON.")
+        sys.exit(1)
 
 
-# ── Geometry → matplotlib patches ─────────────────────────────────────────────
+def render_map(gdf, highlight: list, highlight_color: str,
+                highlight2: list, highlight2_color: str,
+                output_path: str, transparent: bool):
+    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=150)  # 16:9
 
-def geom_to_patches(geom, **kw):
-    patches = []
-    polys = list(geom.geoms) if geom.geom_type == "MultiPolygon" else [geom]
-    for poly in polys:
-        if not isinstance(poly, Polygon):
-            continue
-        verts, codes = [], []
-        for ring in [poly.exterior] + list(poly.interiors):
-            coords = list(ring.coords)
-            verts  += coords
-            codes  += [MplPath.MOVETO] + [MplPath.LINETO] * (len(coords) - 2) + [MplPath.CLOSEPOLY]
-        patches.append(PathPatch(MplPath(verts, codes), **kw))
-    return patches
+    if not transparent:
+        fig.patch.set_facecolor(BACKGROUND)
+        ax.set_facecolor(BACKGROUND)
 
+    gdf.plot(ax=ax, facecolor=BASE_FILL, edgecolor=OUTLINE, linewidth=1.8)
 
-def centroid(geom):
-    """Return (x, y) centroid of a geometry."""
-    try:
-        c = geom.centroid
-        return c.x, c.y
-    except Exception:
-        return None
+    if highlight:
+        gdf[gdf["NAME_1"].isin(highlight)].plot(
+            ax=ax, facecolor=highlight_color, edgecolor=OUTLINE, linewidth=2.5
+        )
 
+    if highlight2:
+        gdf[gdf["NAME_1"].isin(highlight2)].plot(
+            ax=ax, facecolor=highlight2_color, edgecolor=OUTLINE, linewidth=2.5
+        )
 
-# ── Render ─────────────────────────────────────────────────────────────────────
-
-def render_map(features: list, lookup: dict, label_states: set, out_path: str,
-               label_overrides: dict = None):
-    """
-    lookup: {state_name_lower: hex_color}
-    label_states: set of state_name_lower values to label
-    """
-    fig, ax = plt.subplots(figsize=(FIG_W, FIG_H), facecolor=BG_COLOR)
-    ax.set_facecolor(BG_COLOR)
+    ax.set_axis_off()
     ax.set_aspect("equal")
-    ax.axis("off")
-
-    missing = set(k for k, v in lookup.items() if v != DEFAULT_FILL)
-
-    for feat in features:
-        name  = get_name(feat)
-        color = lookup.get(name.lower(), DEFAULT_FILL)
-        if name.lower() in missing and color != DEFAULT_FILL:
-            missing.discard(name.lower())
-        geom  = shape(feat["geometry"])
-        for p in geom_to_patches(geom, facecolor=color,
-                                  edgecolor=LINE_COLOR, linewidth=LINE_WIDTH):
-            ax.add_patch(p)
-
-        # Label
-        if name.lower() in label_states:
-            cx, cy = centroid(geom) or (None, None)
-            display_name = (label_overrides or {}).get(name.lower(), name)
-            if cx is not None:
-                ax.text(cx, cy, display_name, ha="center", va="center",
-                        fontsize=LABEL_SIZE, fontweight="bold",
-                        color=LINE_COLOR, zorder=5,
-                        bbox=dict(boxstyle="round,pad=0.15", fc=BG_COLOR,
-                                  ec="none", alpha=0.7))
-
-    if missing:
-        print(f"⚠  States not found in dataset (check spelling with --list-states):")
-        for m in sorted(missing):
-            print(f"   '{m}'")
-
-    combined = unary_union([shape(f["geometry"]) for f in features])
-    minx, miny, maxx, maxy = combined.bounds
-    pad = 1.0
-    ax.set_xlim(minx - pad, maxx + pad)
-    ax.set_ylim(miny - pad, maxy + pad)
-
     plt.tight_layout(pad=0)
-    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_path, dpi=DPI, bbox_inches="tight", facecolor=BG_COLOR)
+    plt.savefig(
+        output_path,
+        facecolor="none" if transparent else BACKGROUND,
+        transparent=transparent,
+        bbox_inches="tight",
+        pad_inches=0.15,
+    )
     plt.close(fig)
-    print(f"✓ Saved → {out_path}  ({int(FIG_W*DPI)}×{int(FIG_H*DPI)}px)")
-
-
-# ── CLI ────────────────────────────────────────────────────────────────────────
-
-def parse_color(s: str) -> str:
-    return s if s.startswith("#") else COLOR_MAP.get(s.lower(), s)
-
-
-def name_set(csv: str) -> frozenset:
-    return frozenset(n.strip().lower() for n in csv.split(",") if n.strip())
 
 
 def main():
-    p = argparse.ArgumentParser(
-        description="India state-highlight map generator — The Interested Indian style"
-    )
-    p.add_argument("--geojson", default=GEOJSON_DEFAULT)
-    p.add_argument("--list-states", action="store_true",
-                   help="Print available state names and exit")
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--geojson", required=True, help="Path to the India states GeoJSON file")
+    parser.add_argument("--highlight", default="", help="Comma-separated state name(s) to highlight")
+    parser.add_argument("--highlight-color", default=DEFAULT_HIGHLIGHT, help="Fill color for --highlight states (hex)")
+    parser.add_argument("--highlight2", default="", help="Optional second group of states, for comparison maps")
+    parser.add_argument("--highlight2-color", default="#1E4D2B", help="Fill color for --highlight2 states (hex)")
+    parser.add_argument("--out", required=False, help="Output PNG path. Required unless --list-states.")
+    parser.add_argument("--transparent", action="store_true", help="Transparent background instead of dark charcoal, for compositing in the video editor")
+    parser.add_argument("--list-states", action="store_true", help="Print all valid state names in the GeoJSON and exit")
+    args = parser.parse_args()
 
-    # Single-group mode
-    p.add_argument("--states", default=None,
-                   help="Comma-separated states to highlight (all same colour)")
-    p.add_argument("--color", default="orange",
-                   help="Colour for --states (name or hex, default: orange)")
-
-    # Per-state colour mode
-    p.add_argument("--state-colors", default=None,
-                   help='Per-state colours: "Tamil Nadu=teal,Kerala=green,Andhra Pradesh=yellow"')
-
-    # Two-group mode
-    p.add_argument("--group1", default=None)
-    p.add_argument("--color1", default="orange")
-    p.add_argument("--group2", default=None)
-    p.add_argument("--color2", default="grey")
-
-    # Labels
-    p.add_argument("--labels", action="store_true",
-                   help="Print state names on highlighted states")
-    p.add_argument("--label-override", default=None,
-                   help='Override displayed label for a state: "Andhra Pradesh=Telangana & AP"')
-
-    p.add_argument("--out", default="india_map.png")
-    args = p.parse_args()
-
-    gj = Path(args.geojson)
-    if not gj.exists():
-        print(f"❌ GeoJSON not found: {gj}")
-        print(f"\nDownload it:")
-        print(f'  Invoke-WebRequest -Uri "https://raw.githubusercontent.com/geohacker/india/master/state/india_state.geojson" -OutFile "{gj}"')
-        sys.exit(1)
-
-    features = load_geojson(str(gj))
+    gdf = load_states(args.geojson)
 
     if args.list_states:
-        list_states(features)
+        for name in sorted(gdf["NAME_1"].unique()):
+            print(f"  {name}")
         return
 
-    # Build lookup: {name_lower: color}
-    lookup      = {}
-    label_set   = set()
+    if not args.out:
+        parser.error("--out is required unless using --list-states")
 
-    if args.state_colors:
-        # "Tamil Nadu=teal,Kerala=green,Andhra Pradesh=yellow"
-        for part in args.state_colors.split(","):
-            part = part.strip()
-            if "=" not in part:
-                print(f"⚠  Skipping malformed entry (expected 'State=color'): '{part}'")
-                continue
-            state, color = part.rsplit("=", 1)
-            state = state.strip().lower()
-            lookup[state] = parse_color(color.strip())
-            if args.labels:
-                label_set.add(state)
-    elif args.group1 or args.group2:
-        if args.group1:
-            for n in name_set(args.group1):
-                lookup[n] = parse_color(args.color1)
-                if args.labels:
-                    label_set.add(n)
-        if args.group2:
-            for n in name_set(args.group2):
-                lookup[n] = parse_color(args.color2)
-                if args.labels:
-                    label_set.add(n)
-    elif args.states:
-        for n in name_set(args.states):
-            lookup[n] = parse_color(args.color)
-            if args.labels:
-                label_set.add(n)
-    else:
-        print("❌ Specify --states, --state-colors, --group1/--group2, or --list-states")
-        p.print_help()
-        sys.exit(1)
+    highlight = [s.strip() for s in args.highlight.split(",") if s.strip()]
+    highlight2 = [s.strip() for s in args.highlight2.split(",") if s.strip()]
 
-    # Parse label overrides
-    label_overrides = {}
-    if args.label_override:
-        for part in args.label_override.split(","):
-            part = part.strip()
-            if "=" in part:
-                state, override = part.split("=", 1)
-                label_overrides[state.strip().lower()] = override.strip()
+    if highlight:
+        validate_states(gdf, highlight, "highlight")
+    if highlight2:
+        validate_states(gdf, highlight2, "highlight2")
 
-    render_map(features, lookup, label_set, args.out, label_overrides)
+    render_map(gdf, highlight, args.highlight_color, highlight2, args.highlight2_color, args.out, args.transparent)
+    print(f"✓ Saved {args.out}")
 
 
 if __name__ == "__main__":

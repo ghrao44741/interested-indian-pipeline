@@ -39,7 +39,8 @@ BANNED_WORDS = [
     "holistic", "deep dive", "unpack",
 ]
 
-STAGE_ORDER = ["topics", "script", "voice", "split", "prompts", "images", "stitch", "metadata"]
+STAGE_ORDER = ["topics", "script", "voice", "split", "prompts", "images", "stitch", "metadata",
+               "thumbnail", "chapters", "upload"]
 
 CHANNEL_DNA = """You are a viral educational YouTube video creation engine for "The Interested Indian".
 
@@ -92,14 +93,17 @@ class ReviewAgent:
 
     def review(self, stage: str, context: dict) -> ReviewResult:
         reviewers = {
-            "topics":   self._review_topics,
-            "script":   self._review_script,
-            "voice":    self._review_voice,
-            "split":    self._review_split,
-            "prompts":  self._review_prompts,
-            "images":   self._review_images,
-            "stitch":   self._review_stitch,
-            "metadata": self._review_metadata,
+            "topics":    self._review_topics,
+            "script":    self._review_script,
+            "voice":     self._review_voice,
+            "split":     self._review_split,
+            "prompts":   self._review_prompts,
+            "images":    self._review_images,
+            "stitch":    self._review_stitch,
+            "metadata":  self._review_metadata,
+            "thumbnail": self._review_thumbnail,
+            "chapters":  self._review_chapters,
+            "upload":    self._review_upload,
         }
         fn = reviewers.get(stage)
         if not fn:
@@ -452,6 +456,100 @@ class ReviewAgent:
             issues=issues,
             recommendations=recs,
         )
+
+    # ── Thumbnail ──────────────────────────────────────────────────────────────
+
+    def _review_thumbnail(self, ctx: dict) -> ReviewResult:
+        thumb_path = Path(ctx.get("thumbnail_path", ""))
+        issues, recs = [], []
+
+        if not thumb_path.exists():
+            return ReviewResult(False, 0, ["thumbnail.png not found"], ["Re-run thumbnail stage"])
+
+        try:
+            from PIL import Image as _Image
+            img = _Image.open(thumb_path)
+            w, h = img.size
+            if (w, h) != (1280, 720):
+                issues.append(f"Wrong dimensions: {w}×{h} (expected 1280×720)")
+                recs.append("Regenerate thumbnail — check generate_thumbnail.py output")
+            size_kb = thumb_path.stat().st_size // 1024
+            if size_kb > 2048:
+                issues.append(f"Thumbnail too large: {size_kb} KB (YouTube limit: 2 MB)")
+                recs.append("Save with more compression or reduce image complexity")
+        except Exception as e:
+            issues.append(f"Could not open thumbnail: {e}")
+
+        score = 10 - len(issues) * 3
+        return ReviewResult(passed=score >= self.PASS_THRESHOLD, score=max(0, score), issues=issues, recommendations=recs)
+
+    # ── Chapters ───────────────────────────────────────────────────────────────
+
+    def _review_chapters(self, ctx: dict) -> ReviewResult:
+        chapters_path = Path(ctx.get("chapters_path", ""))
+        issues, recs = [], []
+
+        if not chapters_path.exists():
+            return ReviewResult(False, 0, ["chapters.txt not found"], ["Re-run chapters stage"])
+
+        text  = chapters_path.read_text(encoding="utf-8").strip()
+        lines = [l.strip() for l in text.splitlines() if l.strip()]
+
+        # Must have at least 5 chapters
+        if len(lines) < 5:
+            issues.append(f"Only {len(lines)} chapters (need at least 5)")
+            recs.append("Re-run with --num-chapters 7")
+
+        # First chapter must start at 00:00
+        if lines and not lines[0].startswith("00:00"):
+            issues.append("First chapter does not start at 00:00")
+
+        # Each line must match timestamp pattern
+        import re as _re
+        bad = [l for l in lines if not _re.match(r"\d{1,2}:\d{2}", l)]
+        if bad:
+            issues.append(f"{len(bad)} chapter lines missing timestamp: {bad[:2]}")
+
+        # Generic chapter names are bad
+        generic = ["chapter", "section", "part ", "intro"]
+        for line in lines:
+            name_part = line.split(" ", 1)[1].lower() if " " in line else ""
+            if any(g in name_part for g in generic) and name_part.strip() == g.strip():
+                issues.append(f"Generic chapter name: '{line}'")
+                recs.append("Use specific chapter names describing the content")
+                break
+
+        score = 10 - len(issues) * 2
+        return ReviewResult(passed=score >= self.PASS_THRESHOLD, score=max(0, score), issues=issues, recommendations=recs)
+
+    # ── Upload ─────────────────────────────────────────────────────────────────
+
+    def _review_upload(self, ctx: dict) -> ReviewResult:
+        """Check that an upload record exists and has a valid video ID."""
+        # Find project_dir — it's passed through context
+        project_dir = Path(ctx.get("project_dir", ""))
+        record_path = project_dir / "upload_record.json"
+        issues, recs = [], []
+
+        if not record_path.exists():
+            # Upload was skipped — that's allowed (not a failure)
+            return ReviewResult(
+                passed=True, score=8,
+                issues=[],
+                recommendations=["Upload skipped — run upload_youtube.py manually when ready"],
+            )
+
+        try:
+            rec    = json.loads(record_path.read_text(encoding="utf-8"))
+            vid_id = rec.get("video_id", "")
+            if not vid_id or len(vid_id) < 8:
+                issues.append("upload_record.json has no valid video_id")
+                recs.append("Check YouTube Studio to confirm upload, or re-run upload stage")
+        except Exception as e:
+            issues.append(f"Could not read upload_record.json: {e}")
+
+        score = 10 - len(issues) * 4
+        return ReviewResult(passed=score >= self.PASS_THRESHOLD, score=max(0, score), issues=issues, recommendations=recs)
 
     # ── Claude quality assessor ────────────────────────────────────────────────
 
@@ -836,11 +934,22 @@ class OrchestratorAgent:
         output = self.project_dir / "output" / f"{self.project_dir.name}_final.mp4"
         if output.exists():
             size_mb = output.stat().st_size // (1024 * 1024)
-            print(f"  Video : {output}  ({size_mb} MB)")
+            print(f"  Video     : {output}  ({size_mb} MB)")
         meta = self.state["data"].get("metadata_path", "")
         if meta:
-            print(f"  Meta  : {meta}")
-        print("\n  Final step: watch the video, then upload to YouTube.")
+            print(f"  Metadata  : {meta}")
+        thumb = self.state["data"].get("thumbnail_path", "")
+        if thumb:
+            print(f"  Thumbnail : {thumb}")
+        chapters = self.state["data"].get("chapters_path", "")
+        if chapters:
+            print(f"  Chapters  : {chapters}")
+        upload_url = self.state["data"].get("upload_url", "")
+        if upload_url:
+            print(f"\n  ✓ Published: {upload_url}")
+            print("    Next: add end screen + cards in YouTube Studio, then set Public.")
+        else:
+            print("\n  Final step: run upload_youtube.py --project <ep> when ready.")
 
     def _run_with_review(self, stage: str):
         self._banner(f"Stage: {stage.upper()}")
@@ -957,14 +1066,17 @@ class OrchestratorAgent:
 
     def _run_stage(self, stage: str):
         fns = {
-            "topics":   self._stage_topics,
-            "script":   self._stage_script,
-            "voice":    self._stage_voice,
-            "split":    self._stage_split,
-            "prompts":  self._stage_prompts,
-            "images":   self._stage_images,
-            "stitch":   self._stage_stitch,
-            "metadata": self._stage_metadata,
+            "topics":    self._stage_topics,
+            "script":    self._stage_script,
+            "voice":     self._stage_voice,
+            "split":     self._stage_split,
+            "prompts":   self._stage_prompts,
+            "images":    self._stage_images,
+            "stitch":    self._stage_stitch,
+            "metadata":  self._stage_metadata,
+            "thumbnail": self._stage_thumbnail,
+            "chapters":  self._stage_chapters,
+            "upload":    self._stage_upload,
         }
         fns[stage]()
 
@@ -1134,6 +1246,74 @@ class OrchestratorAgent:
         print(f"  Saved: {meta_path.name}")
         self.state["data"]["metadata_path"] = str(meta_path)
         self._save_state()
+
+    def _stage_thumbnail(self):
+        gen = PIPELINE_DIR / "generate_thumbnail.py"
+        self._run_cmd(
+            [sys.executable, str(gen), "--project", str(self.project_dir)],
+            label="generate_thumbnail.py"
+        )
+        thumb = self.project_dir / "thumbnail.png"
+        if thumb.exists():
+            self.state["data"]["thumbnail_path"] = str(thumb)
+            self._save_state()
+            print(f"  Thumbnail: {thumb}")
+        else:
+            raise RuntimeError("thumbnail.png not created")
+
+    def _stage_chapters(self):
+        gen = PIPELINE_DIR / "generate_chapters.py"
+        self._run_cmd(
+            [sys.executable, str(gen), "--project", str(self.project_dir)],
+            label="generate_chapters.py"
+        )
+        chapters = self.project_dir / "chapters.txt"
+        if chapters.exists():
+            self.state["data"]["chapters_path"] = str(chapters)
+            self._save_state()
+        else:
+            raise RuntimeError("chapters.txt not created")
+
+    def _stage_upload(self):
+        """Human-gated: show what would upload, ask for confirmation."""
+        upload_record = self.project_dir / "upload_record.json"
+        if upload_record.exists():
+            rec = json.loads(upload_record.read_text(encoding="utf-8"))
+            print(f"\n  ⚠ Already uploaded: {rec.get('url', 'unknown URL')}")
+            answer = self._checkpoint("Upload again? (yes / no [default])").lower()
+            if answer != "yes":
+                self.state["data"]["upload_url"] = rec.get("url", "")
+                self._save_state()
+                return
+
+        gen = PIPELINE_DIR / "upload_youtube.py"
+
+        # First: dry-run so human sees what will go up
+        self._run_cmd(
+            [sys.executable, str(gen), "--project", str(self.project_dir), "--dry-run"],
+            label="upload_youtube.py --dry-run"
+        )
+
+        answer = self._checkpoint(
+            "Ready to upload to YouTube?\n"
+            "  Options: [enter] upload now  |  schedule 2026-07-28T17:00:00+05:30  |  skip"
+        )
+
+        if answer.lower() == "skip":
+            print("  Upload skipped — run upload_youtube.py manually when ready.")
+            return
+
+        cmd = [sys.executable, str(gen), "--project", str(self.project_dir)]
+        if answer.lower().startswith("schedule"):
+            parts = answer.split(maxsplit=1)
+            if len(parts) == 2:
+                cmd += ["--schedule", parts[1]]
+        self._run_cmd(cmd, label="upload_youtube.py")
+
+        if upload_record.exists():
+            rec = json.loads(upload_record.read_text(encoding="utf-8"))
+            self.state["data"]["upload_url"] = rec.get("url", "")
+            self._save_state()
 
     # ── Utilities ──────────────────────────────────────────────────────────────
 

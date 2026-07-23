@@ -170,5 +170,45 @@ Where things stand:
 - Notification agent — email or Telegram alert at checkpoints and on completion
 - Analytics feedback loop — 7-day post-publish YouTube Analytics → fed back into ResearchAgent competitive intelligence
 
+## This Session — Brand Color System, Script Comparisons, Shorts Fork
+
+### ⚠️ Possible Duplicate Tooling — Check Before Using
+This session (a separate conversation from the one that built the automation pipeline above) built **`generate_images_review.py`** — a Gemini-vision image QA agent, parsing the same `image_prompts_one_line_per_prompt*.md` format, flagging style drift / baked-in text / corruption / content mismatch, and explicitly routing any prompt naming an Indian state to `generate_india_map.py` rather than trying to vision-check map accuracy (a vision reviewer has the same geographic blind spot as the generator). **This looks like it overlaps with `review_images.py`** (Claude Haiku vision, 8-check rubric) documented above as already built and used successfully on ep01's 90 images. The two were built in different conversations without awareness of each other. Before running either again: compare the two, pick one, and retire the other — don't maintain both.
+
+### Brand Color System (brand.json)
+- **Problem found:** both stitch scripts hardcoded `color=0xFAF7F2` (That's Why's warm white) in every ffmpeg pad/letterbox filter — including in `stitch_video_longform.py`, where it's simply wrong for Interested Indian's actual visual identity. Also a **latent bug in `stitch_video_complete.py`**: since that one script serves both That's Why *and* Aeonium Glow, any Aeonium Glow clip needing letterbox padding would silently get cream bars instead of its actual dark background — hadn't surfaced yet only because no asset so far happened to mismatch the output aspect ratio exactly.
+- **Fix:** both scripts gained `load_pad_color(project_dir, default_hex)` + `normalize_hex_for_ffmpeg()` helpers. Looks for `{project}/brand.json` (long-form also checks `{project}/../brand.json` as a channel-level fallback, matching the sibling-repo layout). Format: `{"pad_color": "#1A2B4C"}` (accepts `#RRGGBB`, `0xRRGGBB`, or bare `RRGGBB`). Falls back to the old hardcoded value if no `brand.json` is found — verified zero behavior change for any project that doesn't have one yet.
+- Both scripts now print the active pad color (and flag explicitly when it's the fallback default) at the top of every stitch run.
+- **Three brand.json files finalized and delivered:**
+  - Aeonium Glow → `#1C1C1A`
+  - That's Why → `#FAF7F2`
+  - **Interested Indian → `#1A2B4C` (deep navy) — finalized this session.** Rejected `#1C1C1C` charcoal (the placeholder color already silently baked into `generate_india_map.py`) because it's visually indistinguishable from Aeonium Glow's `#1C1C1A` — would've made two channels look the same. Navy chosen instead for distinctiveness + fits the analytical/geopolitics tone.
+  - `generate_india_map.py`'s `BACKGROUND` constant updated from `#1C1C1C` → `#1A2B4C` to match; re-verified the Karnataka test render looks correct against the new navy background.
+- **To do:** drop `brand.json` (pad_color `#1A2B4C`) into `ep01/` or once at `interested_indian_pipeline/brand.json` (channel root) so every episode picks it up via the parent-fallback check.
+
+### Long-form vs Shorts Stitch Script — Full Comparison
+Beyond the obvious 1920×1080 vs 1080×1920 resolution split, `stitch_video_longform.py` and `stitch_video_complete.py` differ in several *intentional* ways that should NOT be unified:
+- **CTA architecture is fundamentally different, not just resized.** Shorts overlays the CTA card onto the *last manifest scene's own audio* (zero added runtime — matters for Shorts completion-rate algorithm); long-form appends a whole separate `SCENE-CTA` pseudo-scene with its own shared audio/image from `{project}/../common/cta/` (a few extra seconds is negligible on a 10+ min video). Shorts auto-generates its CTA card via `generate_cta_card.py` from manifest fields; long-form expects the shared assets pre-made. Don't port either approach onto the other format.
+- **Mascot overlay exists only in long-form** (`mascot_config.json`, `apply_mascot_overlay`) — genuinely Interested-Indian-specific (its stick-figure mascot), not something Aeonium Glow/That's Why need.
+- **Captions use two different systems**, not just different styling: long-form burns plain SRT bottom-third subtitles inline in the same file; Shorts imports an external `burn_captions.py` (presumably karaoke/ASS word-highlight style, per long-form's own docstring noting "not karaoke ASS"). Correct for each format — long essay vs punchy short-form.
+- **BGM volume: 0.08 (long-form) vs 0.10 (Shorts)** — deliberate, quieter under sustained narration.
+- **Path resolution:** long-form wraps the relative path in `os.path.normpath()` — needed for the `..\..\interested_indian_pipeline\ep01` sibling-repo traversal; Shorts doesn't need this since its projects are flat subfolders.
+- **Only bug found (not a format difference):** the hardcoded pad color — now fixed via brand.json above.
+
+### Scene Splitter — auto_split_scenes.py vs auto_split_scenes_v1_stage3_export.py
+Confirmed **safe to switch Shorts over to the stage3_export version** — it's a strict superset for `--video-type ShortVideo` (the default in both files):
+- Every audio-processing function (`transcribe_with_timestamps`, `split_into_sentences`, `split_long_sentence`, `build_scenes`, `cut_audio_clip`) is byte-identical between the two.
+- The only two changes are additive: `group_scenes_by_timing` gained a configurable `--fragment-max-seconds` (only runs in `LongVideo` mode — no-op for Shorts' default `ShortVideo` mode), and a new Step 6 writes `{project}/timestamped_script.txt` alongside `manifest.json` (inert unless you use it — `stitch_video.py` never reads it).
+- In `ShortVideo` mode specifically, both scripts produce identical `manifest.json`, identical audio clips, identical terminal output.
+- Worth knowing: if a Short ever uses a numbered-list format ("Sign 1... Sign 2..."), both scripts' docstrings already recommend `--video-type LongVideo` for it — and `--fragment-max-seconds`' 2.5s default was written with exactly that Aeonium Glow label+explanation format in mind, so it's arguably more directly useful there than for long-form.
+
+### generate_source_audio.py — Confirmed Long-Form Only + New Shorts Fork
+- Clarified: `generate_source_audio.py` is used for the ~10-min long-form narration only.
+- Compared against a raw `edge-tts --text "..." --write-media narration.wav` CLI test (used for an Aeonium Glow succulent-watering Short). Found: (1) the script had **no `--rate`/`--pitch`/`--volume` support at all** — couldn't replicate the CLI test's `--rate=-10%`; (2) `--write-media narration.wav` is a mislabeled file — edge-tts always returns mp3-encoded bytes regardless of the extension given, so that "wav" file is actually mp3 data; usually harmless since most tools sniff content, but a landmine for anything trusting the extension.
+- **`generate_source_audio_shorts.py` created** as a dedicated Shorts fork (not just a flag added to the long-form script): same `--project`/`--script`/`--preview`/`--list-voices` interface, now with `--rate`/`--pitch`/`--volume` exposed, and its "next step" hint corrected to `--video-type ShortVideo` (the long-form version hardcoded `LongVideo`, which would've been wrong advice for a Short). `generate_source_audio.py` itself was left untouched — no risk to the long-form pipeline.
+- Example Shorts usage: `python generate_source_audio_shorts.py --project aeonium-glow/succulent-watering --script succulent_watering_script.txt --voice en-US-JennyNeural --rate=-10% --out narration.mp3`
+
 ## Notes / Decisions
 - (add anything that changes scope, tone, or topic here as we go)
+
+

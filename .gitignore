@@ -16,8 +16,12 @@
 */output/*
 !*/output/.gitkeep
 
-# Secrets
+# Secrets / credentials — never commit these
 .env
+Youtube_Interested_Indian_Upload.json
+*_Upload.json
+google_credentials*.json
+token.json
 
 # BGM / audio assets (large media — store separately)
 bgm.mp3

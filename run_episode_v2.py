@@ -47,14 +47,17 @@ def show_status(project_dir: Path):
     completed = state.get("completed", [])
     current   = state.get("stage", "topics")
     labels = {
-        "topics":   "Stage 1  — Topic Ideas",
-        "script":   "Stage 2  — Narration Script",
-        "voice":    "Stage 3a — Voice Generation",
-        "split":    "Stage 3b — Scene Splitting",
-        "prompts":  "Stage 3c — Image Prompts",
-        "images":   "Stage 3d — Image Generation",
-        "stitch":   "Stage 4  — Video Stitch",
-        "metadata": "Stage 5  — YouTube Metadata",
+        "topics":    "Stage 1  — Topic Ideas",
+        "script":    "Stage 2  — Narration Script",
+        "voice":     "Stage 3a — Voice Generation",
+        "split":     "Stage 3b — Scene Splitting",
+        "prompts":   "Stage 3c — Image Prompts",
+        "images":    "Stage 3d — Image Generation",
+        "stitch":    "Stage 4  — Video Stitch",
+        "metadata":  "Stage 5  — YouTube Metadata",
+        "thumbnail": "Stage 6  — Thumbnail",
+        "chapters":  "Stage 7  — Chapter Timestamps",
+        "upload":    "Stage 8  — YouTube Upload",
     }
     print(f"\n  Status: {project_dir.name}")
     print(f"  {'─'*40}")
