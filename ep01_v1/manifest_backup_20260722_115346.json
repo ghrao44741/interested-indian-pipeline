@@ -1,0 +1,1078 @@
+{
+  "episode": "ep01",
+  "title": "Untitled Episode",
+  "voice": "en-US-JennyNeural",
+  "word_segments_file": "source_audio/narration_words.json",
+  "scenes": [
+    {
+      "id": "SCENE-001",
+      "image": "images/SCENE-001.png",
+      "audio": "audio/SCENE-001.mp3",
+      "script": "Karnataka contributes nearly 9% of India's GDP with about 5% of its population.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 0.131,
+      "whisperx_end": 6.097
+    },
+    {
+      "id": "SCENE-002",
+      "image": "images/SCENE-002.png",
+      "audio": "audio/SCENE-002.mp3",
+      "script": "For every rupee it sends to the union government in taxes, it gets back roughly 15 pace.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 6.578,
+      "whisperx_end": 11.863
+    },
+    {
+      "id": "SCENE-003",
+      "image": "images/SCENE-003.png",
+      "audio": "audio/SCENE-003.mp3",
+      "script": "Tamil Nadu, Kerala, Telangana, and Andhra Pradesh face versions of the same arithmetic.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 12.384,
+      "whisperx_end": 17.93
+    },
+    {
+      "id": "SCENE-004",
+      "image": "images/SCENE-004.png",
+      "audio": "audio/SCENE-004.mp3",
+      "script": "The states doing the most economically are the ones losing the most fiscally.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 18.39,
+      "whisperx_end": 22.475
+    },
+    {
+      "id": "SCENE-005",
+      "image": "images/SCENE-005.png",
+      "audio": "audio/SCENE-005.mp3",
+      "script": "That is not an accident of geography.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-01",
+      "whisperx_start": 22.875,
+      "whisperx_end": 24.656
+    },
+    {
+      "id": "SCENE-006",
+      "image": "images/SCENE-006.png",
+      "audio": "audio/SCENE-006.mp3",
+      "script": "It is the output of a formula.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-01",
+      "whisperx_start": 25.116,
+      "whisperx_end": 26.597
+    },
+    {
+      "id": "SCENE-007",
+      "image": "images/SCENE-007.png",
+      "audio": "audio/SCENE-007.mp3",
+      "script": "To understand why, you have to start with Article 280 of the Constitution.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-01",
+      "whisperx_start": 27.037,
+      "whisperx_end": 31.239
+    },
+    {
+      "id": "SCENE-008",
+      "image": "images/SCENE-008.png",
+      "audio": "audio/SCENE-008.mp3",
+      "script": "It created the Finance Commission, a body reconstituted every five years to decide how the union government splits its tax revenue with the states.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 31.719,
+      "whisperx_end": 40.203
+    },
+    {
+      "id": "SCENE-009",
+      "image": "images/SCENE-009.png",
+      "audio": "audio/SCENE-009.mp3",
+      "script": "This is not a courtesy.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-02",
+      "whisperx_start": 40.743,
+      "whisperx_end": 41.724
+    },
+    {
+      "id": "SCENE-010",
+      "image": "images/SCENE-010.png",
+      "audio": "audio/SCENE-010.mp3",
+      "script": "It is a structural necessity.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-02",
+      "whisperx_start": 42.184,
+      "whisperx_end": 43.545
+    },
+    {
+      "id": "SCENE-011",
+      "image": "images/SCENE-011.png",
+      "audio": "audio/SCENE-011.mp3",
+      "script": "Under India's constitutional design, the union collects the bulk of major taxes, income tax, corporation tax, GST.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-02",
+      "whisperx_start": 44.026,
+      "whisperx_end": 51.992
+    },
+    {
+      "id": "SCENE-012",
+      "image": "images/SCENE-012.png",
+      "audio": "audio/SCENE-012.mp3",
+      "script": "States carry most of the spending responsibility, health, education, policing, rural infrastructure.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 52.472,
+      "whisperx_end": 58.757
+    },
+    {
+      "id": "SCENE-013",
+      "image": "images/SCENE-013.png",
+      "audio": "audio/SCENE-013.mp3",
+      "script": "Someone has to bridge that gap.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-03",
+      "whisperx_start": 59.258,
+      "whisperx_end": 60.659
+    },
+    {
+      "id": "SCENE-014",
+      "image": "images/SCENE-014.png",
+      "audio": "audio/SCENE-014.mp3",
+      "script": "The Finance Commission is that bridge.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-03",
+      "whisperx_start": 61.099,
+      "whisperx_end": 62.801
+    },
+    {
+      "id": "SCENE-015",
+      "image": "images/SCENE-015.png",
+      "audio": "audio/SCENE-015.mp3",
+      "script": "Every commission answers two questions.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-03",
+      "whisperx_start": 63.361,
+      "whisperx_end": 65.303
+    },
+    {
+      "id": "SCENE-016",
+      "image": "images/SCENE-016.png",
+      "audio": "audio/SCENE-016.mp3",
+      "script": "First, how much of the shared tax pool goes to states as a whole, the vertical share.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-03",
+      "whisperx_start": 65.883,
+      "whisperx_end": 70.387
+    },
+    {
+      "id": "SCENE-017",
+      "image": "images/SCENE-017.png",
+      "audio": "audio/SCENE-017.mp3",
+      "script": "Second, how that pool is split between individual states, the horizontal share.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 70.927,
+      "whisperx_end": 75.611
+    },
+    {
+      "id": "SCENE-018",
+      "image": "images/SCENE-018.png",
+      "audio": "audio/SCENE-018.mp3",
+      "script": "The first question is about the union versus the states.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 76.091,
+      "whisperx_end": 78.834
+    },
+    {
+      "id": "SCENE-019",
+      "image": "images/SCENE-019.png",
+      "audio": "audio/SCENE-019.mp3",
+      "script": "The second is about states versus each other.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-04",
+      "whisperx_start": 79.374,
+      "whisperx_end": 81.576
+    },
+    {
+      "id": "SCENE-020",
+      "image": "images/SCENE-020.png",
+      "audio": "audio/SCENE-020.mp3",
+      "script": "And it's the second question that produces the paradox playing out in Bengaluru, Chennai, and Thiruvananthapuram right now.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-04",
+      "whisperx_start": 82.076,
+      "whisperx_end": 88.662
+    },
+    {
+      "id": "SCENE-021",
+      "image": "images/SCENE-021.png",
+      "audio": "audio/SCENE-021.mp3",
+      "script": "The 14th Finance Commission, submitted in 2015, set the vertical share at 42%, the highest it had ever been.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 89.162,
+      "whisperx_end": 97.113
+    },
+    {
+      "id": "SCENE-022",
+      "image": "images/SCENE-022.png",
+      "audio": "audio/SCENE-022.mp3",
+      "script": "States cheered, but the horizontal formula behind that pool was already shifting in a direction the southern states would come to regret.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 97.613,
+      "whisperx_end": 104.862
+    },
+    {
+      "id": "SCENE-023",
+      "image": "images/SCENE-023.png",
+      "audio": "audio/SCENE-023.mp3",
+      "script": "The 15th Finance Commission, covering 2021 to 2026, brought that shift into sharp focus.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 105.323,
+      "whisperx_end": 111.806
+    },
+    {
+      "id": "SCENE-024",
+      "image": "images/SCENE-024.png",
+      "audio": "audio/SCENE-024.mp3",
+      "script": "It lowered the vertical share slightly to 41%.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 112.386,
+      "whisperx_end": 115.687
+    },
+    {
+      "id": "SCENE-025",
+      "image": "images/SCENE-025.png",
+      "audio": "audio/SCENE-025.mp3",
+      "script": "More consequentially, it changed how population was counted.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 116.167,
+      "whisperx_end": 119.269
+    },
+    {
+      "id": "SCENE-026",
+      "image": "images/SCENE-026.png",
+      "audio": "audio/SCENE-026.mp3",
+      "script": "Every finance commission needs a population figure to help decide who needs more money.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 119.749,
+      "whisperx_end": 124.471
+    },
+    {
+      "id": "SCENE-027",
+      "image": "images/SCENE-027.png",
+      "audio": "audio/SCENE-027.mp3",
+      "script": "For decades, that figure came from the 1971 census, frozen deliberately.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 124.951,
+      "whisperx_end": 129.973
+    },
+    {
+      "id": "SCENE-028",
+      "image": "images/SCENE-028.png",
+      "audio": "audio/SCENE-028.mp3",
+      "script": "Why freeze it?",
+      "scene_type": "grouped",
+      "visual_group_id": "group-05",
+      "whisperx_start": 130.433,
+      "whisperx_end": 131.014
+    },
+    {
+      "id": "SCENE-029",
+      "image": "images/SCENE-029.png",
+      "audio": "audio/SCENE-029.mp3",
+      "script": "Because using a current census would reward states with high birth rates and effectively find states that had successfully brought population growth under control.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-05",
+      "whisperx_start": 131.454,
+      "whisperx_end": 140.202
+    },
+    {
+      "id": "SCENE-030",
+      "image": "images/SCENE-030.png",
+      "audio": "audio/SCENE-030.mp3",
+      "script": "Kerala, Tamil Nadu, and Karnataka had done exactly that.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 140.642,
+      "whisperx_end": 144.126
+    },
+    {
+      "id": "SCENE-031",
+      "image": "images/SCENE-031.png",
+      "audio": "audio/SCENE-031.mp3",
+      "script": "Starting in the 1970s, these states ran aggressive family planning programs, decades before the rest of the country followed.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 144.686,
+      "whisperx_end": 151.813
+    },
+    {
+      "id": "SCENE-032",
+      "image": "images/SCENE-032.png",
+      "audio": "audio/SCENE-032.mp3",
+      "script": "By the 2000s, their fertility rates had dropped near or below replacement level.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 152.233,
+      "whisperx_end": 156.615
+    },
+    {
+      "id": "SCENE-033",
+      "image": "images/SCENE-033.png",
+      "audio": "audio/SCENE-033.mp3",
+      "script": "Uttar Pradesh and Bihar had not made the same progress.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 157.135,
+      "whisperx_end": 160.057
+    },
+    {
+      "id": "SCENE-034",
+      "image": "images/SCENE-034.png",
+      "audio": "audio/SCENE-034.mp3",
+      "script": "The 15th Finance Commission was told, under its terms of reference, to use the 2011 census instead of the 1971 figures.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 160.597,
+      "whisperx_end": 169.181
+    },
+    {
+      "id": "SCENE-035",
+      "image": "images/SCENE-035.png",
+      "audio": "audio/SCENE-035.mp3",
+      "script": "That single instruction, buried in a government notification, is the mechanism behind the entire dispute.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 169.742,
+      "whisperx_end": 176.185
+    },
+    {
+      "id": "SCENE-036",
+      "image": "images/SCENE-036.png",
+      "audio": "audio/SCENE-036.mp3",
+      "script": "Once 2011 population data entered the formula, states with larger, faster-growing populations gained share.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 176.805,
+      "whisperx_end": 183.531
+    },
+    {
+      "id": "SCENE-037",
+      "image": "images/SCENE-037.png",
+      "audio": "audio/SCENE-037.mp3",
+      "script": "States that had spent 40 years suppressing their birth rates lost it.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 184.051,
+      "whisperx_end": 187.374
+    },
+    {
+      "id": "SCENE-038",
+      "image": "images/SCENE-038.png",
+      "audio": "audio/SCENE-038.mp3",
+      "script": "The numbers make the mechanism concrete.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-06",
+      "whisperx_start": 187.815,
+      "whisperx_end": 189.696
+    },
+    {
+      "id": "SCENE-039",
+      "image": "images/SCENE-039.png",
+      "audio": "audio/SCENE-039.mp3",
+      "script": "Under the 14th Finance Commission, Karnataka's share of the divisible tax pool was 4.713%.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-06",
+      "whisperx_start": 190.177,
+      "whisperx_end": 195.101
+    },
+    {
+      "id": "SCENE-040",
+      "image": "images/SCENE-040.png",
+      "audio": "audio/SCENE-040.mp3",
+      "script": "Under the 15th, it fell to 3.647%.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-07",
+      "whisperx_start": 195.241,
+      "whisperx_end": 196.322
+    },
+    {
+      "id": "SCENE-041",
+      "image": "images/SCENE-041.png",
+      "audio": "audio/SCENE-041.mp3",
+      "script": "That is a drop of roughly 23% in the state's allocation,",
+      "scene_type": "grouped",
+      "visual_group_id": "group-07",
+      "whisperx_start": 201.086,
+      "whisperx_end": 204.708
+    },
+    {
+      "id": "SCENE-042",
+      "image": "images/SCENE-042.png",
+      "audio": "audio/SCENE-042.mp3",
+      "script": "translating into a cumulative shortfall state officials have put above 80,000 crore rupees across the award period.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 205.128,
+      "whisperx_end": 212.092
+    },
+    {
+      "id": "SCENE-043",
+      "image": "images/SCENE-043.png",
+      "audio": "audio/SCENE-043.mp3",
+      "script": "Kerala lost roughly a quarter of a percentage point of the pool as well, a smaller sounding number that still runs into thousands of crores annually.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 212.552,
+      "whisperx_end": 220.717
+    },
+    {
+      "id": "SCENE-044",
+      "image": "images/SCENE-044.png",
+      "audio": "audio/SCENE-044.mp3",
+      "script": "Uttar Pradesh, by contrast, retained the largest single share of any state,",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 221.197,
+      "whisperx_end": 226.159
+    },
+    {
+      "id": "SCENE-045",
+      "image": "images/SCENE-045.png",
+      "audio": "audio/SCENE-045.mp3",
+      "script": "at nearly 18 percent, and Bihar's allocation continued to rank second nationally in absolute terms.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 226.52,
+      "whisperx_end": 232.662
+    },
+    {
+      "id": "SCENE-046",
+      "image": "images/SCENE-046.png",
+      "audio": "audio/SCENE-046.mp3",
+      "script": "Why did southern states lose out specifically?",
+      "scene_type": "grouped",
+      "visual_group_id": "group-08",
+      "whisperx_start": 233.303,
+      "whisperx_end": 235.304
+    },
+    {
+      "id": "SCENE-047",
+      "image": "images/SCENE-047.png",
+      "audio": "audio/SCENE-047.mp3",
+      "script": "The formula the 15th Commission used weighted several factors together.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-08",
+      "whisperx_start": 235.724,
+      "whisperx_end": 239.666
+    },
+    {
+      "id": "SCENE-048",
+      "image": "images/SCENE-048.png",
+      "audio": "audio/SCENE-048.mp3",
+      "script": "Population at 15 percent.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-09",
+      "whisperx_start": 240.146,
+      "whisperx_end": 241.987
+    },
+    {
+      "id": "SCENE-049",
+      "image": "images/SCENE-049.png",
+      "audio": "audio/SCENE-049.mp3",
+      "script": "Area at 15 percent.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-09",
+      "whisperx_start": 242.487,
+      "whisperx_end": 243.548
+    },
+    {
+      "id": "SCENE-050",
+      "image": "images/SCENE-050.png",
+      "audio": "audio/SCENE-050.mp3",
+      "script": "Forest and ecology cover at 10%.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-09",
+      "whisperx_start": 244.508,
+      "whisperx_end": 246.91
+    },
+    {
+      "id": "SCENE-051",
+      "image": "images/SCENE-051.png",
+      "audio": "audio/SCENE-051.mp3",
+      "script": "Income distance at 45%, meant to give more to states with lower per capita income relative to the richest state.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-09",
+      "whisperx_start": 247.43,
+      "whisperx_end": 254.256
+    },
+    {
+      "id": "SCENE-052",
+      "image": "images/SCENE-052.png",
+      "audio": "audio/SCENE-052.mp3",
+      "script": "Demographic performance at 12.5%, meant to reward states with lower fertility rates, intended as a partial correction for the population shift.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 254.716,
+      "whisperx_end": 263.623
+    },
+    {
+      "id": "SCENE-053",
+      "image": "images/SCENE-053.png",
+      "audio": "audio/SCENE-053.mp3",
+      "script": "tax and fiscal effort at 2.5%.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 264.083,
+      "whisperx_end": 266.864
+    },
+    {
+      "id": "SCENE-054",
+      "image": "images/SCENE-054.png",
+      "audio": "audio/SCENE-054.mp3",
+      "script": "On paper, the Demographic Performance Criterion looks like it should have protected the southern states.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 267.384,
+      "whisperx_end": 272.305
+    },
+    {
+      "id": "SCENE-055",
+      "image": "images/SCENE-055.png",
+      "audio": "audio/SCENE-055.mp3",
+      "script": "In practice, its weight was too small to offset the switch to 2011 population data and the Income Distance Criterion, the largest single factor,",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 272.885,
+      "whisperx_end": 282.027
+    },
+    {
+      "id": "SCENE-056",
+      "image": "images/SCENE-056.png",
+      "audio": "audio/SCENE-056.mp3",
+      "script": "worked against states like Karnataka and Tamil Nadu precisely because their higher per capita income made them look less in need of support under the formula's own logic.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 282.408,
+      "whisperx_end": 291.69
+    },
+    {
+      "id": "SCENE-057",
+      "image": "images/SCENE-057.png",
+      "audio": "audio/SCENE-057.mp3",
+      "script": "A state can generate more GST, house more corporate headquarters, and post stronger growth, and still come out behind in this calculation,",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 292.19,
+      "whisperx_end": 300.272
+    },
+    {
+      "id": "SCENE-058",
+      "image": "images/SCENE-058.png",
+      "audio": "audio/SCENE-058.mp3",
+      "script": "because the formula treats income level as evidence of lower need rather than evidence of contribution.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 300.612,
+      "whisperx_end": 306.394
+    },
+    {
+      "id": "SCENE-059",
+      "image": "images/SCENE-059.png",
+      "audio": "audio/SCENE-059.mp3",
+      "script": "This is where the political reaction becomes explainable rather than just loud.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 306.834,
+      "whisperx_end": 310.755
+    },
+    {
+      "id": "SCENE-060",
+      "image": "images/SCENE-060.png",
+      "audio": "audio/SCENE-060.mp3",
+      "script": "In 2024, the Chief Ministers of Karnataka, Kerala, Tamil Nadu, and Telangana appeared together in Delhi to protest the devolution formula,",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 311.255,
+      "whisperx_end": 320.437
+    },
+    {
+      "id": "SCENE-061",
+      "image": "images/SCENE-061.png",
+      "audio": "audio/SCENE-061.mp3",
+      "script": "an unusual show of coordinated action across states governed by different parties.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 320.857,
+      "whisperx_end": 325.259
+    },
+    {
+      "id": "SCENE-062",
+      "image": "images/SCENE-062.png",
+      "audio": "audio/SCENE-062.mp3",
+      "script": "Karnataka's Chief Minister, Siddharma Yaa, has repeatedly cited the 15-pays figure in public forums,",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 325.799,
+      "whisperx_end": 331.86
+    },
+    {
+      "id": "SCENE-063",
+      "image": "images/SCENE-063.png",
+      "audio": "audio/SCENE-063.mp3",
+      "script": "framing it not as an abstract fiscal grievance, but as a direct penalty for responsible governance.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 332.3,
+      "whisperx_end": 337.922
+    },
+    {
+      "id": "SCENE-064",
+      "image": "images/SCENE-064.png",
+      "audio": "audio/SCENE-064.mp3",
+      "script": "Kerala's former finance minister, Thomas Isaac, made a similar argument years earlier, when the shift to 2011 population data was first proposed,",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 338.462,
+      "whisperx_end": 347.506
+    },
+    {
+      "id": "SCENE-065",
+      "image": "images/SCENE-065.png",
+      "audio": "audio/SCENE-065.mp3",
+      "script": "warning that it would punish exactly the states that had done what national population policy asked of them.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 347.907,
+      "whisperx_end": 353.289
+    },
+    {
+      "id": "SCENE-066",
+      "image": "images/SCENE-066.png",
+      "audio": "audio/SCENE-066.mp3",
+      "script": "The union government's counter-argument follows constitutional logic rather than political convenience.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 353.689,
+      "whisperx_end": 358.972
+    },
+    {
+      "id": "SCENE-067",
+      "image": "images/SCENE-067.png",
+      "audio": "audio/SCENE-067.mp3",
+      "script": "The Finance Commission's mandate is not to reward efficient states.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 359.512,
+      "whisperx_end": 362.933
+    },
+    {
+      "id": "SCENE-068",
+      "image": "images/SCENE-068.png",
+      "audio": "audio/SCENE-068.mp3",
+      "script": "It is to equalize fiscal capacity across a union with enormous income disparities between states.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 363.514,
+      "whisperx_end": 369.356
+    },
+    {
+      "id": "SCENE-069",
+      "image": "images/SCENE-069.png",
+      "audio": "audio/SCENE-069.mp3",
+      "script": "Uttar Pradesh's per capita income is a fraction of Karnataka's.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 369.936,
+      "whisperx_end": 373.357
+    },
+    {
+      "id": "SCENE-070",
+      "image": "images/SCENE-070.png",
+      "audio": "audio/SCENE-070.mp3",
+      "script": "Bihar's is lower still.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-10",
+      "whisperx_start": 373.858,
+      "whisperx_end": 374.958
+    },
+    {
+      "id": "SCENE-071",
+      "image": "images/SCENE-071.png",
+      "audio": "audio/SCENE-071.mp3",
+      "script": "If devolution followed contribution rather than need, poorer states would fall further behind, and the union would stop functioning as a union in any meaningful sense.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-10",
+      "whisperx_start": 375.478,
+      "whisperx_end": 385.182
+    },
+    {
+      "id": "SCENE-072",
+      "image": "images/SCENE-072.png",
+      "audio": "audio/SCENE-072.mp3",
+      "script": "Both positions are internally consistent.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-11",
+      "whisperx_start": 385.742,
+      "whisperx_end": 387.843
+    },
+    {
+      "id": "SCENE-073",
+      "image": "images/SCENE-073.png",
+      "audio": "audio/SCENE-073.mp3",
+      "script": "They are simply optimizing for different things, one for reward, one for redistribution, and the formula can only pick one weighting at a time.",
+      "scene_type": "grouped",
+      "visual_group_id": "group-11",
+      "whisperx_start": 388.283,
+      "whisperx_end": 396.607
+    },
+    {
+      "id": "SCENE-074",
+      "image": "images/SCENE-074.png",
+      "audio": "audio/SCENE-074.mp3",
+      "script": "There's a second layer to this that rarely makes it into the political rhetoric.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 397.047,
+      "whisperx_end": 400.848
+    },
+    {
+      "id": "SCENE-075",
+      "image": "images/SCENE-075.png",
+      "audio": "audio/SCENE-075.mp3",
+      "script": "Devolution isn't the only channel of transfer.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 401.349,
+      "whisperx_end": 403.91
+    },
+    {
+      "id": "SCENE-076",
+      "image": "images/SCENE-076.png",
+      "audio": "audio/SCENE-076.mp3",
+      "script": "The union also distributes centrally sponsored schemes, discretionary grants, and disaster and revenue deficit grants,",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 404.39,
+      "whisperx_end": 411.673
+    },
+    {
+      "id": "SCENE-077",
+      "image": "images/SCENE-077.png",
+      "audio": "audio/SCENE-077.mp3",
+      "script": "and those channels operate under separate, less transparent rules.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 412.133,
+      "whisperx_end": 415.435
+    },
+    {
+      "id": "SCENE-078",
+      "image": "images/SCENE-078.png",
+      "audio": "audio/SCENE-078.mp3",
+      "script": "A state can lose share in the formal finance commission formula and still receive compensating amounts through other routes,",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 416.015,
+      "whisperx_end": 422.48
+    },
+    {
+      "id": "SCENE-079",
+      "image": "images/SCENE-079.png",
+      "audio": "audio/SCENE-079.mp3",
+      "script": "which is part of why the union describes the net picture as more balanced than the raw devolution percentages suggest,",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 422.88,
+      "whisperx_end": 429.105
+    },
+    {
+      "id": "SCENE-080",
+      "image": "images/SCENE-080.png",
+      "audio": "audio/SCENE-080.mp3",
+      "script": "while state governments describe those other channels as unpredictable and politically discretionary rather than a stable entitlement they can plan a budget around.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 429.466,
+      "whisperx_end": 438.233
+    },
+    {
+      "id": "SCENE-081",
+      "image": "images/SCENE-081.png",
+      "audio": "audio/SCENE-081.mp3",
+      "script": "The introduction of GST in 2017 added a further complication.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 438.813,
+      "whisperx_end": 443.655
+    },
+    {
+      "id": "SCENE-082",
+      "image": "images/SCENE-082.png",
+      "audio": "audio/SCENE-082.mp3",
+      "script": "Before GST, states had independent power to set and collect certain taxes.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 444.075,
+      "whisperx_end": 448.897
+    },
+    {
+      "id": "SCENE-083",
+      "image": "images/SCENE-083.png",
+      "audio": "audio/SCENE-083.mp3",
+      "script": "GST folded most of that into a single national pool, administered jointly but collected centrally,",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 449.477,
+      "whisperx_end": 455.96
+    },
+    {
+      "id": "SCENE-084",
+      "image": "images/SCENE-084.png",
+      "audio": "audio/SCENE-084.mp3",
+      "script": "then redistributed through the GST Council rather than the Finance Commission.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 456.38,
+      "whisperx_end": 460.342
+    },
+    {
+      "id": "SCENE-085",
+      "image": "images/SCENE-085.png",
+      "audio": "audio/SCENE-085.mp3",
+      "script": "States gave up fiscal autonomy in exchange for a promised compensation mechanism, guaranteed for five years, which expired in 2022.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 460.842,
+      "whisperx_end": 468.984
+    },
+    {
+      "id": "SCENE-086",
+      "image": "images/SCENE-086.png",
+      "audio": "audio/SCENE-086.mp3",
+      "script": "Southern states, again disproportionately consumption and services heavy in their tax base,",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 469.524,
+      "whisperx_end": 474.705
+    },
+    {
+      "id": "SCENE-087",
+      "image": "images/SCENE-087.png",
+      "audio": "audio/SCENE-087.mp3",
+      "script": "argue that the post-compensation GST regime compounds the same devolution problem,",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 475.245,
+      "whisperx_end": 479.987
+    },
+    {
+      "id": "SCENE-088",
+      "image": "images/SCENE-088.png",
+      "audio": "audio/SCENE-088.mp3",
+      "script": "reducing their independent revenue tools just as the Finance Commission formula was already working against them.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 480.367,
+      "whisperx_end": 486.028
+    },
+    {
+      "id": "SCENE-089",
+      "image": "images/SCENE-089.png",
+      "audio": "audio/SCENE-089.mp3",
+      "script": "The 16th Finance Commission, constituted in November 2023 under the chairmanship of Irvin Panagria,",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 486.468,
+      "whisperx_end": 493.093
+    },
+    {
+      "id": "SCENE-090",
+      "image": "images/SCENE-090.png",
+      "audio": "audio/SCENE-090.mp3",
+      "script": "is now working through the same tensions for the award period beginning April 2026.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 493.513,
+      "whisperx_end": 498.557
+    },
+    {
+      "id": "SCENE-091",
+      "image": "images/SCENE-091.png",
+      "audio": "audio/SCENE-091.mp3",
+      "script": "Early indications suggest the vertical share will again be held near 41% and several states, including Karnataka,",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 499.137,
+      "whisperx_end": 506.563
+    },
+    {
+      "id": "SCENE-092",
+      "image": "images/SCENE-092.png",
+      "audio": "audio/SCENE-092.mp3",
+      "script": "have submitted formal proposals asking for the income distance waiting to be reduced",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 506.843,
+      "whisperx_end": 511.266
+    },
+    {
+      "id": "SCENE-093",
+      "image": "images/SCENE-093.png",
+      "audio": "audio/SCENE-093.mp3",
+      "script": "and replaced with a criterion based on each state's direct contribution to national GDP.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 511.606,
+      "whisperx_end": 516.91
+    },
+    {
+      "id": "SCENE-094",
+      "image": "images/SCENE-094.png",
+      "audio": "audio/SCENE-094.mp3",
+      "script": "Preliminary estimates already show Karnataka's inter-SE share moving upward again, from 3.647% to just over 4%.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 517.35,
+      "whisperx_end": 524.155
+    },
+    {
+      "id": "SCENE-095",
+      "image": "images/SCENE-095.png",
+      "audio": "audio/SCENE-095.mp3",
+      "script": "though still below its 14th Commission level, suggesting the formula is drifting back toward the states it took share away from without fully reversing course.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 526.737,
+      "whisperx_end": 535.66
+    },
+    {
+      "id": "SCENE-096",
+      "image": "images/SCENE-096.png",
+      "audio": "audio/SCENE-096.mp3",
+      "script": "What this dispute really exposes isn't a flaw in the Finance Commission.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 536.22,
+      "whisperx_end": 540.222
+    },
+    {
+      "id": "SCENE-097",
+      "image": "images/SCENE-097.png",
+      "audio": "audio/SCENE-097.mp3",
+      "script": "It's the underlying tension the Constitution built in on purpose.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 540.682,
+      "whisperx_end": 544.103
+    },
+    {
+      "id": "SCENE-098",
+      "image": "images/SCENE-098.png",
+      "audio": "audio/SCENE-098.mp3",
+      "script": "A single national tax pool distributed by formula will always create winners and losers,",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 544.683,
+      "whisperx_end": 550.647
+    },
+    {
+      "id": "SCENE-099",
+      "image": "images/SCENE-099.png",
+      "audio": "audio/SCENE-099.mp3",
+      "script": "because no formula can simultaneously reward economic performance and correct for economic inequality.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 551.047,
+      "whisperx_end": 557.15
+    },
+    {
+      "id": "SCENE-100",
+      "image": "images/SCENE-100.png",
+      "audio": "audio/SCENE-100.mp3",
+      "script": "Every five years, a new commission sits down, adjusts the weights, and shifts the outcome in one direction or the other.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 557.631,
+      "whisperx_end": 564.555
+    },
+    {
+      "id": "SCENE-101",
+      "image": "images/SCENE-101.png",
+      "audio": "audio/SCENE-101.mp3",
+      "script": "The state's on the losing side of that adjustment change.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 565.035,
+      "whisperx_end": 567.657
+    },
+    {
+      "id": "SCENE-102",
+      "image": "images/SCENE-102.png",
+      "audio": "audio/SCENE-102.mp3",
+      "script": "But the argument itself, contribution versus need, has been running since Article 280 was first drafted.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 568.017,
+      "whisperx_end": 574.361
+    },
+    {
+      "id": "SCENE-103",
+      "image": "images/SCENE-103.png",
+      "audio": "audio/SCENE-103.mp3",
+      "script": "So the paradox from the beginning of this video isn't really a paradox at all.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 574.841,
+      "whisperx_end": 578.564
+    },
+    {
+      "id": "SCENE-104",
+      "image": "images/SCENE-104.png",
+      "audio": "audio/SCENE-104.mp3",
+      "script": "It's the visible output of a formula working exactly as constructed, redistributing revenue away from the states that grew fastest and toward the states that grew slowest,",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 579.024,
+      "whisperx_end": 588.61
+    },
+    {
+      "id": "SCENE-105",
+      "image": "images/SCENE-105.png",
+      "audio": "audio/SCENE-105.mp3",
+      "script": "because growing slower was, in the framework's own terms, defined as needing more.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 588.951,
+      "whisperx_end": 593.574
+    },
+    {
+      "id": "SCENE-106",
+      "image": "images/SCENE-106.png",
+      "audio": "audio/SCENE-106.mp3",
+      "script": "Karnataka's 15 pays on the rupee isn't a bureaucratic error.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 594.054,
+      "whisperx_end": 597.626
+    },
+    {
+      "id": "SCENE-107",
+      "image": "images/SCENE-107.png",
+      "audio": "audio/SCENE-107.mp3",
+      "script": "It's the constitutional bargain of a diverse union, written into a spreadsheet and recalculated every five years.",
+      "scene_type": "standalone",
+      "visual_group_id": null,
+      "whisperx_start": 598.108,
+      "whisperx_end": 604.99
+    }
+  ]
+}
