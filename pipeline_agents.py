@@ -1408,7 +1408,9 @@ class OrchestratorAgent:
     def _stage_thumbnail(self):
         gen = PIPELINE_DIR / "generate_thumbnail.py"
         self._run_cmd(
-            [sys.executable, str(gen), "--project", str(self.project_dir)],
+            [sys.executable, str(gen),
+             "--project", str(self.project_dir),
+             "--theme", "auto"],
             label="generate_thumbnail.py"
         )
         thumb = self.project_dir / "thumbnail.png"
