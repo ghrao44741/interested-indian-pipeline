@@ -1336,7 +1336,8 @@ class OrchestratorAgent:
             [python, str(split),
              "--audio",      audio_path.name,   # filename only — script prepends source_audio/ itself
              "--project",    str(self.project_dir),
-             "--video-type", "LongVideo"],
+             "--video-type", "LongVideo",
+             "--device",     "cpu"],             # venv has CPU-only torch
             cwd=SHORTS_DIR, label=split.name
         )
 
