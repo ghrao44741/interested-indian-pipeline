@@ -1,0 +1,37 @@
+{
+  "_comment": "Central config for The Interested Indian pipeline. Commit this file.",
+
+  "channel": {
+    "name": "The Interested Indian",
+    "handle": "@TheInterestedIndian",
+    "tagline": "India. Explained. Finally."
+  },
+
+  "mascot": {
+    "reference_url": "https://rqkumunldqvmynqxibca.supabase.co/storage/v1/object/public/generated-images/adhoc-1784824975374.png",
+    "reference_local": "mascot_reference.png",
+    "session_id": "d9d31dea-1095-4a70-b57e-9c0de7eaca7b",
+    "description": "Chubby round Indian cartoon mascot, amber round glasses, spiky black hair, warm tan skin, cream kurta, off-white pajama trousers, sandals. 4 expressions: NEUTRAL, SHOCKED, CONFUSED, SMUG.",
+    "locked_date": "2026-07-23"
+  },
+
+  "thumbnail": {
+    "themes": {
+      "auto": "odd episodes = dark, even episodes = light",
+      "dark": "deep navy #0C1828 bg, white text, amber accent",
+      "light": "warm cream #FAF7F2 bg, dark brown text, crimson accent"
+    }
+  },
+
+  "image_pipeline": {
+    "mascot_scenes": "generate_images_aibmm.py (GPT Image 2 + mascot reference)",
+    "map_scenes":    "generate_india_map.py (geopandas — TODO)",
+    "chart_scenes":  "generate_chart.py (matplotlib — TODO)",
+    "photo_scenes":  "search_pexels.py (Pexels API — TODO)"
+  },
+
+  "pexels": {
+    "api_key_env": "PEXELS_API_KEY",
+    "note": "Free API, no watermark, commercial use OK. Get key at pexels.com/api"
+  }
+}
