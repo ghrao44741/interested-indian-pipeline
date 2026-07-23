@@ -21,7 +21,10 @@ from typing import Optional
 import anthropic
 
 try:
-    from duckduckgo_search import DDGS
+    try:
+        from ddgs import DDGS          # new package name (ddgs >= 1.0)
+    except ImportError:
+        from duckduckgo_search import DDGS  # legacy fallback
     SEARCH_AVAILABLE = True
 except ImportError:
     SEARCH_AVAILABLE = False
@@ -30,6 +33,10 @@ except ImportError:
 
 PIPELINE_DIR = Path(__file__).parent
 SHORTS_DIR   = PIPELINE_DIR.parent / "Aeonium_Glow" / "shorts_pipeline2"
+
+# WhisperX lives in a separate venv (heavy ML deps — torch, CUDA).
+# Use its Python for the split stage so the main env stays lightweight.
+WHISPERX_PYTHON = Path(r"C:\Bakcup_Asus\Aeonium_Glow\transcription-tools\.venv\Scripts\python.exe")
 
 BANNED_WORDS = [
     "unleash", "unlock", "dive into", "delve into", "game-changer", "game changer",
@@ -1218,15 +1225,20 @@ class OrchestratorAgent:
         gen_audio = PIPELINE_DIR / "generate_source_audio.py"
         script_path = Path(self.state["data"]["script_path"])
         self._run_cmd(
-            [sys.executable, str(gen_audio), "--script", str(script_path),
-             "--out-dir", str(self.project_dir / "source_audio")],
+            [sys.executable, str(gen_audio),
+             "--project", str(self.project_dir),
+             "--script",  str(script_path)],
             label="generate_source_audio.py"
         )
 
     def _stage_split(self):
         split = self._find_script(SHORTS_DIR, ["auto_split_scenes_v1_stage3_export.py", "auto_split_scenes.py"])
+        # Use the whisperx venv Python if available; fall back to current interpreter.
+        python = str(WHISPERX_PYTHON) if WHISPERX_PYTHON.exists() else sys.executable
+        if not WHISPERX_PYTHON.exists():
+            print(f"  ⚠ WhisperX venv not found at {WHISPERX_PYTHON} — using current Python (may fail)")
         self._run_cmd(
-            [sys.executable, str(split), "--project", str(self.project_dir), "--video-type", "LongVideo"],
+            [python, str(split), "--project", str(self.project_dir), "--video-type", "LongVideo"],
             cwd=SHORTS_DIR, label=split.name
         )
 
