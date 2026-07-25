@@ -1,0 +1,117 @@
+[00:00] So here's something I learned last week that I still can't quite believe.
+[00:05] If the Prime Minister wants to dismiss a state government in India, they can't just do it instead.
+[00:14] The President has to send a formal letter to the Governor,
+[00:18] who then has to politely inform the Chief Minister that their government no longer enjoys confidence and could they perhaps consider stepping
+[00:27] down It's like if your boss wanted to fire you but had to send your mom a recommendation that maybe you should quit.
+[00:37] This is a real constitutional procedure. It has happened 37 times since independence. And I need to explain why it exists because the story behind it is somehow more absurd than the process itself.
+[00:52] Let me start with what this actually is. Article 356 of the Indian Constitution allows the president to impose what's called president's rule on any state.
+[01:03] When this happens, the elected state government is suspended, the chief minister is out,
+[01:10] and the state is run directly by the central government, through the governor.
+[01:16] On paper, this is supposed to be an emergency measure for when a state government literally cannot function, Like if there is a complete breakdown of law and order.
+[01:27] Or the legislature is so fractured, nobody can form a majority.
+[01:31] In practice, it's been used 91 times between 1950 and 2023.
+[01:34] 91. For context, There have been 17 Lok Sabhas in that same period.
+[01:42] We have had more presidents rule in positions than general elections.
+[01:46] And here's the thing that made me go back and re-read the Constitution.
+[01:50] Three times, the actual wording of Article 356 never defines what breakdown of constitutional machinery means.
+[01:59] It just says the president can impose it if they are satisfied that the state government can't function.
+[02:05] Satisfied based on what? The constitution doesn't say. Now before you think this is just states whining about the central government being mean to them, let me give you a few examples of how this has actually been used.
+[02:19] In 1959, the Central Congress government dismissed the communist government in Kerala, a government that had won a clear majority in a free election.
+[02:29] The official reason was law and order breakdown.
+[02:35] The real reason was that Kerala's education reforms were making the Congress party nervous.
+[02:42] In 1977, after the emergency ended and Janata Party won the center, they immediately dismissed nine Congress state governments,
+[02:51] including Tamil Nadu and Punjab, even though those governments had perfectly functioning majorities.
+[02:59] The stated reason this time was that those assemblies no longer reflected the will of the people, because the national mood had changed.
+[03:08] Which is not actually a constitutional justification, but here we are.
+[03:13] The most brazen one might be Arunachal Pradesh in 2016.
+[03:17] The Congress had a majority. There was an internal party dispute about who should be chief minister.
+[03:23] The governor, using powers I didn't even know governors had, advanced the assembly session date on his own,
+[03:30] then said the government had lost confidence because of this internal party mess.
+[03:34] The center imposed president's rule. The Supreme Court later said this was completely illegal and reversed it, but not before the central government.
+[03:45] had successfully helped engineer a floor-crossing operation.
+[03:49] The constitutional machinery had broken down, apparently, because politicians were arguing about who should lead them.
+[03:56] Which, I mean, that's just called politics. Here's where the choreography gets properly weird. The president cannot impose president's rule on their own initiative.
+[04:06] They need a report from the governor saying things are broken.
+[04:10] The governor is appointed by the president on the advice of the prime minister.
+[04:14] So the chain of command is prime minister tells president who to appoint as governor.
+[04:20] Governor sends report to president saying state government should be dismissed.
+[04:25] President acts on that report and dismisses the government.
+[04:28] It's constitutional buck passing as a formal procedure.
+[04:33] And then there's the parliamentary approval bit.
+[04:37] After the president imposes president's rule, both houses of parliament have to approve it within two months.
+[04:44] If they don't, president's rule automatically lapses.
+[04:48] But here's the thing. If the party in power at the center has a majority in parliament,
+[04:55] which they obviously do because they're in power, then this approval is essentially automatic.
+[05:01] It's not a real check. It's a constitutional formality designed to look like accountability.
+[05:07] I know this sounds like boring constitutional procedure stuff, so let me tell you why this actually matters.
+[05:13] In the 1970s and 80s, president's rule was imposed 36 times.
+[05:18] That's an average of once every 10 months for two decades.
+[05:22] It became the standard central government tactic for dealing with opposition ruled states.
+[05:28] Win an election in a state? Cool. The center will just dismiss your government six months later.
+[05:35] The Supreme Court finally got so tired of this in 1994 that they laid down guidelines in
+[05:41] the SR for my case saying you can't just impose president's rule because you feel like it.
+[05:48] There has to be actual objective evidence of constitutional breakdown and courts can review it.
+[05:54] After Bomai, the frequency dropped. Between 1994 and 2023, president's rule has been imposed 23 times.
+[06:03] Still a lot, but less cartoonishly frequent.
+[06:07] And several of those were genuinely forehung assemblies where no party could form a government, which is arguably what the provision was meant for in the first place.
+[06:16] But the Bomai judgment created its own absurdity.
+[06:20] Now, when the center wants to impose president's rule, The governor's report has to be very carefully worded to make it sound like objective constitutional breakdown rather than political convenience.
+[06:31] So you get these incredibly elaborate reports listing things like rising incidence of communal tension or deteriorating law and order situation,
+[06:41] with attached statistics that may or may not actually show deterioration depending on which baseline you use.
+[06:49] It's like writing a Yelp review designed to survive legal scrutiny.
+[06:53] The governor becomes a constitutional lawyer, trying to draft around precedent.
+[06:59] Here's my favorite part of this whole mess, the governor.
+[07:03] is the central figure in this entire process has no fixed term.
+[07:09] They serve at the pleasure of the president, which in practice means at the pleasure of the prime minister.
+[07:15] So if a governor refuses to send a report recommending president's rule, the center can just replace them with someone who will.
+[07:25] This happened in Tamil Nadu in 1991.
+[07:28] The Governor refused to recommend President's rule.
+[07:31] The Centre removed him and appointed a new Governor who promptly sent the report.
+[07:37] The Supreme Court later said the dismissal was invalid, but again, not before the political damage was done.
+[07:44] Now let me explain why the Constitution set it up this way.
+[07:48] Because the framers weren't idiots. The original logic goes back to the Government of India Act 1935, which the British used to govern colonial India.
+[07:58] That Act had a similar provision called Section 93, which allowed the Governor General to take over provinces if the local government failed.
+[08:07] The Constitutional Assembly in 1949 debated whether to include something similar.
+[08:12] B. R. Ambedkar, who chaired the drafting committee, explicitly warned that Article 356 should be a dead letter.
+[08:21] meaning it should exist for genuine emergencies, but never actually be used.
+[08:27] He said, and I'm quoting here, I hope the president will take proper precautions before actually dismissing the ministry.
+[08:34] The assumption was that the president would act as a neutral constitutional arbiter, not a party political figure.
+[08:43] The assumption was that governors would be elder statesmen, above partisan politics.
+[08:50] The assumption was that parliament would provide meaningful oversight.
+[08:55] All three of those assumptions turned out to be wrong within a decade of independence.
+[09:00] And here's the thing that genuinely bothers me about this.
+[09:04] There's a weird constitutional imbalance baked in here.
+[09:08] If a chief minister has a majority in the state assembly,
+[09:13] They cannot be removed by a vote of no confidence unless MLAs actually cross the floor and vote them out.
+[09:20] That's a high bar. It requires public defection, horse trading, all the ugly but visible mechanics of democratic politics.
+[09:29] But Article 356 lets the Centre bypass all of that.
+[09:33] The Governor sends a report, the President signs an order, and the democratically elected government is gone.
+[09:40] No floor test required. No public vote. Just executive action, wrapped in constitutional language.
+[09:48] The counter-argument, which I should mention because some of you are already typing it,
+[09:53] is that without Article 356, there is no mechanism to deal with genuinely broken state governments.
+[10:00] And that's fair. In 1992, after Babri Masjid was demolished, the UP government had clearly failed to maintain law and order.
+[10:09] President's rule there was arguably justified.
+[10:12] In 2005, Bihar had a hung assembly and literally no combination of parties could form a majority.
+[10:20] President's rule was the only option until fresh elections.
+[10:25] The provision is an inherently illegitimate. It's the frequency and context of its use that creates the problem.
+[10:32] But here's what I keep coming back to. We have a federal system. where states are supposed to have independent executive authority in their domains.
+[10:42] The whole point of federalism is that states aren't just administrative units of the center, they're autonomous political entities with their own elected governments,
+[10:51] and yet we have a constitutional clause that lets the center suspend that autonomy with basically no advanced judicial review.
+[11:00] The Supreme Court can reverse it afterwards, like they did in Arunachal, but by then the political crisis has already done its work.
+[11:08] The current UPA-era Sarkaria Commission recommended in 1988 that Article 356 should only be used as a last resort,
+[11:17] and only when objective material shows constitutional breakdown.
+[11:21] The National Commission to Review the Working of the Constitution in 2002 went further and suggested Article 356 should be amended to require a two-thirds majority in Parliament,
+[11:32] not just a simple majority. To approve President's rule, neither recommendation has been implemented.
+[11:40] So where does this leave us? We have a constitutional provision designed for emergency use that became a routine political tool,
+[11:47] then got partially restrained by courts, but still exists as this sword of Damocles hanging over every opposition-ruled state government.
+[11:55] Governors have become the most powerful unelected officials in Indian federalism because they control access to this nuclear option.
+[12:04] The whole process is wrapped in this elaborate constitutional courtesy, where the president must ask the governor to inform the chief minister,
+[12:12] as if adding procedural steps makes the power less blunt.
+[12:16] I think the reason this bothers me is that it reveals a deep ambivalence in the Indian constitutional design.
+[12:24] about whether we actually trust federal democracy. If we trust it, why do we need a clause that lets the center overrule state voters?
+[12:33] If we don't trust it, why pretend we have federalism at all?
+[12:37] The Constitutional Assembly in 1949 couldn't resolve that tension.
+[12:42] So they built Article 356 as a compromise, a federal override switch that's supposed to exist but never be touched, except we've touched it 91 times.
+[12:51] And so we are left with this. A constitutional procedure where the President asks the Governor to ask the Chief Minister to maybe resign,
+[13:00] because formally acknowledging that the Centre can just fire state governments would make the whole federal structure look like theatre.
+[13:09] Which, depending on how you count Article 356 impositions, it sort of already is.

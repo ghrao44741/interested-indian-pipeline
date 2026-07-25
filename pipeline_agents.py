@@ -18,6 +18,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+# Auto-load .env from pipeline directory so API keys work without manual export
+_env_path = Path(__file__).parent / ".env"
+if _env_path.exists():
+    for _line in _env_path.read_text(encoding="utf-8").splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _v = _line.split("=", 1)
+            os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
+
 import anthropic
 
 try:
@@ -46,8 +55,8 @@ BANNED_WORDS = [
     "holistic", "deep dive", "unpack",
 ]
 
-STAGE_ORDER = ["topics", "script", "voice", "split", "prompts", "images", "stitch", "metadata",
-               "thumbnail", "chapters", "upload"]
+STAGE_ORDER = ["topics", "script", "review-script", "voice", "split", "prompts", "images",
+               "overlays", "stitch", "metadata", "thumbnail", "chapters", "upload"]
 
 CHANNEL_DNA = """You are a viral educational YouTube video creation engine for "The Interested Indian".
 
@@ -57,26 +66,61 @@ CHANNEL DNA:
 - Voice register: "I" narrates. "You" is the audience. Conversational, direct, occasionally self-deprecating.
   WRONG: "Karnataka contributes nearly nine percent of India's GDP."
   RIGHT: "So I looked at Karnataka's numbers, and — okay, wait, this can't be right."
+
+- OPENER TEMPLATE (use this exact structure):
+  "And this is [topic]. While most [coverage/content] shows you [A], [B], [C], [increasingly absurd D] —
+   there's [honest reframe]. For example, [pivot to the thing nobody talks about]."
+  The opener must NOT start with "Did you know" or a dramatic music-drop setup. It's conversational, slightly
+  weary, first-person. No grandiose announcement. Just: subvert the common framing, then pivot.
+
 - Hook: A policy paradox that sounds genuinely absurd out of context. Opens within the first 4 lines. Make the
   viewer feel slightly betrayed by something they never knew. The hook must contain a specific number or fact,
   not vague setup.
-- Humor mandate: Every 2–3 paragraphs must include ONE of: a modern analogy (gaming, cricket, food delivery),
-  a self-aware observation, a deadpan understatement, or a gentle audience poke ("I know exactly what some of
-  you are typing right now"). Humor must serve comprehension — it's the spoonful of sugar, not the point.
+
+- Storytelling rhythm (confirmed from transcript analysis of top-performing videos):
+  [FACT BLOCK 30–45 sec] → [HUMOR/MEME BEAT 5–10 sec] → [LOCAL ANECDOTE/STEREOTYPE SUBVERTED 30 sec] → repeat.
+  At 5–8 images per minute of runtime. End every 5–6 sentence block with a question or one-line punchline.
+
+- Humor mandate: Every 2–3 paragraphs must include ONE of: a modern analogy (cricket, IPL, Zomato, gaming,
+  Bollywood), a self-aware observation, a deadpan understatement, or a gentle audience poke.
+  Humor must serve comprehension — it's the spoonful of sugar, not the point.
   WRONG: "The Finance Commission is a body reconstituted every five years."
   RIGHT: "Every five years, the government assembles a committee of economists to decide who gets what — sort of
          like if your family had a constitutional requirement to argue about the restaurant bill."
+
+- MEME FRAMEWORK TECHNIQUE (use sparingly, once per video, at the driest/most complex section):
+  Apply a pop-culture framework to a regional/political concept. Formats that work:
+    "The N stages of [experience]" — e.g. "The 5 stages of being a South Indian taxpayer"
+    "The IPL draft but for [policy resource]"
+    "Think of it like Squid Game, except the winners are the Finance Ministry"
+  This is the single highest-engagement comedy beat. Place it at the densest information section.
+
+- ONE-LINER REGION/ENTITY SUMMARIES: Every state, institution, or policy in a state-explainer video gets one
+  brutal honest sentence before the deeper dive.
+  Examples: "Sejong — the Disney World of Korean bureaucracy." → "Chandigarh — the bureaucrat's utopia that
+  nobody asked for." "The Planning Commission — five-year plans, zero accountability, somehow lasted 65 years."
+
 - Jargon rule: NEVER use a policy term without immediately translating it in plain language on the same beat.
   WRONG: "The inter-se share of the divisible tax pool"
   RIGHT: "Your inter-se share — which is bureaucrat for 'your slice of the pie'"
+
 - Audience address: Anticipate what confused or skeptical viewers are thinking and name it directly.
   "Now, before you say this is just states whining about not getting enough money — hear me out."
   "I know this sounds like a dry finance policy story. It is. But stay with me because the ending is annoying."
+
 - Self-aware humility: Acknowledge complexity honestly at least once per video.
   "This next part is actually confusing and I'm going to do my best not to make it worse."
   "I spent two days reading about this and I'm still not entirely sure I understand it. Here's what I do know."
-- Sentence rhythm: Short sentence. One concrete fact. One longer connective sentence. Short sentence. End every
-  5–6 sentence block with either a question or a one-line punchline.
+
+- DARK SOCIAL COMMENTARY LAYER: Go one layer deeper than facts — psychologise what the policy/history did to
+  people. Not just "development was unequal" but "which is why the average person in Bihar has spent decades
+  doing the math on whether staying home or leaving is the worse bet. Spoiler: both are."
+
+- Sentence rhythm: Short sentence. One concrete fact. One longer connective sentence. Short sentence.
+
+- AUDIENCE INVITATION AT CLOSE: End with "I've simplified a lot here, so tell me in the comments what I missed
+  or got wrong." This invites locals to validate/extend, which drives comment velocity.
+
 - Narrative arc:
     1. Hook — the absurd-sounding fact that makes no sense yet
     2. "Let me explain" — the rule or law that created this
@@ -84,10 +128,19 @@ CHANNEL DNA:
     4. The unintended consequence — nobody planned for this, and it matters
     5. Who wins, who loses — and why the people on the losing side aren't wrong to be annoyed
     6. Close — echo the hook, but now the viewer understands the dark joke
+    + Audience invitation to correct/extend in comments
+
+- DIFFERENTIATION CTA (use at video end, NOT "I don't use AI"):
+  "I read the actual parliamentary debates for this one, not just the Wikipedia summary. Subscribe if you want
+   more of that kind of thing."
+
 - STRICT: ZERO corporate clichés (unleash, unlock, dive into, tapestry, game-changer). No sensationalism.
   No abstract academic framing without a plain-English follow-up on the same line.
+  Banned words: genuinely, honestly, straightforward, fascinating, crucial, pivotal.
+
 - Visual style: Flat cartoon doodles on warm cream or pale backgrounds. Chubby expressive mascot with glasses.
-  Real photo inserts for context. Colorful region-coded maps. Bold text callouts in colored boxes."""
+  Real photo cutouts layered on clean backgrounds (collage aesthetic). Pop culture reaction images as meme beats
+  (5–10 sec). Colorful region-coded maps. Bold text callouts in colored boxes."""
 
 # ── Shared result types ────────────────────────────────────────────────────────
 
@@ -299,7 +352,14 @@ class ReviewAgent:
             issues.append(f"Only {len(scenes)} scenes (expected 80–120 for a 12–18 min essay)")
             recs.append("Check if WhisperX ran correctly on the source audio")
 
-        if total_dur < 480:
+        if total_dur is None or total_dur == 0:
+            # total_duration missing — compute from per-scene durations if available
+            computed = sum(s.get("duration") or 0 for s in scenes)
+            if computed > 0:
+                recs.append(f"total_duration missing in manifest; computed {computed:.0f}s from scene durations — run pipeline_agents patch or re-split")
+            else:
+                issues.append("Manifest total_duration is 0 and no per-scene durations found — manifest may be incomplete")
+        elif total_dur < 480:
             issues.append(f"Manifest total duration {total_dur:.0f}s seems too short")
 
         # Check for duplicate IDs
@@ -333,41 +393,46 @@ class ReviewAgent:
         manifest_path = project_dir / "manifest.json"
         if manifest_path.exists():
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            # Count unique images expected
-            seen, unique = set(), 0
+            # Count unique shots: one per visual group + each standalone
+            # (grouped scenes share one image → one prompt per group)
+            seen_groups, unique_shots = set(), 0
             for s in manifest["scenes"]:
-                img = s["image"]
-                if img not in seen:
-                    seen.add(img)
-                    unique += 1
-            if len(shot_lines) < unique - 2:  # allow 2 slack
-                issues.append(f"Only {len(shot_lines)} prompts for {unique} required images")
+                gid = s.get("visual_group_id")
+                if gid:
+                    if gid not in seen_groups:
+                        seen_groups.add(gid)
+                        unique_shots += 1
+                else:
+                    unique_shots += 1
+            if len(shot_lines) < unique_shots - 2:  # allow 2 slack
+                issues.append(f"Only {len(shot_lines)} prompts for {unique_shots} required shots")
 
-        # Style DNA checks on a sample
-        missing_open  = [l for l in shot_lines if "Minimalist 2D doodle" not in l]
-        missing_close = [l for l in shot_lines if "hand-drawn, 16:9" not in l and "hand-drawn" not in l]
+        # Style DNA checks for The Interested Indian (flat cartoon, cream bg)
         missing_overlay = [l for l in shot_lines if "OVERLAY:" not in l]
         missing_cue     = [l for l in shot_lines if "CUE:" not in l]
 
-        if missing_open:
-            issues.append(f"{len(missing_open)} prompts missing 'Minimalist 2D doodle' opening")
-            recs.append("Prompts must start with: Minimalist 2D doodle, white bg,")
         if missing_overlay:
             issues.append(f"{len(missing_overlay)} prompts missing OVERLAY field")
         if missing_cue:
             issues.append(f"{len(missing_cue)} prompts missing CUE field")
 
-        # Sample Claude quality check (first 5 prompts)
+        # Sample Claude quality check (first 5 prompts) — informational only
+        # Claude suggestions go to recs, NOT issues. Only structural hard failures lower the score.
         sample = "\n".join(shot_lines[:5])
         result = self._claude_assess(
-            "Review these image prompts for 'The Interested Indian' channel. "
-            "Score 0–10 on: style DNA adherence (minimalist doodle, white bg, hand-drawn), "
-            "abstract-to-visual translation quality, overlay text brevity, editor cue clarity. "
-            "List issues.\n\n" + sample
+            "Review these image prompts for 'The Interested Indian' YouTube channel. "
+            "Channel style: flat digital cartoon, warm cream background (#FAF7F2), bold outlines, "
+            "educational and approachable. Score 0–10 on: visual storytelling quality, "
+            "abstract-to-concrete translation, overlay text brevity, editor cue clarity. "
+            "Only flag CRITICAL issues (missing fields, completely off-brand, wrong aspect ratio). "
+            "Style preferences are NOT issues — they are recommendations.\n\n" + sample
         )
-        issues += result.get("issues", [])
-        recs   += result.get("recommendations", [])
-        score = result.get("score", 7) - len(issues)
+        # Only count Claude issues that are truly structural (not style nitpicks)
+        claude_score = result.get("score", 8)
+        recs += result.get("issues", []) + result.get("recommendations", [])
+
+        # Final score: start from Claude's score, deduct only hard structural failures
+        score = claude_score - len(issues)  # issues = missing OVERLAY/CUE/shot count only
         score = max(0, min(10, score))
 
         return ReviewResult(
@@ -423,8 +488,14 @@ class ReviewAgent:
         project_dir = Path(ctx["project_dir"])
         issues, recs = [], []
 
-        output_file = project_dir / "output" / f"{project_dir.name}_final.mp4"
-        if not output_file.exists():
+        # Stitch may write to ep01/output/ or to the pipeline root
+        _candidates = [
+            project_dir / "output" / f"{project_dir.name}_final.mp4",
+            project_dir.parent / f"{project_dir.name}_final.mp4",
+            project_dir / f"{project_dir.name}_final.mp4",
+        ]
+        output_file = next((p for p in _candidates if p.exists()), None)
+        if output_file is None:
             return ReviewResult(False, 0, ["Output MP4 not found"], ["Re-run stitch_video_longform.py"])
 
         try:
@@ -623,6 +694,14 @@ class ReviewAgent:
                 text = response.content[0].text.strip()
                 if not text:
                     raise ValueError("Empty response from Claude assess")
+                # Strip markdown fences if model wraps JSON in ```json ... ```
+                if text.startswith("```"):
+                    text = re.sub(r"^```[a-z]*\n?", "", text)
+                    text = re.sub(r"\n?```$", "", text.rstrip())
+                # Find JSON object if there's leading/trailing prose
+                m = re.search(r"\{.*\}", text, re.DOTALL)
+                if m:
+                    text = m.group(0)
                 return json.loads(text)
             except Exception as e:
                 last_err = e
@@ -1125,12 +1204,14 @@ class OrchestratorAgent:
 
     def _run_stage(self, stage: str):
         fns = {
-            "topics":    self._stage_topics,
-            "script":    self._stage_script,
-            "voice":     self._stage_voice,
+            "topics":         self._stage_topics,
+            "script":         self._stage_script,
+            "review-script":  self._stage_review_script,
+            "voice":          self._stage_voice,
             "split":     self._stage_split,
             "prompts":   self._stage_prompts,
             "images":    self._stage_images,
+            "overlays":  self._stage_overlays,
             "stitch":    self._stage_stitch,
             "metadata":  self._stage_metadata,
             "thumbnail": self._stage_thumbnail,
@@ -1142,14 +1223,31 @@ class OrchestratorAgent:
     def _stage_topics(self):
         response = self.client.messages.create(
             model="claude-sonnet-4-5",
-            max_tokens=1024,
+            max_tokens=1200,
             system=CHANNEL_DNA,
             messages=[{
                 "role": "user",
                 "content": (
-                    "Generate exactly 5 viral topic ideas for the channel. "
-                    "Output ONLY a markdown table: # | Video Title | Core Institutional Focus. "
-                    "No preamble."
+                    "Generate exactly 5 viral topic ideas for the channel.\n\n"
+                    "TITLE FORMULA GUIDE — use at least 2 of these proven formats:\n"
+                    "  A. 'Every [Indian region/group] Explained by a [insider/outsider]' "
+                    "     — e.g. 'Every South Indian State Explained by a North Indian' "
+                    "     — their HIGHEST performing format (1.5M+ views equivalent)\n"
+                    "  B. '[Topic] is the Most [surprising adjective] [topic]' "
+                    "     — e.g. 'Indian Federalism is the Most Confusing Federalism'\n"
+                    "  C. '[Place/Policy] is Not a [Common Misconception] Debate' "
+                    "     — subvert the obvious framing\n"
+                    "  D. 'A Tale of Two [contrasting entities]' "
+                    "     — e.g. 'A Tale of Two Indias: Why Bihar and Kerala Diverged'\n"
+                    "  E. '[PLACE/POLICY] IS (kinda) [VERDICT]!!!' "
+                    "     — caps + parenthetical softener for shock value with deniability\n\n"
+                    "CONTENT ANGLE GUIDE — prioritise topics with:\n"
+                    "  • North-South or Centre-State tension (high Indian audience heat)\n"
+                    "  • A policy that sounds boring but has an infuriating hidden consequence\n"
+                    "  • Regional identity/stereotype that most people assume but is historically wrong\n"
+                    "  • Something that sounds like BJP vs Congress but is actually much older\n\n"
+                    "Output ONLY a markdown table: # | Video Title | Core Institutional Focus | Title Formula Used.\n"
+                    "No preamble. No explanation."
                 )
             }]
         )
@@ -1227,6 +1325,65 @@ class OrchestratorAgent:
             input("  Press ENTER after editing...")
         elif answer == "redo":
             self._stage_script()
+
+    def _stage_review_script(self):
+        """Channel DNA + wittiness review. Blocks pipeline if score < 6; warns if 6-6.9."""
+        script_path = Path(self.state["data"].get("script_path", ""))
+        if not script_path.exists():
+            raise RuntimeError(f"Script file not found: {script_path}")
+
+        reviewer = PIPELINE_DIR / "review_script.py"
+        if not reviewer.exists():
+            print("  ⚠ review_script.py not found — skipping DNA review")
+            return
+
+        self._banner("Stage: review-script")
+
+        # Run the reviewer in quick (deterministic) mode first — instant
+        self._run_cmd(
+            [sys.executable, str(reviewer), "--script", str(script_path), "--quick"],
+            label="review_script.py (quick)"
+        )
+
+        # Run full Claude review — generates script_review.md
+        report_path = self.project_dir / "script_review.md"
+        self._run_cmd(
+            [sys.executable, str(reviewer), "--script", str(script_path),
+             "--out", str(report_path)],
+            label="review_script.py (full)"
+        )
+
+        # Parse overall score from report
+        score = None
+        if report_path.exists():
+            m = re.search(r"OVERALL_SCORE:\s*(\d+)/10", report_path.read_text(encoding="utf-8"))
+            if m:
+                score = int(m.group(1))
+
+        if score is not None:
+            print(f"\n  Script DNA score: {score}/10")
+            if score < 6:
+                print(f"\n  ✗ Script scored {score}/10 — below minimum threshold of 6.")
+                print(f"  Review: {report_path}")
+                answer = input("  [r]ewrite script / [s]kip and continue anyway / [q]uit > ").strip().lower()
+                if answer in ("r", "rewrite"):
+                    self.state["completed"] = [s for s in self.state["completed"] if s != "script"]
+                    self.state["stage"] = "script"
+                    self._save_state()
+                    raise RuntimeError("Script rejected by DNA review — restarting from script stage")
+                elif answer in ("q", "quit"):
+                    raise RuntimeError("Aborted by user after DNA review")
+                else:
+                    print("  ⚠ Continuing with low-scoring script (user override)")
+            elif score < 7:
+                print(f"  ⚠ Script scored {score}/10 — marginal. Review {report_path.name} before proceeding.")
+                input("  Press ENTER to continue or Ctrl+C to abort > ")
+            else:
+                print(f"  ✓ Script passed DNA review ({score}/10)")
+        else:
+            print(f"  ⚠ Could not parse score from {report_path.name} — review manually")
+            print(f"  Report: {report_path}")
+            input("  Press ENTER to continue > ")
 
     def _print_script_preview(self, script_text: str):
         """Print a human-readable script QA summary before the checkpoint."""
@@ -1313,15 +1470,45 @@ class OrchestratorAgent:
     def _stage_voice(self):
         gen_audio = PIPELINE_DIR / "generate_source_audio.py"
         script_path = Path(self.state["data"]["script_path"])
+
+        # Read provider + voice from channel_config.json
+        provider = "edge"
+        voice    = "en-US-GuyNeural"
+        cfg_path = PIPELINE_DIR / "channel_config.json"
+        if cfg_path.exists():
+            import json as _json
+            cfg       = _json.loads(cfg_path.read_text(encoding="utf-8"))
+            vcfg      = cfg.get("voice", {})
+            provider  = vcfg.get("provider", provider)
+            voice     = vcfg.get("default", voice)
+
+        # Manifest voice overrides channel_config (per-episode override)
+        manifest_voice = self.state.get("data", {}).get("voice") or \
+                         (json.loads((self.project_dir / "manifest.json").read_text()).get("voice")
+                          if (self.project_dir / "manifest.json").exists() else None)
+        if manifest_voice and manifest_voice != voice:
+            voice = manifest_voice
+
         self._run_cmd(
             [sys.executable, str(gen_audio),
-             "--project", str(self.project_dir),
-             "--script",  str(script_path)],
+             "--project",  str(self.project_dir),
+             "--script",   str(script_path),
+             "--provider", provider,
+             "--voice",    voice],
             label="generate_source_audio.py"
         )
 
     def _stage_split(self):
-        split = self._find_script(SHORTS_DIR, ["auto_split_scenes_v1_stage3_export.py", "auto_split_scenes.py"])
+        # Prefer the versioned script in PIPELINE_DIR (has duration fixes);
+        # fall back to shorts_pipeline2 versions if not found here.
+        versioned = PIPELINE_DIR / "auto_split_scenes_v1_stage3_export.py"
+        if versioned.exists():
+            split = versioned
+            run_dir = PIPELINE_DIR
+        else:
+            split = self._find_script(SHORTS_DIR, ["auto_split_scenes_v1_stage3_export.py", "auto_split_scenes.py"])
+            run_dir = SHORTS_DIR
+
         # Use the whisperx venv Python if available; fall back to current interpreter.
         python = str(WHISPERX_PYTHON) if WHISPERX_PYTHON.exists() else sys.executable
         if not WHISPERX_PYTHON.exists():
@@ -1332,14 +1519,15 @@ class OrchestratorAgent:
         if not mp3s:
             raise FileNotFoundError(f"No .mp3 found in {audio_dir} — run voice stage first")
         audio_path = mp3s[0]
-        self._run_cmd(
-            [python, str(split),
-             "--audio",      audio_path.name,   # filename only — script prepends source_audio/ itself
-             "--project",    str(self.project_dir),
-             "--video-type", "LongVideo",
-             "--device",     "cpu"],             # venv has CPU-only torch
-            cwd=SHORTS_DIR, label=split.name
-        )
+        title = self.state["data"].get("title", "")
+        cmd = [python, str(split),
+               "--audio",      audio_path.name,
+               "--project",    str(self.project_dir),
+               "--video-type", "LongVideo",
+               "--device",     "cpu"]
+        if title:
+            cmd += ["--title", title]
+        self._run_cmd(cmd, cwd=run_dir, label=split.name)
 
     def _stage_prompts(self):
         gen = PIPELINE_DIR / "generate_image_prompts.py"
@@ -1367,6 +1555,16 @@ class OrchestratorAgent:
                     label="Regenerating FAIL shots"
                 )
 
+    def _stage_overlays(self):
+        """Burn OVERLAY text onto each generated image using PIL (no AI typos)."""
+        overlay_script = PIPELINE_DIR / "add_text_overlays.py"
+        self._run_cmd(
+            [sys.executable, str(overlay_script),
+             "--project", str(self.project_dir),
+             "--overwrite"],
+            label="add_text_overlays.py"
+        )
+
     def _stage_stitch(self):
         stitch = SHORTS_DIR / "stitch_video_longform.py"
         self._run_cmd(
@@ -1391,7 +1589,7 @@ class OrchestratorAgent:
                     "Generate YouTube metadata:\n\n"
                     "VIRAL VIDEO TITLE:\n[under 70 chars]\n\n"
                     "VIDEO DESCRIPTION:\n[2-3 line hook, 3-4 line summary, subscribe line, 15-20 hashtags]\n\n"
-                    "VIRAL VIDEO TAGS:\n[25-40 comma-separated tags]"
+                    "VIRAL VIDEO TAGS:\n[10-15 comma-separated tags. Rules: plain words only, no apostrophes, no hyphens, no special characters. Total combined length under 400 characters. Example: Article 356, Indian Constitution, President Rule, Indian politics]"
                 )
             }]
         )
@@ -1500,3 +1698,37 @@ class OrchestratorAgent:
         print(f"\n{'═'*60}")
         print(f"  {text}")
         print(f"{'═'*60}")
+
+
+# ── Entry point ────────────────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="The Interested Indian — pipeline runner")
+    parser.add_argument("--project",    required=True, help="Episode folder (e.g. ep01)")
+    parser.add_argument("--start-from", default="topics",
+                        choices=STAGE_ORDER, metavar="STAGE",
+                        help=f"Stage to start from. Choices: {', '.join(STAGE_ORDER)}")
+    parser.add_argument("--only",       default=None,
+                        choices=STAGE_ORDER, metavar="STAGE",
+                        help="Run only this one stage and exit")
+    args = parser.parse_args()
+
+    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        print("❌ ANTHROPIC_API_KEY not set in .env")
+        sys.exit(1)
+
+    client         = anthropic.Anthropic(api_key=api_key)
+    review_agent   = ReviewAgent(client)
+    research_agent = ResearchAgent(client)
+    project_dir    = PIPELINE_DIR / args.project
+
+    orchestrator = OrchestratorAgent(client, project_dir, review_agent, research_agent)
+
+    if args.only:
+        print(f"Running single stage: {args.only}")
+        orchestrator._run_stage(args.only)
+    else:
+        orchestrator.run_pipeline(from_stage=args.start_from)

@@ -113,16 +113,16 @@ DELAY_BETWEEN_CALLS = 1.0   # seconds
 # This is the key to style consistency — every prompt starts with the same
 # style description so Flux maintains the doodle look across all 90 images.
 STYLE_PREFIX = (
-    "Minimalist 2D doodle illustration, warm cream white background (#FAF7F2), "
-    "black ink line art only, hand-drawn sketch texture, flat educational infographic style. "
-    "No photorealism, no 3D rendering, no gradients, no drop shadows. "
-    "Simple stick figures for any people. 16:9 landscape composition. "
-    "Colour accents only: warm orange for South Indian states, "
-    "muted grey for Union government elements, neutral blue for data/charts. "
+    "Flat digital cartoon illustration, warm cream background (#FAF7F2), "
+    "bold black outlines, expressive characters, vibrant colors. "
+    "Channel: The Interested Indian — friendly, approachable, educational. "
+    "Mascot: chubby round cartoon character with big round glasses, thick expressive eyebrows, "
+    "short stubby arms. NOT a stick figure. Expressive cartoon faces. "
+    "No photorealism, no 3D rendering. 16:9 landscape composition. "
 )
 
 STYLE_SUFFIX = (
-    " Clean, simple, readable. White or cream background. Hand-drawn feel."
+    " Bold outlines, vibrant colors, 16:9."
 )
 
 

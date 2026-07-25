@@ -79,11 +79,22 @@ def _get_authenticated_service():
 # ── Episode data readers ───────────────────────────────────────────────────────
 
 def _find_video(project_dir: Path) -> Path | None:
-    output_dir = project_dir / "output"
-    if output_dir.exists():
-        mp4s = sorted(output_dir.glob("*_final.mp4"))
-        if mp4s:
-            return mp4s[-1]
+    """Find the final MP4 — checks ep01/output/, ep01/, and pipeline root."""
+    candidates = [
+        project_dir / "output",      # ep01/output/*_final.mp4
+        project_dir,                  # ep01/*_final.mp4
+        project_dir.parent,           # interested_indian_pipeline/*_final.mp4 (stitch root)
+    ]
+    for search_dir in candidates:
+        if search_dir.exists():
+            mp4s = sorted(search_dir.glob(f"{project_dir.name}_final.mp4"))
+            if mp4s:
+                return mp4s[-1]
+            # fallback: any *_final.mp4 in output dir
+            if search_dir == project_dir / "output":
+                mp4s = sorted(search_dir.glob("*_final.mp4"))
+                if mp4s:
+                    return mp4s[-1]
     return None
 
 
@@ -156,11 +167,29 @@ def _upload_video(
         status_obj = {"privacyStatus": "private", "publishAt": schedule}
         print(f"  Scheduled publish: {schedule}")
 
+    # YouTube tag rules: each tag ≤ 500 chars, combined total ≤ 500 chars,
+    # no < or > characters. tags[:500] was counting items not chars — fix it.
+    def _sanitize_tags(raw: list[str]) -> list[str]:
+        cleaned, total = [], 0
+        for t in raw:
+            # Strip all chars YouTube rejects: apostrophes, quotes, <>, &, etc.
+            t = re.sub(r"[^A-Za-z0-9 \-.]", "", t).strip()
+            if not t:
+                continue
+            if total + len(t) > 490:   # leave a small safety margin
+                break
+            cleaned.append(t)
+            total += len(t)
+        return cleaned
+
+    safe_tags = _sanitize_tags(tags)
+    print(f"  Tags: {len(safe_tags)}/{len(tags)} kept ({sum(len(t) for t in safe_tags)} chars)")
+
     body = {
         "snippet": {
             "title":       title[:100],
             "description": description[:5000],
-            "tags":        tags[:500],
+            "tags":        safe_tags,
             "categoryId":  CATEGORY_ID,
             "defaultLanguage": "en",
         },
@@ -195,13 +224,21 @@ def _upload_video(
 def _upload_thumbnail(youtube, video_id: str, thumbnail_path: Path):
     try:
         from googleapiclient.http import MediaFileUpload
+        from googleapiclient.errors import HttpError
     except ImportError:
         return
 
     print(f"  Uploading thumbnail...")
-    media = MediaFileUpload(str(thumbnail_path), mimetype="image/png")
-    youtube.thumbnails().set(videoId=video_id, media_body=media).execute()
-    print("  ✓ Thumbnail set")
+    try:
+        media = MediaFileUpload(str(thumbnail_path), mimetype="image/png")
+        youtube.thumbnails().set(videoId=video_id, media_body=media).execute()
+        print("  ✓ Thumbnail set")
+    except HttpError as e:
+        if e.resp.status == 403:
+            print("  ⚠ Thumbnail skipped — channel needs verification (1000+ subs) for API thumbnail upload.")
+            print(f"    Upload manually in YouTube Studio: ep01/thumbnail.png")
+        else:
+            raise
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
@@ -213,6 +250,8 @@ def main():
                         help="ISO 8601 publish datetime (e.g. 2026-07-28T17:00:00+05:30). Omit to leave private.")
     parser.add_argument("--dry-run",  action="store_true", dest="dry_run",
                         help="Print what would be uploaded without actually uploading")
+    parser.add_argument("--no-tags",  action="store_true", dest="no_tags",
+                        help="Upload with no tags (diagnostic — bypasses invalidTags errors)")
     args = parser.parse_args()
 
     project_dir = Path(args.project)
@@ -262,7 +301,7 @@ def main():
         video_path,
         title=meta["title"],
         description=meta["description"],
-        tags=meta["tags"],
+        tags=[] if args.no_tags else meta["tags"],
         schedule=args.schedule,
     )
 

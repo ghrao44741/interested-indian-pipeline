@@ -21,6 +21,15 @@ import sys
 import time
 from pathlib import Path
 
+# Auto-load .env from the pipeline directory
+_env_path = Path(__file__).parent / ".env"
+if _env_path.exists():
+    for _line in _env_path.read_text(encoding="utf-8").splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _v = _line.split("=", 1)
+            os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
+
 try:
     import anthropic
 except ImportError:
@@ -33,8 +42,8 @@ SYSTEM_PROMPT = """You are the image prompt writer for "The Interested Indian" Y
 
 CHANNEL VISUAL STYLE DNA:
 - Art style: Flat digital cartoon illustration — bold black outlines, expressive characters, colorful maps.
-  Mix hand-drawn style with photo-realistic inserts (e.g. a cartoon mascot standing in front of a real
-  photo of Parliament or a city skyline, blended into a scene).
+  Photo-realistic inserts are allowed (e.g. a cartoon mascot standing in front of a faded real
+  photo of Parliament or a city skyline, blended at reduced opacity into the background).
 - Background: Warm cream (#FAF7F2), pale sky blue (#E8F4F8), or soft yellow (#FFF8E7). Light, NOT white.
   NOT dark. No gradient backgrounds. The background should have subtle warmth, not clinical stark white.
 - Color palette — use these actively, not sparingly:
@@ -47,13 +56,23 @@ CHANNEL VISUAL STYLE DNA:
   northern states in another. State borders in bold black. Key states labeled with bold colored call-out boxes.
 - Color call-out boxes: Short labels in BOLD text inside colored rounded rectangles (orange, navy, crimson)
   floating next to the relevant region. E.g. "KARNATAKA: 15p on ₹1" in an orange box with bold dark text.
-- Photo inserts: Where context helps, describe the scene as including a real photo blended in — e.g.
-  "photo insert of Bengaluru tech park in top-right corner" or "newspaper headline photo background, lightly
-  faded to 30% opacity behind the mascot".
+- Photo cutout collage: For context scenes, describe real photos cut out and layered on a clean background —
+  e.g. "photo cutout of Indian Parliament building placed on warm cream background, slightly tilted, mascot
+  standing beside it pointing". This is the PREFERRED treatment for real-world context shots, not full photo.
+- Meme reaction panels: For the humor/meme beat (every 2-3 scenes), describe a pop-culture reaction image
+  style — e.g. "cartoon reaction panel in the style of a meme: mascot with exaggerated shocked expression,
+  eyes wide, mouth open, holding a chart that says something surprising; warm cream background". These are
+  5–10 second visual breaks. DO NOT reference actual copyrighted characters by name — describe the FEELING:
+  "cartoon character with shocked expression", "distracted person meme composition", "this-is-fine-dog energy
+  but as the mascot sitting calmly while fire/chaos surrounds the policy framework". The editor will match to
+  appropriate meme format in post.
 - Charts: Colorful bar charts with each bar a different region color. Pie charts with bold segment colors.
   NOT plain black-and-white. Every data element should use a distinct color from the palette.
-- On-screen text: Added in post-production by the editor — do NOT include narration text or subtitles in
-  the image prompt. Short diagram labels (e.g. "CENSUS 2011", "₹1 → 15p", "Art. 280") are fine and encouraged.
+- On-screen text: DO NOT include ANY rendered text in the image prompt. No labels, no numbers in boxes,
+  no "bold text reading X", no callout boxes with words, no text banners. AI image generators produce
+  typos and garbled text — ALL text will be added cleanly in post-production by the PIL overlay stage.
+  Instead of text labels, use VISUAL ICONS: a red X mark, a checkmark, an arrow, a clock icon, a star,
+  a building silhouette, a parchment scroll icon. Let the visual elements tell the story without words.
 - Aspect ratio: Always 16:9.
 
 IMAGE PROMPT RULES:
@@ -62,6 +81,9 @@ IMAGE PROMPT RULES:
    For data: "Infographic cartoon chart, pale blue background,"
 2. Every prompt MUST end with: "bold outlines, vibrant colors, 16:9"
 3. Use the mascot actively — it should appear in at least 40% of shots, reacting to what's on screen.
+3a. MEME REACTION BEAT: Every 2–3 shots, when the narration lands a joke, punchline, or ironic observation,
+    write a MEME-STYLE reaction prompt: mascot with exaggerated expression, simple clean background, single
+    strong visual gag. These are the 5–10 sec humor breaks. Label these shots with CUE: "meme beat — hold 6s"
 4. Make maps colorful — every region a distinct color. No gray maps. No monochrome.
 5. Translate abstract policy concepts into concrete colorful visuals:
    - "fiscal devolution" → mascot standing by a central treasury building, colored arrows flowing to
@@ -71,7 +93,9 @@ IMAGE PROMPT RULES:
    - "census year change" → two comparison panels: 1971 calendar vs 2011 calendar, mascot pointing between them
 6. Hold scenes across consecutive timestamps — for the same policy beat, describe a consistent base image
    and only note what changes (mascot pose, new arrow, new colored label).
-7. Each OVERLAY is the editor's text overlay — a short punchy phrase, 4–8 words, TITLE CASE. Not a full sentence.
+7. Each OVERLAY is the editor's text overlay (added by PIL in post, NOT by the AI) — a short punchy
+   phrase, 4–8 words, TITLE CASE. Not a full sentence. This text will be rendered cleanly by the
+   overlay stage, so accuracy is guaranteed. Do NOT repeat this text inside the PROMPT field.
 8. Each CUE is the editor's motion/animation directive — one sentence describing Ken Burns zoom, mascot pop-in,
    arrow animation, or hold duration.
 

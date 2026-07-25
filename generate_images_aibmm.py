@@ -20,6 +20,7 @@ USAGE:
     python generate_images_aibmm.py --project ep01
     python generate_images_aibmm.py --project ep01 --overwrite
     python generate_images_aibmm.py --project ep01 --scene-type mascot
+    python generate_images_aibmm.py --project ep01 --force-general   (generates map/chart/photo as cartoons)
     python generate_images_aibmm.py --test  (generates one test image)
 
 Reads:  {project}/image_prompts_one_line_per_prompt.md
@@ -213,7 +214,7 @@ def _parse_prompts(md_path: Path) -> list[dict]:
 # ── Main batch generator ───────────────────────────────────────────────────────
 
 def generate_images(project_dir: Path, scene_type_filter: str | None,
-                    overwrite: bool, client):
+                    overwrite: bool, client, force_general: bool = False):
     prompts_path = project_dir / "image_prompts_one_line_per_prompt.md"
     images_dir   = project_dir / "images"
 
@@ -244,15 +245,17 @@ def generate_images(project_dir: Path, scene_type_filter: str | None,
             skipped += 1
             continue
 
-        if stype in ("map", "chart", "photo"):
+        if stype in ("map", "chart", "photo") and not force_general:
             print(f"  ⚙  SHOT {shot['shot_num']:02d}  [{stype}]  {shot['file']}  → use dedicated generator")
             skipped += 1
             continue
 
         print(f"  ⏳ SHOT {shot['shot_num']:02d}  [{stype}]  {shot['file']}")
 
+        # With --force-general, map/chart/photo fall through as general cartoon scenes
+        effective_type = "general" if (force_general and stype in ("map", "chart", "photo")) else stype
         ok = (generate_mascot_scene(shot["prompt"], client, out_path)
-              if stype == "mascot"
+              if effective_type == "mascot"
               else generate_general_scene(shot["prompt"], client, out_path))
 
         if ok:
@@ -283,8 +286,11 @@ def main():
                         help="Only generate scenes of this type")
     parser.add_argument("--overwrite",  action="store_true",
                         help="Regenerate even if output already exists")
-    parser.add_argument("--test",       action="store_true",
+    parser.add_argument("--test",          action="store_true",
                         help="Generate one test image to verify the setup")
+    parser.add_argument("--force-general", action="store_true", dest="force_general",
+                        help="Generate map/chart/photo scenes as general cartoon illustrations "
+                             "instead of routing to dedicated generators")
     args = parser.parse_args()
 
     api_key = _get_api_key()
@@ -327,7 +333,8 @@ def main():
         print(f"❌ Project folder not found: {project_dir}")
         sys.exit(1)
 
-    generate_images(project_dir, args.scene_type, args.overwrite, client)
+    generate_images(project_dir, args.scene_type, args.overwrite, client,
+                    force_general=args.force_general)
 
 
 if __name__ == "__main__":

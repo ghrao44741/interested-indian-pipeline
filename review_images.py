@@ -48,19 +48,18 @@ DELAY_BETWEEN_CALLS = 0.5   # seconds — avoids rate-limit bursts
 
 STYLE_GUIDE = """
 CHANNEL STYLE GUIDE (The Interested Indian):
-- Minimalist 2D doodle / vector illustration
-- Background: white or warm cream (#FAF7F2) — never dark, never gradient
-- Line art: black ink only, hand-drawn feel, slight sketch texture
-- Colour accents ONLY:
-    • Warm orange → South Indian states (Karnataka, TN, Kerala, Telangana, AP)
-    • Muted grey → Union government / Parliament elements
-    • Neutral blue → data, charts, numbers
-    • Muted green → positive / compliant states
-    • Red → losses, penalties, negative outcomes
-- Stick figures for people (simple, no detailed faces)
-- No photorealism, no 3D renders, no gradients, no complex shading
-- Aspect ratio: 16:9 landscape (1920×1080)
-- Text in images: legible, hand-lettered or clean block style
+- Flat digital cartoon illustration — expressive characters with bold black outlines
+- Mascot: chubby round cartoon character with big round glasses, thick eyebrows, short stubby arms.
+  Should look friendly and slightly exasperated. NOT a stick figure — detailed cartoon face is correct.
+- Background: warm cream (#FAF7F2), pale sky blue (#E8F4F8), or soft yellow (#FFF8E7). Light, not white.
+  Never dark. Subtle warmth.
+- Color palette: Crimson, Navy Blue, Forest Green, Warm Orange, Gold, Teal, Dusty Red, Amber.
+  Used actively and vibrantly — colorful, not muted.
+- Maps: Color-coded with distinct colors per region. State borders in bold black.
+- No photorealism, no 3D renders. Flat cartoon is correct. Gradients are acceptable if subtle.
+- Aspect ratio: 16:9 landscape
+- Text in images: should be MINIMAL — all overlay text is added in post-production by PIL.
+  Do NOT fail an image for missing overlay text. The overlay stage handles that separately.
 """
 
 REVIEW_PROMPT = """\
@@ -77,25 +76,25 @@ ANIMATION CUE: {cue}
 {style_guide}
 
 KEY TERMS that must be spelled correctly if they appear in the image:
-  Numbers: 42%, 41%, 4.713%, 3.647%, 4.131%, 15 paise, ₹80,000 crore, 12.5%, 45%, 15%, 10%, 2.5%
-  States: Karnataka, Tamil Nadu, Kerala, Telangana, Andhra Pradesh, Uttar Pradesh, Bihar
-  Institutions: Finance Commission, GST Council, Article 280
-  People: Siddaramaiah, Arvind Panagariya, Thomas Isaac
-  Concepts: Income Distance, Demographic Performance, Divisible Pool, Finance Commission
-  Finance Commissions: 14th FC, 15th FC, 16th FC
-  Years: 1971, 2011, 2015, 2017, 2021, 2022, 2023, 2026
+  Numbers: 91, 37, 356, 1959, 1977, 1994, 2016, 1949, 1950, 2023
+  States: Kerala, Arunachal Pradesh, Tamil Nadu, Punjab, Bihar, Uttar Pradesh
+  Institutions: President's Rule, Article 356, Supreme Court, Parliament, Lok Sabha, Rajya Sabha
+  People: B.R. Ambedkar, Governor, Chief Minister, Prime Minister, President
+  Concepts: Constitutional Machinery, Bommai Judgment, Sarkaria Commission
+  Cases: S.R. Bommai, Article 356
 
-THIS VIDEO'S TOPIC: Indian fiscal federalism — Finance Commission devolution formula,
-South Indian states (especially Karnataka) losing tax share due to population-based formula
-changes (1971 → 2011 census), and the 15th/16th Finance Commission arithmetic.
+THIS VIDEO'S TOPIC: Article 356 of the Indian Constitution — President's Rule, how the central
+government can dismiss state governments, historical misuse (Kerala 1959, 9 states 1977,
+Arunachal Pradesh 2016), the Bommai judgment, and constitutional federalism in India.
 Any image showing content from a completely different topic (recipes, sports, foreign countries,
-unrelated people, product advertisements, etc.) is off-topic.
+unrelated people, product advertisements, cooking etc.) is off-topic.
 
 RUBRIC — check each dimension:
 1. style_ok       : Does it match the style guide? (doodle, white bg, correct palette)
 2. content_match  : Does the image clearly depict what INTENDED VISUAL describes?
-3. overlay_ok     : Is the OVERLAY TEXT visible, legible, and present in the image?
-                    (Mark true if overlay is absent but not required to be in the image itself)
+3. overlay_ok     : ALWAYS mark true. Overlay text is added by a separate PIL stage AFTER
+                    image generation — it will NOT be in the AI-generated image. Never fail
+                    an image for missing overlay text.
 4. ratio_ok       : Is the image landscape / 16:9? (mark true if unsure)
 5. no_artifacts   : Is the image free of AI generation errors (mangled text, extra limbs,
                     distorted shapes, blurry regions)?
@@ -110,12 +109,15 @@ RUBRIC — check each dimension:
 TYPO REPORTING: If no_typos is false, list the exact wrong text found and what it should be.
 
 VERDICT rules:
-- "PASS"  : All 8 dimensions OK
-- "WARN"  : 1–2 minor issues — style slightly off, text small but readable, content mostly right,
-            minor spelling variant (e.g. "Siddaramaiah" vs "Siddaramaiah" — acceptable)
-- "FAIL"  : Any of: wrong style entirely, content unrecognisable, required text missing/unreadable,
-            obvious AI artifacts, confirmed typo in a key number or proper noun,
-            image is off-topic, watermark present
+- "PASS"  : All dimensions OK (flat cartoon style, correct content, no bad artifacts)
+- "WARN"  : 1–2 minor issues — mascot proportions slightly off, minor composition issue,
+            content mostly right but one element missing
+- "FAIL"  : Any of: photorealistic 3D render (not cartoon), content completely wrong/unrecognisable,
+            obvious AI artifacts (extra limbs, distorted shapes, blurry key areas), confirmed typo
+            in a key number or proper noun from KEY TERMS, image is off-topic (completely different
+            subject), watermark present.
+            Do NOT fail for: expressive cartoon faces (that's correct style), missing overlay text
+            (PIL handles that), vibrant colors (that's correct), detailed mascot character (correct).
 
 Respond with ONLY this JSON (no markdown, no explanation):
 {{

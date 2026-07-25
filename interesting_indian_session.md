@@ -126,15 +126,43 @@ Where things stand:
 - Decided on **Option A**: name shared images as `group-XX.png` and let the stitch script handle fallback natively
 - Same approach should eventually be ported to `shorts_pipeline2/stitch_video_complete.py`
 
-## Immediate Next Steps (Resume Here)
-1. **Upload ep01 to YouTube** — `ep01/output/ep01_final.mp4` ready; metadata in `ep01/metadata_*.txt`
-2. **Thumbnail** — still needed for ep01 before upload; will be automated for ep02+
-3. **Chapter markers** — run Whisper on final MP4, Claude groups into chapters for description
-4. **YouTube upload script** — `upload_youtube.py` (YouTube Data API v3); covers upload + thumbnail + chapters + scheduling
-5. **Notification agent** — email/Telegram alert when pipeline completes or checkpoint fires
-6. **Analytics feedback loop** — after 7 days live, pull YouTube Analytics into Research Agent's competitive intelligence
-7. **GitHub:** push `interested_indian_pipeline` repo (blocked on repo-naming mismatch)
-8. **Port group fallback to shorts_pipeline2:** add `visual_group_id` → `group-XX.png` lookup to `stitch_video_complete.py`
+## Immediate Next Steps (Resume Here) — updated 2026-07-23
+
+### EP01 Status: Video generated ✓ — Testing in progress
+- `ep01_final.mp4` generated (10:50 duration, -26.85 dBFS, 1920×1080)
+- Visual quality confirmed good from screenshots (flat cartoon style ✓, text overlays ✓, channel branding ✓)
+- **Pending before upload:**
+  - Regenerate voiceover with male voice (en-US-GuyNeural) — manifest has JennyNeural (female)
+  - Review video end-to-end and note any image quality issues
+  - Generate thumbnail: `python generate_thumbnail.py --project ep01`
+  - Generate chapters: `python generate_chapters.py --project ep01`
+  - Upload: `python run_episode_v2.py --project ep01 --from-stage upload`
+
+### To regenerate EP01 voice with male voice:
+```powershell
+python generate_source_audio.py --project ep01 --script ep01\script_the_clause_that_makes_the_president_ask_the_govern.txt --voice en-US-GuyNeural
+python run_episode_v2.py --project ep01 --from-stage split
+```
+
+### Pipeline fixes in this session (2026-07-23):
+1. **PIL text overlay stage** (`add_text_overlays.py`) — burns OVERLAY text from prompts file onto images post-generation. Navy banner bottom, white bold text, amber badge. Backed up as `_orig.png`. Added to STAGE_ORDER between images and stitch.
+2. **AI text typos fixed** — `generate_image_prompts.py` updated to forbid text in AI image prompts; all text added via PIL overlay stage.
+3. **`generate_images_aibmm.py` `--force-general` flag** — generates map/chart/photo scenes as cartoon illustrations instead of routing to dedicated generators.
+4. **`stitch_video_longform.py` group image resolution** — `resolve_group_images()` copies group rep → all member filenames before stitch. Now logs each copy (no silent failure).
+5. **BGM support** — `common/bgm/default.mp3` created. Stitch falls back to `common/bgm/` automatically if no `ep01/bgm.mp3`.
+6. **Voice config** — `channel_config.json` now has `voice.default = en-US-GuyNeural`. Pipeline reads this instead of hardcoded JennyNeural.
+7. **Ken Burns zoom configurable** — `channel_config.json` `stitch.ken_burns_zoom = 1.05` (was hardcoded 1.08). Stitch reads at startup.
+8. **`review_images.py`** — fixed style guide (was checking "minimalist stick figures"), fixed topic (was fiscal federalism), fixed overlay_ok check (always true, PIL adds separately).
+9. **`generate_images_flux.py`** — fixed STYLE_PREFIX (was injecting "stick figures" into every prompt).
+10. **`auto_split_scenes_v1_stage3_export.py`** — now writes `duration` per scene and `total_duration` to manifest.
+
+### Remaining tasks:
+- #11 Install CUDA PyTorch in transcription-tools venv (WhisperX slow on CPU)
+- #12 Fix banned word false positives in script reviewer
+- #13 Tune question ratio threshold in script reviewer
+- #14 Review EP01 generated images for visual style quality
+- #15 Build notification agent
+- #16 Build analytics feedback loop
 
 ## Automation Pipeline (Multi-Agent System)
 
@@ -339,4 +367,192 @@ OPENAI_API_KEY=...   ✓ confirmed working
 - #15 Build notification agent
 - #16 Build analytics feedback loop
 - EP01 pipeline: check if WhisperX finished (manifest.json?), resume from prompts stage if yes
+
+---
+
+## Session — ElevenLabs Integration, EP01 End-to-End Test, Pipeline Bug Fixes (July 2026)
+
+### ElevenLabs TTS — Replacing Edge TTS as Default
+
+- **Voice selected:** ANX - Deep & Friendly (`gYQ0co3BoppQZ8BDM3lj`), `eleven_multilingual_v2`, stability 0.5, similarity 0.75
+- **API key header:** `xi-api-key` (NOT `Authorization: Bearer` — confirmed via `debug_eleven_auth.py`)
+- **Key scopes needed:** `voices_read`, `user_read`, `text_to_speech`. Old key had none → created new key.
+- **10K char limit per call** → `generate_source_audio.py` rewritten with chunking: splits at sentence boundaries ≤9500 chars, generates each chunk separately, concatenates via pydub (fallback: ffmpeg concat)
+- **channel_config.json voice section updated:**
+  ```json
+  "voice": {
+      "provider": "elevenlabs",
+      "default": "gYQ0co3BoppQZ8BDM3lj",
+      "default_name": "ANX - Deep & Friendly",
+      "model": "eleven_multilingual_v2",
+      "stability": 0.5,
+      "similarity_boost": 0.75
+  }
+  ```
+- **Known issue:** ElevenLabs output is quiet. Fixed in stitch with `loudnorm=I=-14` (see Stitch section below).
+- **Tier:** Starter (40K chars/month). EP01 script = 11,759 chars = 2 chunks, ~30% of monthly quota.
+- **Helper scripts added:** `preview_elevenlabs_voices.py` (two-pass Indian accent search), `find_voice_id.py`, `debug_eleven_auth.py`
+- **Task #24:** Evaluate Google/Gemini TTS + other ElevenLabs Indian voices before committing long-term.
+
+### EP01 End-to-End Test — Article 356
+
+- **Script:** `script_the_clause_that_makes_the_president_ask_the_govern.txt` (1885 words, 11,759 chars)
+- **Audio:** ElevenLabs ANX, 2 chunks → 13.2 min voiceover → `ep01/source_audio/narration.mp3`
+- **Scenes:** 147 (WhisperX re-split after ElevenLabs audio — more scenes than original 130 due to longer audio)
+- **Images:** SCENE-001 to SCENE-130 from previous run. SCENE-131 to SCENE-147 were missing → copied SCENE-130.png as placeholder for pipeline test. All 83/98 FAIL on image review (wrong assets — see EP01 image issues below).
+- **Stitch:** Completed. Output at `interested_indian_pipeline/ep01_final.mp4` (not `ep01/output/` — see bug fix below).
+- **Upload:** https://www.youtube.com/watch?v=pqHPKA92xuk (private, no tags, no thumbnail via API)
+- **Duration:** ~13.5 min, 128 MB
+
+### EP01 Image Issues (AI Review via vidiq `vidiq_video_watch`)
+- 83/98 FAIL rate — wrong assets throughout (e.g. American flag + "LAW" book appears 3 times at 00:38, 04:27, 10:06 instead of Indian context images)
+- Video cuts off mid-sentence at 13:30 with no CTA
+- Narration severely quiet relative to BGM
+- Ken Burns zoom noticeable (was 1.08×)
+- **Action required:** Full image regen before proper re-upload
+
+### Pipeline Bug Fixes
+
+**1. `manifest["episode"]` stored full Windows path**
+- Root cause: `auto_split_scenes_v1_stage3_export.py` wrote `"episode": args.project` where `args.project` was the full absolute path passed by `pipeline_agents.py`.
+- Effect: `stitch_video_longform.py` did `os.path.join(output_dir, f"{episode}_final.mp4")` — Windows `os.path.join` treats an absolute second arg as the full path, dropping `output_dir`. Result: `ep01_final.mp4` wrote to pipeline root, not `ep01/output/`.
+- Fix: `auto_split_scenes_v1_stage3_export.py` → `"episode": os.path.basename(args.project.rstrip("/\\"))`
+- Fix: `stitch_video_longform.py` → defensive `os.path.basename()` on episode read (both occurrences)
+- Fix: `ep01/manifest.json` patched directly to `"episode": "ep01"`
+
+**2. `manifest["title"]` was "Untitled Episode"**
+- Root cause: `pipeline_agents.py` `_stage_split` never passed `--title` to the split script.
+- Fix: reads `self.state["data"].get("title", "")` and appends `--title title` to split command.
+- Fix: `ep01/manifest.json` patched to correct title.
+
+**3. `pipeline_agents.py` had no `__main__` entry point**
+- Fix: added `if __name__ == "__main__":` with argparse (`--project`, `--start-from`, `--only`).
+- Instantiation: `OrchestratorAgent(client, project_dir, review_agent, research_agent)`
+
+**4. `_review_stitch` looked for MP4 in one hardcoded path**
+- Fix: checks 3 candidate paths: `ep01/output/`, `ep01/`, pipeline root.
+
+**5. `upload_youtube.py` `_find_video()` searched only `ep01/output/`**
+- Fix: searches `ep01/output/`, `ep01/`, and pipeline root (in order).
+
+**6. `upload_youtube.py` tags `invalidTags` API error**
+- Root cause: unknown (sanitised tags looked clean, 485 chars, no special chars). Workaround: used `--no-tags` for EP01 upload.
+- Fix: metadata generation prompt updated to request "10-15 plain-word tags, no apostrophes, no hyphens, total under 400 chars".
+
+**7. `upload_youtube.py` thumbnail upload 403**
+- Cause: YouTube requires channel verification (1000+ subs) for API thumbnail upload.
+- Fix: `_upload_thumbnail` now catches 403 and warns instead of crashing. Upload thumbnail manually in YouTube Studio.
+
+### Stitch Audio/Visual Tuning
+
+| Setting | Before | After | Reason |
+|---|---|---|---|
+| `BGM_VOLUME` | 0.08 | 0.04 | EP01 review: BGM drowning narration |
+| `KEN_BURNS_ZOOM_RATIO` | 1.08 | 1.04 | EP01 review: zoom too noticeable |
+| Voice normalisation | none | `loudnorm=I=-14:TP=-1.5:LRA=11` on voice track | ElevenLabs quiet output |
+| BGM fade-in | none | `afade=t=in:st=0:d=2` | Smooth loop start |
+| amix weights | equal (1:1) | 4:1 voice:BGM | Ensure voice dominates |
+
+### CTA Setup
+
+- `common/cta/cta.png` — uses existing `cta_ai.png` (AI-generated, 1.2MB) — ✓ ready
+- `common/cta/cta_script.txt` — "If this made you think, subscribe. New episode every week. The Interested Indian — Indian history and policy, explained clearly."
+- `common/cta/cta.mp3` — **still needs generating.** Run in PowerShell:
+  ```powershell
+  cd C:\Bakcup_Asus\interested_indian_pipeline
+  python -m edge_tts --voice en-IN-PrabhatNeural --text "If this made you think, subscribe. New episode every week. The Interested Indian — Indian history and policy, explained clearly." --write-media common\cta\cta.mp3
+  ```
+- Note: using Edge TTS male voice (`en-IN-PrabhatNeural`) for CTA — acceptable mismatch since CTA is a distinct card moment. Regenerate with final narration voice once #24 is resolved.
+
+### generate_country_map.py (New)
+
+- Generalised from `generate_india_map.py` — works with any country's GeoJSON
+- `_detect_name_field()` auto-detects from priority list: `ST_NM, NAME_1, ADM1_NAME, shapeName, name, ...`
+- Latitude correction: `ax.set_aspect(1.0 / cos(mean_lat))` fixes E-W squishing at high latitudes
+- `--name-field` CLI override, `--india-regions` flag for India-specific region colors
+- Backward compatible: omitting `--geojson` defaults to India auto-download
+- Tested: India (ST_NM, aspect 0.947), UK (NAME_1, aspect 0.503), Germany (shapeName, ~50°N)
+
+### Immediate Next Steps (EP01 Re-Do)
+
+1. Generate CTA audio (PowerShell command above)
+2. Regen all 147 images — full regen with better prompts (`python pipeline_agents.py --project ep01 --only images`)
+3. Patch `ep01/episode_state.json` to reset stitch/metadata/upload as incomplete
+4. Re-stitch (`--only stitch`) — will now write to `ep01/output/ep01_final.mp4` ✓
+5. Re-run metadata (`--only metadata`) — will generate clean tags ✓
+6. Re-upload (`python upload_youtube.py --project ep01`) — no `--no-tags` needed this time
+7. Upload thumbnail manually in YouTube Studio
+
+### Pending Tasks (Updated)
+- #11 Install CUDA PyTorch in transcription-tools venv
+- #12 Fix banned word false positives in script reviewer
+- #13 Tune question ratio threshold in script reviewer
+- #14 EP01 image regen (147 scenes, full regen) ← **NEXT**
+- #15 Build notification agent
+- #16 Build analytics feedback loop
+- #21 Add `--topic` override flag to pipeline
+- #22 Add `--script-file` override flag to pipeline
+- #24 Find and finalise narration voice (ElevenLabs Indian voices + Google/Gemini TTS) ← **NEW**
+
+---
+
+## Session — Script DNA Reviewer Built (July 2026)
+
+### review_script.py (New — Task #26 ✓)
+
+`review_script.py` in `interested_indian_pipeline/` — standalone Channel DNA & wittiness reviewer.
+
+**What it checks (deterministic, instant, free):**
+- **Banned words**: "genuinely", "honestly", "straightforward" + all corporate clichés (unleash, unlock, dive into, tapestry, game-changer, delve, etc.)
+- **Humor density**: flags runs of 3+ consecutive paragraphs with no humor signals (modern analogy, self-aware observation, audience poke, etc.)
+- **Jargon translation**: flags any known policy term not followed by a translation signal (which is, meaning, basically, —, etc.) in the same sentence
+- **Clichés**: "over the years", "throughout history", "it is worth noting", etc.
+- **Hook quality**: must have specific number, be under ~80 words, create curiosity
+
+**What Claude checks (qualitative, ~$0.01 per review):**
+Scores 1–10 on 8 dimensions:
+- Hook quality, Humor density, Jargon clarity, Sentence rhythm, Audience address, Wittiness, Narrative arc, Overall
+- Flags 3–5 specific boring sentences with explanations
+- Highlights 2–3 best moments
+- Gives 3–5 actionable recommendations
+
+**Modes:**
+- `--quick` — deterministic only, instant (no API cost)
+- default — deterministic + Claude full review, saves `{project}/script_review.md`
+- `--deep` — also rewrites the 3 most boring sections (costs slightly more tokens)
+
+**Usage:**
+```powershell
+python review_script.py --project ep01
+python review_script.py --project ep01 --quick
+python review_script.py --project ep01 --deep
+python review_script.py --script ep01/script_*.txt
+```
+
+**Pipeline integration:**
+- Added `"review-script"` to `STAGE_ORDER` in `pipeline_agents.py` between `"script"` and `"voice"`
+- `_stage_review_script` method: runs quick then full review, parses overall score
+  - Score < 6: prompts user — [r]ewrite / [s]kip / [q]uit. Rewrite resets state to `script` stage.
+  - Score 6–6.9: warning, shows report path, asks ENTER to continue
+  - Score ≥ 7: passes automatically, logs score
+- Human can bypass with `[s]kip` for cases where they already reviewed manually
+
+**CHANNEL_DNA humor signals list** (used for density scan):
+Modern analogies: "sort of like", "kind of like", "imagine if", "think of it as", "which is basically", "which is bureaucrat for"
+Audience pokes: "I know exactly what", "I know what you", "before you say", "stay with me", "hear me out"
+Self-aware: "wait,", "okay, wait", "— right?", "— okay?", "(yes, really)", "(seriously)", "I spent", "I still don't"
+Indian pop culture: cricket, food delivery, gaming, zomato, swiggy, whatsapp, ola, uber, ipl
+
+### Pending Tasks (Updated)
+- #25 Finalize EP01 before publish (GATE — do not start EP02 until complete):
+  1. Generate CTA audio (PowerShell command in CTA section above)
+  2. Regen all 147 images (`python pipeline_agents.py --project ep01 --only images`)
+  3. Re-stitch (`--only stitch`) — now writes to `ep01/output/ep01_final.mp4` ✓
+  4. Re-run metadata (`--only metadata`) — clean tags ✓
+  5. Re-upload (`python upload_youtube.py --project ep01`)
+  6. Upload thumbnail manually in YouTube Studio
+  7. Add tags manually in YouTube Studio
+  8. Review final video → set public
+- #26 ✓ Build review_script.py — COMPLETE
+- #11, #12, #13, #14, #15, #16, #21, #22, #24 — see above
 

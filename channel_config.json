@@ -30,6 +30,21 @@
     "photo_scenes":  "search_pexels.py (Pexels API — TODO)"
   },
 
+  "voice": {
+    "provider": "elevenlabs",
+    "default": "gYQ0co3BoppQZ8BDM3lj",
+    "default_name": "ANX - Deep & Friendly",
+    "model": "eleven_multilingual_v2",
+    "stability": 0.5,
+    "similarity_boost": 0.75,
+    "note": "Provider: 'elevenlabs' or 'edge'. ElevenLabs voice ID stored here. Edge TTS fallback voices: en-US-GuyNeural, en-US-AndrewNeural, en-IN-PrabhatNeural."
+  },
+
+  "stitch": {
+    "ken_burns_zoom": 1.05,
+    "note": "Zoom ratio for Ken Burns effect. 1.05 = 5% zoom (subtle). 1.0 = disabled. Max recommended: 1.10."
+  },
+
   "pexels": {
     "api_key_env": "PEXELS_API_KEY",
     "note": "Free API, no watermark, commercial use OK. Get key at pexels.com/api"

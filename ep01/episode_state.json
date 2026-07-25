@@ -1,8 +1,15 @@
 {
-  "stage": "split",
+  "stage": "upload",
   "completed": [
     "topics",
-    "script"
+    "script",
+    "split",
+    "prompts",
+    "overlays",
+    "stitch",
+    "metadata",
+    "thumbnail",
+    "chapters"
   ],
   "data": {
     "topic_ideas": "# | Video Title | Core Institutional Focus\n---|---|---\n1 | Why Karnataka Gets ₹15 For Every ₹100 It Pays (And Why Everyone's Mad About It) | Finance Commission horizontal devolution formula and the \"rich state penalty\"\n2 | The 73 Seconds That Made Mumbai and Pune Different States — Forever | States Reorganisation Act 1956 and linguistic boundary commission decisions\n3 | Why Goa Has 12 MLAs Per Million People But UP Has 1 (And Yes, That's Completely Legal) | Delimitation freeze of 1976 and the unintended constitutional malapportionment\n4 | The Clause That Makes The President Ask The Governor To Ask The CM To Maybe Resign | Article 356 President's Rule and the bizarre constitutional choreography of state dismissals\n5 | Why Buying Land In Himachal Requires The Government's Permission But Bihar Doesn't | Article 371 special provisions for hill states vs. uniform property rights framework",
@@ -13,7 +20,10 @@
     },
     "title": "The Clause That Makes The President Ask The Governor To Ask The CM To Maybe Resign",
     "slug": "the_clause_that_makes_the_president_ask_the_govern",
-    "script_path": "C:\\Bakcup_Asus\\interested_indian_pipeline\\ep01\\script_the_clause_that_makes_the_president_ask_the_govern.txt"
+    "script_path": "C:\\Bakcup_Asus\\interested_indian_pipeline\\ep01\\script_the_clause_that_makes_the_president_ask_the_govern.txt",
+    "metadata_path": "/sessions/charming-elegant-lovelace/mnt/interested_indian_pipeline/ep01/metadata_the_clause_that_makes_the_president_ask_the_govern.txt",
+    "thumbnail_path": "/sessions/charming-elegant-lovelace/mnt/interested_indian_pipeline/ep01/thumbnail.png",
+    "chapters_path": "/sessions/charming-elegant-lovelace/mnt/interested_indian_pipeline/ep01/chapters.txt"
   },
   "retry_counts": {}
 }

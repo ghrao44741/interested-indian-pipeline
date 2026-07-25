@@ -101,7 +101,21 @@ FPS               = 30
 BGM_VOLUME        = 0.08          # slightly quieter than Shorts (0.10) — more room for narration
 RESOLUTION        = "1920x1080"   # landscape long-form
 KEN_BURNS_ENABLED = True
-KEN_BURNS_ZOOM_RATIO = 1.08       # 8% zoom — subtle, same as Shorts
+_KEN_BURNS_ZOOM_DEFAULT = 1.05    # 5% zoom — configurable via channel_config.json stitch.ken_burns_zoom
+
+def _load_ken_burns_zoom() -> float:
+    """Read zoom ratio from channel_config.json, falling back to default."""
+    cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "channel_config.json")
+    if os.path.exists(cfg_path):
+        try:
+            import json as _j
+            cfg = _j.loads(open(cfg_path, encoding="utf-8").read())
+            return float(cfg.get("stitch", {}).get("ken_burns_zoom", _KEN_BURNS_ZOOM_DEFAULT))
+        except Exception:
+            pass
+    return _KEN_BURNS_ZOOM_DEFAULT
+
+KEN_BURNS_ZOOM_RATIO = _load_ken_burns_zoom()
 DEFAULT_PAD_COLOR = "0xFAF7F2"    # fallback if no brand.json is found — historically That's Why's
                                   # color, carried over here by copy-paste. Add brand.json with this
                                   # project's real color; this default doesn't change until you do.
@@ -445,6 +459,52 @@ def burn_srt_captions(video_path: str, srt_path: str, output_path: str):
 # STEP 1 — STITCH
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def resolve_group_images(project_dir: str, scenes: list) -> None:
+    """
+    For grouped scenes that share one image, copy the group representative's
+    image file to each member scene's expected filename.
+
+    The generator saves one image per shot (e.g. SCENE-006.png for group-01).
+    The stitch script expects SCENE-007.png, SCENE-008.png etc. to also exist.
+    This function fills in the gaps by copying the first available group image
+    to all other member scene filenames.
+    """
+    import shutil
+    images_dir = os.path.join(project_dir, "images")
+
+    # Build: group_id → list of scene_ids in order
+    group_members: dict = {}
+    for scene in scenes:
+        gid = scene.get("visual_group_id")
+        if gid:
+            group_members.setdefault(gid, []).append(scene["id"])
+
+    for gid, members in group_members.items():
+        # Find the first member that has an image (the representative)
+        rep_path = None
+        for sid in members:
+            for ext in [".png", ".jpg", ".jpeg"]:
+                candidate = os.path.join(images_dir, f"{sid}{ext}")
+                if os.path.exists(candidate):
+                    rep_path = candidate
+                    break
+            if rep_path:
+                break
+
+        if not rep_path:
+            continue  # No image at all for this group — will be caught as MISSING later
+
+        # Copy to every member that is missing its image
+        for sid in members:
+            target = os.path.join(images_dir, f"{sid}.png")
+            if not os.path.exists(target):
+                try:
+                    shutil.copy2(rep_path, target)
+                    print(f"  [group] {os.path.basename(rep_path)} → {sid}.png")
+                except Exception as e:
+                    print(f"  ⚠ resolve_group_images: failed to copy {rep_path} → {target}: {e}")
+
+
 def run_stitch(project_dir: str, include_cta: bool = True) -> str:
     """Render all scenes → {project}/output/{episode}_final.mp4. Returns output path."""
     manifest_path = os.path.join(project_dir, "manifest.json")
@@ -453,9 +513,25 @@ def run_stitch(project_dir: str, include_cta: bool = True) -> str:
 
     episode = manifest["episode"]
     scenes  = manifest["scenes"]
+
+    # Fill in missing group-member images before planning
+    resolve_group_images(project_dir, scenes)
     output_dir   = os.path.join(project_dir, "output")
     output_file  = os.path.join(output_dir, f"{episode}_final.mp4")
-    bgm_path     = os.path.join(project_dir, "bgm.mp3")
+    # BGM: episode-level overrides common fallback
+    bgm_path = os.path.join(project_dir, "bgm.mp3")
+    if not os.path.exists(bgm_path):
+        # Fall back to common/bgm/default.mp3 (or first .mp3 found)
+        pipeline_dir  = os.path.dirname(os.path.abspath(__file__))
+        common_bgm    = os.path.join(pipeline_dir, "common", "bgm")
+        fallback      = os.path.join(common_bgm, "default.mp3")
+        if os.path.exists(fallback):
+            bgm_path = fallback
+        elif os.path.isdir(common_bgm):
+            for f in sorted(os.listdir(common_bgm)):
+                if f.endswith(".mp3"):
+                    bgm_path = os.path.join(common_bgm, f)
+                    break
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -472,7 +548,8 @@ def run_stitch(project_dir: str, include_cta: bool = True) -> str:
     print(f"Resolution: {RESOLUTION}")
     print(f"Pad color : {pad_color}" + ("" if pad_color != DEFAULT_PAD_COLOR else "  (default — add brand.json for this project's real color)"))
     print(f"Ken Burns : {'on' if KEN_BURNS_ENABLED else 'off'}  ({KEN_BURNS_ZOOM_RATIO}× zoom)")
-    print(f"BGM       : {'✓ ' + bgm_path if os.path.exists(bgm_path) else '✗ none'}")
+    bgm_label = f"✓ {bgm_path}" if os.path.exists(bgm_path) else "✗ none  (add common/bgm/default.mp3 or ep##/bgm.mp3)"
+    print(f"BGM       : {bgm_label}")
     if mascot_scenes:
         print(f"Mascot    : ✓ {len(mascot_scenes)} scene(s) configured")
     else:

@@ -27,13 +27,36 @@ token.json
 bgm.mp3
 ep01/bgm.mp3
 ep01/bgm_orig.mp3
+ep01_v1/bgm_orig.mp3
 common/cta/*.mp3
+common/bgm/
+
+# Voice preview audio (ElevenLabs test clips — regenerable)
+voice_previews/
+
+# CTA / channel images (binary, store separately)
+common/cta/*.png
+
+# Thumbnail and other generated episode images (regenerable)
+ep01/thumbnail.png
+ep01_v1/*.png
 
 # Large GeoJSON data files (one-time download, not code)
 *.geojson
 
 # Manifest backups (noise — keep only current manifest.json)
 ep01/manifest_backup_*.json
+ep01_v1/manifest_backup_*.json
+
+# Root-level generated outputs (large binary, fully regenerable)
+ep01_final.mp4
+ep01_captioned.mp4
+ep01_captions.srt
+test_*.png
+test_aibmm_scene.png
+test_map_*.png
+test_photo.png
+mascot_reference.png
 
 # OS / editor cruft
 __pycache__/

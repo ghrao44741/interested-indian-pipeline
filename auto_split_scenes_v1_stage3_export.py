@@ -482,16 +482,19 @@ def main():
             "script": corrected_text,
             "scene_type": scene["scene_type"],
             "visual_group_id": scene["visual_group_id"],
+            "duration": round(scene["end"] - scene["start"], 3),
             "whisperx_start": round(scene["start"], 6),
             "whisperx_end": round(scene["end"], 6)
         })
 
     # Step 5: Write manifest.json
+    total_duration = round(sum(s["duration"] for s in manifest_scenes), 3)
     manifest = {
-        "episode": args.project,
+        "episode": os.path.basename(args.project.rstrip("/\\")),  # always "ep01", never full path
         "title": args.title,
         "voice": args.voice,
         "word_segments_file": words_filename,
+        "total_duration": total_duration,
         "scenes": manifest_scenes
     }
 
