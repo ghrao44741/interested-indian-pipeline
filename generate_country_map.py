@@ -40,6 +40,12 @@ USAGE — pipeline integration:
 
 BACKWARD COMPAT — works as India-only replacement (omit --geojson):
     python generate_country_map.py --highlight "Karnataka,Tamil Nadu"
+
+NOTE — visual parity with generate_india_map.py: that script colors non-highlighted Indian
+states by North/South/East/West/Central/Northeast region BY DEFAULT. Here that's opt-in via
+--india-regions (deliberately not auto-applied just because the India GeoJSON was detected —
+this script stays generic, and a comparison episode wants matching, uncluttered styling on
+both sides). Add --india-regions if you want that same regional-coloring look for India alone.
 """
 
 import argparse
