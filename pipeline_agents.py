@@ -1648,7 +1648,7 @@ class OrchestratorAgent:
             vcfg     = cfg.get("voice", {})
             provider = vcfg.get("provider", provider)
             # Resolve voice by provider so Gemini/ElevenLabs/Edge each get the right key
-            if provider == "gemini":
+            if provider in ("gemini", "gemini_cloudtts"):
                 voice         = vcfg.get("gemini_voice", "Charon")
                 speaking_rate = vcfg.get("gemini_speaking_rate")  # e.g. 0.85
             elif provider == "elevenlabs":

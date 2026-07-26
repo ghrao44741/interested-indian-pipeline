@@ -4,6 +4,17 @@ Last updated: 2026-07-26
 
 ## Immediate
 
+- [x] **Narration voice decided: `gemini_cloudtts` (Charon, en-IN, styled)** — plain
+  `gemini` provider Charon sounded generically American, not Indian, since it never
+  set a locale at all. A/B'd via a real Cloud TTS call (`test_gemini31_en_in_voice.py`)
+  against Gemini 3.1 + `en-IN` locale + a style prompt ("warm, witty, conversational
+  Indian English") — confirmed as the pick, wired in as the new default provider.
+  Cloud TTS rejects plain API keys (confirmed via a real 401), so this goes through
+  gcloud OAuth2 instead (`gcloud auth login` once) — `generate_source_audio.py`
+  auto-falls-back to the plain `gemini` provider if gcloud isn't available, verified
+  by simulating that failure directly (not just reading the code). Real end-to-end
+  preview generation via the actual pipeline entry point confirmed a valid 31.5s MP3.
+
 - [x] **CTA audio generated** — `common/cta/cta.mp3` — 27,885 bytes ✓
 
 - [x] **Git commit + push** — route_images.py / pipeline_agents.py fixes pushed (`7dc9abf`)

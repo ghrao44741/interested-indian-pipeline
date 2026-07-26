@@ -2,10 +2,15 @@
 generate_source_audio.py
 The Interested Indian — Full-Script Voiceover Generator
 
-Supports three providers:
-  - gemini      (Google Gemini TTS — default, reads GEMINI_API_KEY from .env)
-  - elevenlabs  (reads from channel_config.json + ELEVENLABS_API_KEY in .env)
-  - edge        (free Edge TTS, no API key needed)
+Supports four providers:
+  - gemini_cloudtts  (default — Gemini 3.1 via Cloud Text-to-Speech, en-IN locale +
+                       style prompt for an Indian-accented narration. Requires the
+                       gcloud CLI installed and authenticated: gcloud auth login.
+                       Cloud TTS rejects plain API keys, unlike the other providers.)
+  - gemini           (Gemini Developer API — reads GEMINI_API_KEY from .env, no
+                       locale/style control, sounds more generically American)
+  - elevenlabs       (reads from channel_config.json + ELEVENLABS_API_KEY in .env)
+  - edge             (free Edge TTS, no API key needed)
 
 The script produces one continuous voiceover MP3 in {project}/source_audio/,
 which auto_split_scenes_v1_stage3_export.py then ingests for WhisperX alignment.
@@ -36,9 +41,11 @@ USAGE — full generation:
 
 import argparse
 import asyncio
+import base64
 import json
 import os
 import re
+import subprocess
 import sys
 import urllib.request
 from pathlib import Path
@@ -71,6 +78,15 @@ DEFAULT_VOICE_GEMINI   = _voice_cfg.get("gemini_voice", "Charon")
 DEFAULT_MODEL_GEMINI   = "gemini-2.5-flash-preview-tts"
 DEFAULT_SPEAKING_RATE  = _voice_cfg.get("gemini_speaking_rate", None)  # None = Gemini default (1.0)
 GEMINI_CHUNK_LIMIT   = 4500   # conservative limit per API call for long scripts
+
+DEFAULT_MODEL_CLOUDTTS  = _voice_cfg.get("gemini_cloudtts_model", "gemini-3.1-flash-tts-preview")
+DEFAULT_LOCALE_CLOUDTTS = _voice_cfg.get("gemini_cloudtts_locale", "en-IN")
+DEFAULT_STYLE_CLOUDTTS  = _voice_cfg.get("gemini_cloudtts_style", "")
+CLOUD_TTS_URL   = "https://texttospeech.googleapis.com/v1beta1/text:synthesize"
+CLOUDTTS_CHUNK_LIMIT = 4500   # conservative — not independently confirmed for this
+                               # Gemini-backed Cloud TTS endpoint; classic Cloud TTS
+                               # has a well-known 5000-char input limit, this mirrors
+                               # the same safety margin as GEMINI_CHUNK_LIMIT above.
 
 SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 
@@ -375,6 +391,135 @@ def gemini_list_voices():
     print("Test voices: python test_gemini_tts.py --voice <name>")
 
 
+# ── Gemini Cloud TTS provider (Gemini 3.1 + en-IN locale + style prompt) ────────
+# Uses Cloud Text-to-Speech (texttospeech.googleapis.com), NOT the Gemini Developer
+# API the 'gemini' provider above uses. Cloud TTS rejects plain API keys — it needs
+# OAuth2 user credentials, so this shells out to the gcloud CLI for a short-lived
+# access token. Requires: gcloud CLI installed + `gcloud auth login` run once.
+
+def _get_gcloud_access_token() -> tuple[str | None, str | None]:
+    """Fetch a short-lived OAuth2 access token from the already-authenticated gcloud
+    CLI, plus the active project ID (sent as X-Goog-User-Project for billing/quota
+    attribution when using user credentials instead of a service account).
+    The token is never printed or logged — it only ever flows into the request header.
+    Returns (token, project) — either may be None if gcloud isn't available/authed.
+    """
+    # shell=True needed on Windows: gcloud is a .cmd batch wrapper, and CreateProcess
+    # can't resolve PATHEXT-extension scripts without going through cmd.exe.
+    use_shell = sys.platform == "win32"
+    try:
+        tok = subprocess.run(["gcloud", "auth", "print-access-token"],
+                              capture_output=True, text=True, timeout=15, shell=use_shell)
+        proj = subprocess.run(["gcloud", "config", "get-value", "project"],
+                               capture_output=True, text=True, timeout=15, shell=use_shell)
+        token = tok.stdout.strip() if tok.returncode == 0 else None
+        project = proj.stdout.strip() if proj.returncode == 0 else None
+        return token, project
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None, None
+
+
+def _cloudtts_call(text: str, voice: str, locale: str, model: str, style_prompt: str,
+                    access_token: str, project: str | None,
+                    speaking_rate: float | None = None) -> bytes:
+    """Single Cloud Text-to-Speech API call → returns raw MP3 bytes.
+    Requests MP3 encoding directly (unlike the raw-PCM 'gemini' provider path),
+    so no WAV-wrapping step is needed for a single chunk.
+    """
+    body = {
+        "audioConfig": {
+            "audioEncoding": "MP3",
+            "pitch": 0,
+            "speakingRate": speaking_rate if speaking_rate is not None else 1,
+        },
+        "input": {
+            "prompt": style_prompt,
+            "text": text,
+        },
+        "voice": {
+            "languageCode": locale,
+            "modelName": model,
+            "name": voice,
+        },
+    }
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json; charset=utf-8",
+    }
+    if project:
+        headers["X-Goog-User-Project"] = project
+    req = urllib.request.Request(CLOUD_TTS_URL, data=json.dumps(body).encode(), headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            data = json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        body_err = e.read().decode()[:500]
+        print(f"❌ Cloud TTS API error {e.code}: {body_err}")
+        if e.code == 401:
+            print("   Access token expired or gcloud not authenticated — run: gcloud auth login")
+        elif e.code == 403:
+            print("   Check Cloud Text-to-Speech API + billing are enabled for the active gcloud project:")
+            print("   https://console.cloud.google.com/apis/library/texttospeech.googleapis.com")
+        sys.exit(1)
+    if "audioContent" not in data:
+        print(f"❌ No audioContent in Cloud TTS response: {json.dumps(data)[:300]}")
+        sys.exit(1)
+    return base64.b64decode(data["audioContent"])
+
+
+def cloudtts_generate(text: str, voice: str, output_path: str,
+                       model: str = DEFAULT_MODEL_CLOUDTTS,
+                       locale: str = DEFAULT_LOCALE_CLOUDTTS,
+                       style_prompt: str = DEFAULT_STYLE_CLOUDTTS,
+                       speaking_rate: float | None = None):
+    """Generate full narration via Cloud TTS (Gemini 3.1 + locale + style prompt),
+    chunking long scripts and concatenating MP3 chunks via the same helper the
+    ElevenLabs path uses.
+    """
+    access_token, project = _get_gcloud_access_token()
+    if not access_token:
+        print("⚠  Could not get a gcloud access token (gcloud not installed, or not")
+        print("   authenticated — run: gcloud auth login). gemini_cloudtts needs gcloud;")
+        print("   falling back to the 'gemini' provider (Gemini Developer API — no")
+        print("   locale/style control, but works with just GEMINI_API_KEY).")
+        gemini_generate(text, voice, output_path, speaking_rate=speaking_rate)
+        return
+
+    rate_label = f"  speaking_rate={speaking_rate}" if speaking_rate is not None else ""
+    chunks = _split_into_chunks(text, max_chars=CLOUDTTS_CHUNK_LIMIT)
+    print(f"  Cloud TTS: {len(chunks)} chunk(s), voice={voice}, model={model}, "
+          f"locale={locale}{rate_label}")
+    if style_prompt:
+        print(f"  Style: {style_prompt}")
+
+    if len(chunks) == 1:
+        audio_bytes = _cloudtts_call(text, voice, locale, model, style_prompt,
+                                      access_token, project, speaking_rate)
+        Path(output_path).write_bytes(audio_bytes)
+        print(f"  ✓ Chunk 1/1 done")
+        return
+
+    tmp_dir = Path(output_path).parent / "_cloudtts_chunks"
+    tmp_dir.mkdir(exist_ok=True)
+    chunk_paths = []
+    for i, chunk in enumerate(chunks, 1):
+        print(f"  ⏳ Chunk {i}/{len(chunks)} ({len(chunk)} chars)...")
+        audio_bytes = _cloudtts_call(chunk, voice, locale, model, style_prompt,
+                                      access_token, project, speaking_rate)
+        p = tmp_dir / f"chunk_{i:03d}.mp3"
+        p.write_bytes(audio_bytes)
+        chunk_paths.append(p)
+        print(f"  ✓ Chunk {i}/{len(chunks)} done")
+
+    print(f"  Concatenating {len(chunks)} chunks...")
+    _concat_mp3_chunks(chunk_paths, output_path)
+
+    for p in chunk_paths:
+        p.unlink(missing_ok=True)
+    tmp_dir.rmdir()
+    print(f"  ✓ Concatenation done")
+
+
 # ── Edge TTS provider ──────────────────────────────────────────────────────────
 
 async def edge_list_voices(locale: str = "en-US"):
@@ -421,7 +566,7 @@ async def main():
     parser.add_argument("--project",   help="Episode folder (e.g. ep01)")
     parser.add_argument("--script",    help="Path to narration .txt file")
     parser.add_argument("--provider",  default=DEFAULT_PROVIDER,
-                        choices=["gemini", "elevenlabs", "edge"],
+                        choices=["gemini_cloudtts", "gemini", "elevenlabs", "edge"],
                         help=f"TTS provider (default from channel_config: {DEFAULT_PROVIDER})")
     parser.add_argument("--voice",     default=None,
                         help="Voice ID (ElevenLabs) or voice name (Edge TTS). Defaults from channel_config.json.")
@@ -442,8 +587,8 @@ async def main():
     if args.list_voices:
         if args.provider == "edge":
             await edge_list_voices(args.locale)
-        elif args.provider == "gemini":
-            gemini_list_voices()
+        elif args.provider in ("gemini", "gemini_cloudtts"):
+            gemini_list_voices()   # same voice names for both Gemini-backed providers
         else:
             elevenlabs_list_voices()
         return
@@ -470,7 +615,7 @@ async def main():
         sys.exit(1)
 
     # Resolve voice
-    if args.provider == "gemini":
+    if args.provider in ("gemini", "gemini_cloudtts"):
         voice = args.voice or DEFAULT_VOICE_GEMINI
     elif args.provider == "elevenlabs":
         voice = args.voice or DEFAULT_VOICE_EL
@@ -504,8 +649,11 @@ async def main():
     print(f"Output  : {output_path}")
     print(f"{'─' * 55}")
 
-    if args.provider == "gemini":
+    if args.provider == "gemini_cloudtts":
         # CLI flag overrides config; config overrides Gemini default (1.0)
+        rate = args.speaking_rate if args.speaking_rate is not None else DEFAULT_SPEAKING_RATE
+        cloudtts_generate(text, voice, output_path, speaking_rate=rate)
+    elif args.provider == "gemini":
         rate = args.speaking_rate if args.speaking_rate is not None else DEFAULT_SPEAKING_RATE
         gemini_generate(text, voice, output_path, speaking_rate=rate)
     elif args.provider == "elevenlabs":

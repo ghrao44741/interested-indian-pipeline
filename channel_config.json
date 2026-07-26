@@ -46,18 +46,22 @@
   },
 
   "voice": {
-    "provider": "gemini",
+    "provider": "gemini_cloudtts",
     "gemini_voice": "Charon",
     "gemini_model": "gemini-2.5-flash-preview-tts",
     "gemini_speaking_rate": 0.85,
-    "_speaking_rate_note": "0.25=slowest, 1.0=default, 4.0=fastest. Implemented via SSML <prosody rate='85%'>. Charon at 1.0 feels rushed — 0.85 is recommended starting point.",
+    "_speaking_rate_note": "0.25=slowest, 1.0=default, 4.0=fastest. 'gemini' provider implements this via SSML <prosody rate='85%'>; 'gemini_cloudtts' uses the native audioConfig.speakingRate field instead. Charon at 1.0 feels rushed — 0.85 is recommended starting point.",
     "gemini_note": "Charon selected 2026-07-25 — deep, authoritative, best for commentary. Tested vs Fenrir/Orus/Puck.",
+    "gemini_cloudtts_model": "gemini-3.1-flash-tts-preview",
+    "gemini_cloudtts_locale": "en-IN",
+    "gemini_cloudtts_style": "Read aloud in a warm, witty, conversational Indian English tone for a faceless YouTube channel narration.",
+    "_gemini_cloudtts_note": "Selected 2026-07-26 after A/B vs plain 'gemini' provider Charon, which sounded generically American, not Indian — see voice_previews/gemini31_Charon_enIN_styled.wav. Goes through Cloud Text-to-Speech (texttospeech.googleapis.com), a different API from the Gemini Developer API the 'gemini' provider uses — Cloud TTS rejects plain API keys, so this REQUIRES the gcloud CLI installed and authenticated (gcloud auth login) on whatever machine runs the pipeline. Falls back to provider 'gemini' if gcloud isn't available.",
     "elevenlabs_default": "gYQ0co3BoppQZ8BDM3lj",
     "elevenlabs_name": "ANX - Deep & Friendly",
     "model": "eleven_multilingual_v2",
     "stability": 0.5,
     "similarity_boost": 0.75,
-    "note": "Provider: 'gemini' (default), 'elevenlabs', or 'edge'. Switch provider here or pass --provider flag."
+    "note": "Provider: 'gemini_cloudtts' (default, Indian-accented via Cloud TTS + en-IN locale + style prompt, needs gcloud auth), 'gemini' (Gemini Developer API, simple API key, no locale/style control), 'elevenlabs', or 'edge'. Switch provider here or pass --provider flag."
   },
 
   "stitch": {
