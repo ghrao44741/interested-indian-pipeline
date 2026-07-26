@@ -77,15 +77,7 @@ Post-upload (manual in YouTube Studio):
 
 ## Pipeline Improvements
 
-- [ ] **#7** Tune question ratio threshold in `review_script.py`
-  - 5–6 questions in 1800 words should not fail (~1 per 400 words, not 250)
-
-- [ ] **#9** Wire `generate_chart.py` as CHART route in `route_images.py`
-  - Currently CHART falls back to xAI Grok; should use matplotlib for accurate data visuals
-
-- [ ] **#10** Update `generate_thumbnail.py` to composite onto base images
-  - Use `common/thumbnails/base_light.png` (even episodes) / `base_dark.png` (odd episodes)
-  - PIL text composite for title + episode number
+(none currently open — #7, #9, #10 closed below)
 
 ## Infrastructure
 
@@ -142,3 +134,31 @@ Post-upload (manual in YouTube Studio):
   stage (`OrchestratorAgent.inject_topic`), script generation still runs normally with
   the supplied topic. Mutually exclusive with `--script-file`. Verified state transitions
   in isolation (stage→script, topics marked complete) without an API call.
+- [x] **#7** Question-ratio threshold recalibrated to 0.04 (was 0.08) in `pipeline_agents.py`
+  (`ReviewAgent._review_script` + `_print_script_preview` — NOT `review_script.py`, which
+  has no such check; TASKS.md previously named the wrong file). Calibrated against 4 real
+  generated scripts, not an estimate — `ep01`'s real 5-questions/1885-words case now
+  passes (0.0427 ≥ 0.04), `ep01_v1`/`test_channel_dna` (weak scripts) still correctly fail.
+  Confirmed the check is non-blocking either way (`passed` is always score-based, and this
+  check never touches score) — a diagnostic-accuracy fix, not a gate fix. Separately
+  confirmed `review_script.py`'s actual Claude-based `OVERALL_SCORE` gate doesn't
+  over-penalize question density (read a real `--deep` review's RHYTHM_SCORE rationale —
+  it's about sentence-length monotony, never mentions question marks) — no fix needed there.
+- [x] **#9** Wired `generate_chart.py` as the real CHART route. Bigger than the backlog
+  description implied — required a new `CHART_ARGS` schema in `generate_image_prompts.py`
+  (mirrors `MAP_ARGS`) plus parsing/validation/dispatch in `route_images.py`
+  (`_validate_chart_args`, `run_chart`, downgrade-to-CARTOON on missing/invalid args,
+  mirroring the existing MAP_ARGS-missing fallback). Verified end-to-end: hand-authored
+  a test prompts file with valid/missing/invalid CHART_ARGS, ran a real (non-dry-run)
+  generation, and visually confirmed the resulting chart PNG rendered correctly
+  (brand-colored bar chart, correct labels/values) — not just that the subprocess exited 0.
+- [x] **#10** `generate_thumbnail.py` now composites onto `common/thumbnails/base_light.png`
+  / `base_dark.png` (cover-fit-cropped to 1280×720) instead of a solid-colour canvas,
+  with a PIL-drawn title in the natural gap between the mascot and map/silhouette art
+  (scrim behind it for legibility) and an "EPxx" badge in the top corner opposite the
+  mascot. The base art already has "THE INTERESTED INDIAN" baked into its own footer —
+  deliberately does NOT redraw a competing footer. Original solid-canvas path preserved
+  untouched as the fallback when base art is missing. Iterated visually against the
+  actual PNGs (not just a clean exit code) — first pass had the text scrim overlapping
+  the mascot's face on a long test title; narrowed the text zone and made badge placement
+  theme-aware to fix it, then re-verified on both a long and a realistic-length title.

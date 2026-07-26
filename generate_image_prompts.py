@@ -138,13 +138,28 @@ If no specific states to highlight (general overview), omit --highlight entirely
 Example: MAP_ARGS: --highlight "Kerala,Karnataka,Tamil Nadu" --callout "South India Block"
 Example: MAP_ARGS: --highlight "Delhi" --highlight2 "Chandigarh,Puducherry" --callout "UTs With Legislatures"
 
+CHART_ARGS format (only for CHART type): --type <bar|stat|timeline|pie> --data '<JSON array>' [--title "Chart Title"]
+  --type = bar (comparisons), stat (single big number/stat card), timeline (chronological events), pie (proportions)
+  Data point shape per type (copy exactly):
+    bar:      [{"label":"Karnataka","value":15,"unit":"p"},{"label":"UP","value":8,"unit":"p"}]
+    stat:     [{"stat":"91","label":"President Rule impositions since 1950","color":"#C0392B"}]
+    timeline: [{"year":1959,"event":"Kerala dismissed"},{"year":1977,"event":"9 Congress states"}]
+    pie:      [{"label":"Politically motivated","value":60},{"label":"Hung assembly","value":30}]
+  CRITICAL — CHART_ARGS must stay valid on a SINGLE line:
+    - Wrap the whole JSON array in single quotes: --data '[...]'; double quotes only inside the JSON
+    - No literal newlines inside --data; keep it compact
+    - Never use the words NARRATION, PROMPT, OVERLAY, or CUE inside any label/event/stat text (reserved field markers)
+  If not confident the JSON will be valid, or the data doesn't cleanly fit one of these 4 shapes, use TYPE: CARTOON instead.
+  Example: CHART_ARGS: --type bar --data '[{"label":"Kerala","value":1},{"label":"UP","value":9}]' --title "Article 356 Uses by State"
+
 OUTPUT FORMAT — output exactly this structure for each scene, nothing else:
 SHOT: [shot number, 2 digits e.g. 01]
 FILE: [image filename e.g. SCENE-001.png or group-01.png]
 TYPE: [CARTOON or MAP or CHART or PHOTO]
 MAP_ARGS: [only include this line for MAP type — e.g. --highlight "Kerala" --callout "Kerala 1959"]
+CHART_ARGS: [only include this line for CHART type — e.g. --type bar --data '[{"label":"Kerala","value":1}]' --title "Article 356 Uses"]
 NARRATION: [exact narration text provided]
-PROMPT: [image generation prompt — always write one even for MAP, used as fallback description]
+PROMPT: [image generation prompt — always write one even for MAP/CHART, used as fallback description]
 OVERLAY: [editor text overlay, 4-8 words]
 CUE: [editor motion/animation directive]
 ---"""
@@ -223,6 +238,7 @@ def parse_claude_output(text: str, shots: list[dict]) -> list[dict]:
             "narration": lines.get("NARRATION", ""),
             "type":     lines.get("TYPE", "CARTOON").strip().upper(),
             "map_args": lines.get("MAP_ARGS", "").strip(),
+            "chart_args": lines.get("CHART_ARGS", "").strip(),
             "prompt":   lines.get("PROMPT", ""),
             "overlay":  lines.get("OVERLAY", ""),
             "cue":      lines.get("CUE", ""),
@@ -248,11 +264,12 @@ def build_output_line(shot: dict, result: dict) -> str:
     scene_type = result.get("type", "CARTOON").strip().upper()
     if scene_type not in ("CARTOON", "MAP", "CHART", "PHOTO"):
         scene_type = "CARTOON"
-    map_args_part = f" MAP_ARGS: {result['map_args']}" if result.get("map_args") else ""
+    map_args_part   = f" MAP_ARGS: {result['map_args']}" if result.get("map_args") else ""
+    chart_args_part = f" CHART_ARGS: {result['chart_args']}" if result.get("chart_args") else ""
 
     return (
         f"**SHOT {shot_label}** · {primary_id} · {type_str} → `{shot['file']}` "
-        f"TYPE: {scene_type}{map_args_part} "
+        f"TYPE: {scene_type}{map_args_part}{chart_args_part} "
         f"NARRATION: \"{shot['narration']}\" "
         f"PROMPT: {result['prompt']} "
         f"OVERLAY: {result['overlay']} "

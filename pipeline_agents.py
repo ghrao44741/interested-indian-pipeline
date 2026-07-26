@@ -334,15 +334,16 @@ class ReviewAgent:
             issues.append(f"Banned words found: {', '.join(found_banned)}")
             recs.append(f"Remove or rephrase: {', '.join(found_banned)}")
 
-        # Rule: questions (at least 1 per 7 sentences)
+        # Rule: questions (roughly 1 per 400 words of narration — was ~1 per 250 words, too strict;
+        # recalibrated against real generated scripts, see TASKS.md)
         # Count '?' in the raw text — splitting on [.!?] consumes delimiters so endswith('?') never fires.
         question_count = text.count("?")
         # Approximate sentence count from full stops + exclamations + questions
         sentence_count = text.count(".") + text.count("!") + question_count
         sentence_count = max(sentence_count, 1)
         q_ratio = question_count / sentence_count
-        if q_ratio < 0.08:
-            issues.append(f"Too few questions: {question_count} questions in ~{sentence_count} sentences (need ~1 per 6–7)")
+        if q_ratio < 0.04:
+            issues.append(f"Too few questions: {question_count} questions in ~{sentence_count} sentences (need ~1 per 25, roughly 1 per 400 words)")
             recs.append("Add more rhetorical questions to break up the narration")
 
         # Claude quality check
@@ -1571,7 +1572,7 @@ class OrchestratorAgent:
         found_banned = [w for w in BANNED_WORDS if w in script_text.lower()]
 
         wc_flag    = "✓" if 1800 <= wc <= 3400 else "✗"
-        q_flag     = "✓" if q_ratio >= 0.08 else "⚠"
+        q_flag     = "✓" if q_ratio >= 0.04 else "⚠"
         ban_flag   = "✓" if not found_banned else "✗"
 
         print(f"  {wc_flag}  Words   : {wc}  (target 2,000–3,200)")

@@ -40,9 +40,9 @@
 
   "image_pipeline": {
     "mascot_scenes": "generate_images_aibmm.py (GPT Image 2 + mascot reference)",
-    "map_scenes":    "generate_india_map.py (geopandas — TODO)",
-    "chart_scenes":  "generate_chart.py (matplotlib — TODO)",
-    "photo_scenes":  "search_pexels.py (Pexels API — TODO)"
+    "map_scenes":    "generate_india_map.py (geopandas)",
+    "chart_scenes":  "generate_chart.py (matplotlib)",
+    "photo_scenes":  "search_pexels.py (Pexels API)"
   },
 
   "voice": {

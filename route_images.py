@@ -6,8 +6,8 @@ and calls the appropriate generator:
 
   MAP    → generate_india_map.py   (accurate GeoJSON — never AI-generated)
   CARTOON → generate_images_flux.py (xAI Grok)
-  CHART  → generate_images_flux.py  (fallback; future: generate_chart.py)
-  PHOTO  → generate_images_flux.py  (fallback; future: search_pexels.py)
+  CHART  → generate_chart.py        (matplotlib)
+  PHOTO  → search_pexels.py         (Pexels API, falls back to generate_images_flux.py)
 
 Scenes without a TYPE field are classified by keyword matching (legacy prompts).
 
@@ -21,6 +21,7 @@ USAGE:
 """
 
 import argparse
+import json
 import re
 import shlex
 import subprocess
@@ -73,6 +74,33 @@ def _classify_by_keywords(line: str) -> str:
     return "CARTOON"
 
 
+def _validate_chart_args(chart_args: str) -> bool:
+    """Verify a CHART_ARGS string shlex-splits cleanly and contains a valid
+    --type (one of bar/stat/timeline/pie) and a --data value that parses as
+    non-empty JSON array. This is the code-level backstop for the LLM's
+    CHART_ARGS output — if this returns False, the caller must downgrade the
+    shot to CARTOON rather than pass a broken --data string to generate_chart.py.
+    """
+    try:
+        tokens = shlex.split(chart_args)
+    except ValueError:
+        return False
+    if "--type" not in tokens or "--data" not in tokens:
+        return False
+    try:
+        chart_type = tokens[tokens.index("--type") + 1]
+        data_str   = tokens[tokens.index("--data") + 1]
+    except IndexError:
+        return False
+    if chart_type not in ("bar", "stat", "timeline", "pie"):
+        return False
+    try:
+        data = json.loads(data_str)
+    except (json.JSONDecodeError, TypeError):
+        return False
+    return isinstance(data, list) and len(data) > 0
+
+
 def parse_shots(prompts_path: Path) -> list[dict]:
     """Parse every shot from the one-line prompts file."""
     shots = []
@@ -86,7 +114,7 @@ def parse_shots(prompts_path: Path) -> list[dict]:
             continue
 
         # TYPE field (new prompts)
-        raw_type = _field(line, "TYPE", ["MAP_ARGS", "NARRATION", "PROMPT", "OVERLAY", "CUE"])
+        raw_type = _field(line, "TYPE", ["MAP_ARGS", "CHART_ARGS", "NARRATION", "PROMPT", "OVERLAY", "CUE"])
         raw_type = raw_type.upper() if raw_type else ""
         if raw_type not in ("CARTOON", "MAP", "CHART", "PHOTO"):
             raw_type = _classify_by_keywords(line)
@@ -102,6 +130,21 @@ def parse_shots(prompts_path: Path) -> list[dict]:
                 raw_type = "CARTOON"  # fallback: no highlight args → AI is better
                 print(f"  ⚠  SHOT {m_shot.group(1)}: MAP type but no MAP_ARGS — routing to AI (re-run prompts stage to get proper map args)")
 
+        # CHART_ARGS field (only meaningful for CHART type).
+        # CHART_ARGS carries an embedded JSON --data payload on a single line, which is
+        # more failure-prone than MAP_ARGS' simple comma list (quoting, or a stray field
+        # name inside label/event text confusing _field()'s boundary regex). Validate it
+        # here at parse time — if it's missing, unparsable, or the JSON is invalid/empty,
+        # downgrade to CARTOON rather than let generate_chart.py fail later as a subprocess.
+        chart_args = ""
+        if raw_type == "CHART":
+            chart_args = _field(line, "CHART_ARGS", ["NARRATION", "PROMPT", "OVERLAY"])
+            if not chart_args or not _validate_chart_args(chart_args):
+                reason = "no CHART_ARGS" if not chart_args else "invalid CHART_ARGS (bad/missing --type or --data JSON)"
+                print(f"  ⚠  SHOT {m_shot.group(1)}: CHART type but {reason} — routing to AI (re-run prompts stage to get proper chart args)")
+                raw_type = "CARTOON"
+                chart_args = ""
+
         # Parse narration for Pexels keyword extraction
         m_narr = re.search(r'NARRATION:\s*"([^"]+)"', line)
         narration = m_narr.group(1) if m_narr else ""
@@ -111,6 +154,7 @@ def parse_shots(prompts_path: Path) -> list[dict]:
             "file":     m_file.group(1),
             "type":     raw_type,
             "map_args": map_args,
+            "chart_args": chart_args,
             "narration": narration,
         })
 
@@ -131,6 +175,27 @@ def run_map(shot: dict, images_dir: Path, script_dir: Path) -> bool:
         except ValueError:
             # Malformed quoted string — pass as single arg, map script will error clearly
             cmd.append(shot["map_args"])
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        err = (result.stderr or result.stdout or "unknown error").strip()[:200]
+        print(f"✗  {err}")
+        return False
+    return True
+
+
+def run_chart(shot: dict, images_dir: Path, script_dir: Path) -> bool:
+    """Call generate_chart.py for one CHART shot. Returns True on success."""
+    out_path = images_dir / shot["file"]
+    chart_script = script_dir / "generate_chart.py"
+
+    cmd = [sys.executable, str(chart_script), "--out", str(out_path)]
+    if shot["chart_args"]:
+        try:
+            cmd.extend(shlex.split(shot["chart_args"]))
+        except ValueError:
+            # Malformed quoted string — pass as single arg, chart script will error clearly
+            cmd.append(shot["chart_args"])
 
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
@@ -204,6 +269,7 @@ def main():
 
     # ── split by type and skip existing ───────────────────────────────────────
     map_shots     = []
+    chart_shots   = []
     photo_shots   = []
     ai_shot_files = []   # filenames for AI batch (flux handles skip-existing itself)
     skipped       = 0
@@ -218,6 +284,8 @@ def main():
             continue
         if shot["type"] == "MAP":
             map_shots.append(shot)
+        elif shot["type"] == "CHART":
+            chart_shots.append(shot)
         elif shot["type"] == "PHOTO":
             photo_shots.append(shot)
         else:
@@ -229,6 +297,7 @@ def main():
     print(f"  Total shots : {len(all_shots)}")
     print(f"  Skipped     : {skipped} (already exist)")
     print(f"  MAP         : {len(map_shots)} → generate_india_map.py (GeoJSON)")
+    print(f"  CHART       : {len(chart_shots)} → generate_chart.py (matplotlib)")
     print(f"  PHOTO       : {len(photo_shots)} → search_pexels.py (Pexels API)")
     print(f"  AI (Grok)   : {len(ai_shot_files)} → generate_images_flux.py")
     print(f"{'═'*58}\n")
@@ -237,13 +306,15 @@ def main():
         print("── DRY RUN — nothing generated ──")
         for s in map_shots:
             print(f"  MAP   SHOT {s['shot_num']:02d}  {s['file']}  args: {s['map_args'] or '(none)'}")
+        for s in chart_shots:
+            print(f"  CHART SHOT {s['shot_num']:02d}  {s['file']}  args: {s['chart_args'] or '(none)'}")
         for s in photo_shots:
             print(f"  PHOTO SHOT {s['shot_num']:02d}  {s['file']}  narration: {s['narration'][:60]}...")
         for f in ai_shot_files:
             print(f"  AI    {f}")
         return
 
-    if not map_shots and not ai_shot_files:
+    if not map_shots and not chart_shots and not ai_shot_files:
         print("✓ Nothing to generate — all images already exist.")
         return
 
@@ -262,6 +333,22 @@ def main():
                 map_fail += 1
 
         print(f"\n  Maps done: {map_ok} ✓  {map_fail} ✗")
+
+    # ── generate CHART shots ───────────────────────────────────────────────────
+    chart_ok = chart_fail = 0
+    if chart_shots:
+        print(f"Generating {len(chart_shots)} chart image(s) via matplotlib...\n")
+        for shot in chart_shots:
+            label = f"[{shot['shot_num']:02d}] {shot['file']}"
+            print(f"  {label}", end="  ", flush=True)
+            if run_chart(shot, images_dir, script_dir):
+                size = (images_dir / shot["file"]).stat().st_size // 1024
+                print(f"✓  ({size} KB)")
+                chart_ok += 1
+            else:
+                chart_fail += 1
+
+        print(f"\n  Charts done: {chart_ok} ✓  {chart_fail} ✗")
 
     # ── generate PHOTO shots → Pexels ─────────────────────────────────────────
     photo_ok = photo_fail = 0
@@ -297,6 +384,9 @@ def main():
     if map_fail:
         print(f"  ⚠ {map_fail} map(s) failed — check GeoJSON state names")
         print(f"    Tip: python generate_india_map.py --list-states")
+    if chart_fail:
+        print(f"  ⚠ {chart_fail} chart(s) failed — check --type/--data JSON")
+        print(f"    Tip: python generate_chart.py --type bar --example")
     if photo_shots:
         print(f"  Photos : {photo_ok} ✓  {photo_fail} ✗ (failed → AI fallback)")
     print(f"\nNext step:")

@@ -3,12 +3,14 @@ generate_thumbnail.py — YouTube Thumbnail Generator for The Interested Indian
 
 Produces a 1280×720px PNG ready for YouTube upload.
 Layout:
-  • Full-bleed background (dark navy or warm cream depending on theme)
-  • Title text in bold — auto-wraps, auto-sizes to fill the canvas
-  • Thin accent rule below the title
-  • "THE INTERESTED INDIAN" footer label
-  • Optional: --accent-image PATH overlays a right-side image (map, portrait, etc.)
-    at 40% canvas width — use for maps from generate_india_map.py
+  • Base art composited from common/thumbnails/base_light.png / base_dark.png
+    (mascot + India map/silhouette + baked-in "THE INTERESTED INDIAN" footer),
+    cover-fit-cropped to 1280×720. Falls back to a solid-colour canvas if missing.
+  • Title text in bold in the natural gap between the mascot and map/silhouette art,
+    with a translucent scrim behind it for legibility — auto-wraps, auto-sizes
+  • Small episode-number badge (e.g. "EP01") in the top-right corner
+  • Fallback path only (no base art found): thin accent rule + own footer strip +
+    optional --accent-image PATH overlaying a right-side image at 40% canvas width
 
 Themes (--theme):
   dark  — Navy (#1A2B4C) bg, white text, amber (#F0A500) accent  [default]
@@ -41,7 +43,7 @@ import sys
 from pathlib import Path
 
 try:
-    from PIL import Image, ImageDraw, ImageFont
+    from PIL import Image, ImageDraw, ImageFont, ImageOps
 except ImportError:
     print("❌ Pillow not found.\n   Run: pip install Pillow --break-system-packages")
     sys.exit(1)
@@ -68,19 +70,24 @@ THEMES = {
 }
 
 
-def _resolve_theme(project_dir: Path, theme_arg: str) -> dict:
-    """Return the colour dict for the resolved theme.
+def _parse_episode_num(project_dir: Path) -> int:
+    """Parse episode number from the project folder name (ep01→1, ep03→3, …). Defaults to 1."""
+    m = re.search(r"\d+", project_dir.name)
+    return int(m.group()) if m else 1
+
+
+def _resolve_theme(project_dir: Path, theme_arg: str) -> tuple[str, dict]:
+    """Return (theme_name, colour_dict) for the resolved theme.
     For 'auto', parses the episode number from the project folder name
     (ep01→1, ep03→3, …) and picks dark for odd, light for even episodes.
     """
     if theme_arg in ("dark", "light"):
-        return THEMES[theme_arg]
+        return theme_arg, THEMES[theme_arg]
     # auto
-    m = re.search(r"\d+", project_dir.name)
-    ep_num = int(m.group()) if m else 1
+    ep_num = _parse_episode_num(project_dir)
     chosen = "dark" if ep_num % 2 == 1 else "light"
     print(f"  Theme  : auto → {chosen} (episode {ep_num})")
-    return THEMES[chosen]
+    return chosen, THEMES[chosen]
 
 CANVAS_W, CANVAS_H = 1280, 720
 SAFE_MARGIN = 64          # pixels inset from all edges
@@ -199,6 +206,25 @@ def _paste_accent(canvas: Image.Image, accent: Image.Image, margin: int):
     canvas.paste(resized.convert("RGB"), (x, y), mask)
 
 
+def _load_base_image(theme_name: str) -> Image.Image | None:
+    """Load the pre-generated base thumbnail art (mascot + India map/silhouette +
+    baked-in "THE INTERESTED INDIAN" footer branding) for this theme, and cover-fit
+    -crop it to exactly CANVAS_W×CANVAS_H. Source art is 1672×941 — nearly the same
+    aspect ratio as the 1280×720 canvas, so the crop is minimal.
+    Returns None if the base file is missing (caller falls back to the solid-colour canvas).
+    """
+    base_path = PIPELINE_DIR / "common" / "thumbnails" / f"base_{theme_name}.png"
+    if not base_path.exists():
+        print(f"  ⚠ Base thumbnail art not found ({base_path}) — falling back to solid-colour canvas")
+        return None
+    try:
+        img = Image.open(base_path).convert("RGB")
+    except Exception as e:
+        print(f"  ⚠ Could not load base thumbnail image: {e}")
+        return None
+    return ImageOps.fit(img, (CANVAS_W, CANVAS_H), method=Image.LANCZOS, centering=(0.5, 0.5))
+
+
 # ── Read episode title ─────────────────────────────────────────────────────────
 
 def _read_title(project_dir: Path) -> str:
@@ -225,13 +251,105 @@ def _read_title(project_dir: Path) -> str:
 
 # ── Main render ────────────────────────────────────────────────────────────────
 
+def _render_on_base(
+    base: Image.Image,
+    title: str,
+    out_path: Path,
+    t: dict,
+    episode_num: int | None,
+    accent_image_path: str | None,
+    theme_name: str = "dark",
+):
+    """Composite title + episode badge onto the pre-made base thumbnail art.
+    Both base_light.png and base_dark.png flank a mascot on one side and a map/
+    silhouette on the other, leaving a natural gap roughly in the horizontal centre —
+    that's where the title goes, widened slightly with a scrim behind it for
+    legibility since it partially overlaps the art on either side.
+    The base art already has "THE INTERESTED INDIAN" baked into its own footer bar,
+    so this does NOT draw a new footer — that would duplicate it.
+    """
+    canvas = base.copy()
+    draw = ImageDraw.Draw(canvas)
+    if accent_image_path:
+        print("  ⚠ Ignoring --accent-image — base thumbnail art already includes mascot/map illustration")
+
+    text_zone_w = int(CANVAS_W * 0.44)
+    text_left   = (CANVAS_W - text_zone_w) // 2
+    text_max_w  = text_zone_w - 40
+
+    footer_safe_h   = 76   # keep clear of the base art's own baked-in footer bar
+    title_area_top  = SAFE_MARGIN
+    title_area_bot  = CANVAS_H - footer_safe_h
+    title_max_h     = title_area_bot - title_area_top - 32
+
+    lines, font = _fit_title(draw, title, text_max_w, title_max_h)
+    try:
+        lh = font.getbbox("Ag")[3] + 14
+    except AttributeError:
+        lh = 60
+    total_text_h = lh * len(lines)
+    y_start = title_area_top + (title_max_h - total_text_h) // 2
+
+    # Legibility scrim behind the text zone
+    scrim_pad = 24
+    scrim_box = (
+        text_left - scrim_pad, y_start - scrim_pad,
+        text_left + text_zone_w + scrim_pad, y_start + total_text_h + scrim_pad,
+    )
+    overlay = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
+    odraw = ImageDraw.Draw(overlay)
+    odraw.rectangle(scrim_box, fill=(*t["bg"], 165))
+    canvas = Image.alpha_composite(canvas.convert("RGBA"), overlay).convert("RGB")
+    draw = ImageDraw.Draw(canvas)
+
+    for line in lines:
+        bbox = draw.textbbox((0, 0), line, font=font)
+        w = bbox[2] - bbox[0]
+        x = text_left + (text_zone_w - w) // 2
+        draw.text((x + 3, y_start + 3), line, font=font, fill=t["shadow"])
+        draw.text((x, y_start), line, font=font, fill=t["text"])
+        y_start += lh
+
+    # Episode-number badge — top corner OPPOSITE the mascot (light: mascot right → badge
+    # top-left; dark: mascot left → badge top-right), per channel_config.json's own
+    # base-art descriptions, so it never sits over the mascot's head.
+    if episode_num:
+        badge_text = f"EP{episode_num:02d}"
+        badge_font = _find_font(30, bold=True)
+        bbox = draw.textbbox((0, 0), badge_text, font=badge_font)
+        bw, bh = bbox[2] - bbox[0], bbox[3] - bbox[1]
+        pad_x, pad_y = 18, 10
+        badge_top = 28
+        mascot_on_right = (theme_name == "light")
+        if mascot_on_right:
+            badge_left = 28
+            badge_box = (badge_left, badge_top, badge_left + bw + 2 * pad_x, badge_top + bh + 2 * pad_y)
+        else:
+            badge_right = CANVAS_W - 28
+            badge_box = (badge_right - bw - 2 * pad_x, badge_top, badge_right, badge_top + bh + 2 * pad_y)
+        draw.rectangle(badge_box, fill=t["accent"])
+        draw.text((badge_box[0] + pad_x, badge_box[1] + pad_y - bbox[1]),
+                   badge_text, font=badge_font, fill=(255, 255, 255))
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    canvas.save(str(out_path), "PNG", optimize=True)
+    print(f"✓ Thumbnail saved → {out_path}  ({CANVAS_W}×{CANVAS_H}px)")
+
+
 def render_thumbnail(
     title: str,
     out_path: Path,
     accent_image_path: str | None = None,
     theme: dict | None = None,
+    theme_name: str = "dark",
+    episode_num: int | None = None,
 ):
     t = theme or THEMES["dark"]   # colours for this render
+
+    base = _load_base_image(theme_name)
+    if base is not None:
+        _render_on_base(base, title, out_path, t, episode_num, accent_image_path, theme_name)
+        return
 
     canvas = Image.new("RGB", (CANVAS_W, CANVAS_H), t["bg"])
     draw   = ImageDraw.Draw(canvas)
@@ -283,7 +401,7 @@ def render_thumbnail(
     draw.rectangle([(0, CANVAS_H - footer_h), (CANVAS_W, CANVAS_H)], fill=t["footer_bg"])
 
     footer_font = _find_font(28, bold=True)
-    footer_text = "THE INTERESTED INDIAN"
+    footer_text = f"THE INTERESTED INDIAN · EP{episode_num:02d}" if episode_num else "THE INTERESTED INDIAN"
     bbox = draw.textbbox((0, 0), footer_text, font=footer_font)
     fw = bbox[2] - bbox[0]
     fh = bbox[3] - bbox[1]
@@ -320,17 +438,25 @@ def main():
         print(f"❌ Project folder not found: {project_dir}")
         sys.exit(1)
 
-    title    = args.title or _read_title(project_dir)
-    out_path = Path(args.out) if args.out else project_dir / "thumbnail.png"
-    theme    = _resolve_theme(project_dir, args.theme)
+    title       = args.title or _read_title(project_dir)
+    out_path    = Path(args.out) if args.out else project_dir / "thumbnail.png"
+    theme_name, theme = _resolve_theme(project_dir, args.theme)
+    episode_num = _parse_episode_num(project_dir)
 
     print(f"  Title  : {title}")
     print(f"  Theme  : {args.theme}")
+    print(f"  Episode: {episode_num}")
     print(f"  Output : {out_path}")
     if args.accent_image:
         print(f"  Accent : {args.accent_image}")
 
-    render_thumbnail(title, out_path, accent_image_path=args.accent_image, theme=theme)
+    render_thumbnail(
+        title, out_path,
+        accent_image_path=args.accent_image,
+        theme=theme,
+        theme_name=theme_name,
+        episode_num=episode_num,
+    )
 
 
 if __name__ == "__main__":
