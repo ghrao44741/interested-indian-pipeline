@@ -1,7 +1,8 @@
 # The Interested Indian — Claude Code Context
 
-Faceless YouTube channel on Indian history, geography, geopolitics, and administrative dynamics.
-Flat digital cartoon style, 12–18 min landscape video essays.
+Faceless YouTube channel on Indian history, geography, geopolitics, administrative dynamics, society, film
+industry politics, religious-institution administration, and city history.
+Flat digital cartoon style, 12–21 min landscape video essays.
 
 Full session history: `interesting_indian_session.md`
 Task list: `TASKS.md`
@@ -170,7 +171,7 @@ Reference: `mascot_reference.png` | Session ID (AIBMM): `d9d31dea-1095-4a70-b57e
 - Humor every 2–3 paragraphs: modern analogy, self-aware observation, deadpan, or audience poke
 - Jargon rule: never use policy term without immediately translating it
 - Banned words: "genuinely", "honestly", "straightforward" + corporate clichés (unleash, unlock, delve, etc.)
-- Length: 1,800–2,800 words for a 12–18 min episode
+- Length: 1,800–3,200 words for a 12–21 min episode
 
 ---
 

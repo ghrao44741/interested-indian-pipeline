@@ -1,14 +1,18 @@
 """
-run_episode.py — Orchestrator for The Interested Indian episode pipeline.
+run_episode_needed_or_not.py — Orchestrator for The Interested Indian episode pipeline.
+
+NOTE: legacy single-agent orchestrator, superseded by run_episode_v2.py + pipeline_agents.py
+(the multi-agent pipeline). Not referenced by any current documented workflow. Renamed to flag
+for a "still needed, or delete?" decision — see interesting_indian_session.md for context.
 
 Implements the full 4-stage Mega Prompt pipeline with human checkpoints.
 State is saved to {project}/episode_state.json so the run can be interrupted
 and resumed at any stage.
 
 Usage:
-    python run_episode.py --project ep02
-    python run_episode.py --project ep02 --from-stage voice   # resume from a stage
-    python run_episode.py --project ep02 --status             # show current state
+    python run_episode_needed_or_not.py --project ep02
+    python run_episode_needed_or_not.py --project ep02 --from-stage voice   # resume from a stage
+    python run_episode_needed_or_not.py --project ep02 --status             # show current state
 
 Stages (in order):
     topics    → Claude generates 5 viral topic ideas      [CHECKPOINT: you pick one]

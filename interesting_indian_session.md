@@ -1,11 +1,11 @@
 # The Interested Indian — Session Tracker
 
 ## Channel
-Faceless YouTube channel on Indian history, geography, geopolitics, and administrative dynamics — modeled on the "Fat Little Asian Man" production blueprint. Minimalist 2D doodle/vector style, stick-figure mascot, 16:9, 12–18 min analytical video essays.
+Faceless YouTube channel on Indian history, geography, geopolitics, and administrative dynamics — modeled on the "Fat Little Asian Man" production blueprint. Minimalist 2D doodle/vector style, stick-figure mascot, 16:9, 12–21 min analytical video essays.
 
 ## Workflow Stages
 1. Generate 5 viral topic ideas
-2. Full narration script (2,000–2,800 words) → downloadable .txt
+2. Full narration script (2,000–3,200 words) → downloadable .txt
 3. User pastes timestamped script (post-voiceover) → image prompts + editing cues, batches of 20
 4. Final viral metadata (title, description, tags)
 
@@ -183,7 +183,7 @@ python run_episode_v2.py --project ep01 --from-stage split
   python run_episode_v2.py --project ep02 --from-stage script
   python run_episode_v2.py --project ep02 --status
   ```
-- **`run_episode.py`** — earlier simpler orchestrator (no agents), kept as backup
+- **`run_episode_needed_or_not.py`** (renamed from `run_episode.py`) — earlier simpler orchestrator (no agents), kept as backup; flagged for a keep-or-delete decision
 - **`local_mp4_analyzer.py`** — audio analysis + Whisper transcription for final MP4. Updated header to "THE INTERESTED INDIAN". Usage: `python local_mp4_analyzer.py ep01/output/ep01_final.mp4`
 
 ### Human Checkpoints (3 total per episode)

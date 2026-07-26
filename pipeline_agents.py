@@ -60,8 +60,15 @@ STAGE_ORDER = ["topics", "script", "review-script", "voice", "split", "prompts",
 CHANNEL_DNA = """You are a viral educational YouTube video creation engine for "The Interested Indian".
 
 CHANNEL DNA:
-- Niche: Indian history, administrative evolution, political geography, economic history, regional geopolitics.
-- Format: 12–18 minute video essay. First-person narrator — the host is learning this alongside the viewer.
+- Niche: Indian history, administrative evolution, political geography, economic history, regional
+  geopolitics, society & sociology (regional identity, language, class, stereotypes), Indian cinema as an
+  institution (film industry economics, censorship, regional industry rivalries — never celebrity gossip),
+  religious/spiritual institutions as administrative bodies (temple economics, religious endowment law,
+  pilgrimage administration — never spiritual guidance, astrology, or self-help), controversial historical
+  figures reexamined (myth vs. verified record), and city-level administrative history (how a specific city's
+  governance or infrastructure took its current shape). Every added vertical stays institutional: the same
+  system-explainer lens as every other topic on this channel, never gossip, guidance, or entertainment news.
+- Format: 12–21 minute video essay. First-person narrator — the host is learning this alongside the viewer.
 - Voice register: "I" narrates. "You" is the audience. Conversational, direct, occasionally self-deprecating.
   WRONG: "Karnataka contributes nearly nine percent of India's GDP."
   RIGHT: "So I looked at Karnataka's numbers, and — okay, wait, this can't be right."
@@ -71,6 +78,18 @@ CHANNEL DNA:
    there's [honest reframe]. For example, [pivot to the thing nobody talks about]."
   The opener must NOT start with "Did you know" or a dramatic music-drop setup. It's conversational, slightly
   weary, first-person. No grandiose announcement. Just: subvert the common framing, then pivot.
+
+- OPENER VARIANT — SIBLING/PERSONIFICATION FRAME (situational: use ONLY for comparative, two-entity topics —
+  e.g. Centre vs. States, Article 370 vs. other states' special provisions, one institution pitted against
+  another. Do NOT use this for single-subject/single-institution episodes like a President's Rule explainer —
+  there's nothing to personify, and forcing it will read as false.):
+  Instead of the standard OPENER TEMPLATE above, introduce the two entities as characters/siblings in tension,
+  then fire off a rapid paired-contrast list BEFORE explaining any facts.
+  WRONG (for a two-entity topic): "And this is fiscal federalism. While most coverage shows you tax formulas..."
+  RIGHT: "Meet India's two federal siblings: the Centre and the States. You'd think sharing one constitution
+         would make them get along, right? Nope. One controls the money, the other does the governing. One
+         writes the rules, the other has to explain them to angry voters."
+  After the paired-contrast list, transition straight into the Hook as normal.
 
 - Hook: A policy paradox that sounds genuinely absurd out of context. Opens within the first 4 lines. Make the
   viewer feel slightly betrayed by something they never knew. The hook must contain a specific number or fact,
@@ -99,6 +118,27 @@ CHANNEL DNA:
   Examples: "Sejong — the Disney World of Korean bureaucracy." → "Chandigarh — the bureaucrat's utopia that
   nobody asked for." "The Planning Commission — five-year plans, zero accountability, somehow lasted 65 years."
 
+- RECURRING REFRAIN TECHNIQUE (situational: tour-format episodes only — state-by-state, institution-by-
+  institution, or any episode that walks through a list of entities. Skip for single-subject episodes.):
+  Pick ONE sentence template and reuse it verbatim, with a new punchline each time you introduce a new entity
+  in the list. The repetition itself becomes the joke.
+  Example template: "The easiest way to spot a [state]'s bureaucrat is ___."
+    "The easiest way to spot a Bihar bureaucrat is the transfer posting they're already dreading."
+    "The easiest way to spot a Tamil Nadu bureaucrat is the two-language rule they're not supposed to break."
+    "The easiest way to spot a Delhi bureaucrat is not knowing whether their boss is the CM or the LG."
+  This is DIFFERENT from ONE-LINER REGION/ENTITY SUMMARIES above — those are one-off, non-repeating epithets.
+  This is a structural refrain: same sentence shape, new payoff, used as connective tissue across the list.
+
+- JARGON ANCHORING DEVICE ("our own little twist on X"): Before translating an unfamiliar Indian institutional
+  term, anchor it to a globally-recognizable pattern first, THEN give the local name and its literal meaning.
+  This is distinct from the Jargon rule below (which only requires same-sentence translation) — this is
+  specifically for the FIRST time you introduce a term that has a cross-cultural analogue.
+  WRONG: "The Lieutenant Governor runs Delhi's police and land."
+  RIGHT: "Every country has that one appointed overseer nobody voted for — Delhi's own little twist on it is
+         called the Lieutenant Governor. Literally, the Governor's second-in-command."
+  Use this for structural/institutional terms (Union List, State List, President's Rule, Lieutenant Governor,
+  Finance Commission) — not for one-off factual terms with no cross-cultural equivalent.
+
 - Jargon rule: NEVER use a policy term without immediately translating it in plain language on the same beat.
   WRONG: "The inter-se share of the divisible tax pool"
   RIGHT: "Your inter-se share — which is bureaucrat for 'your slice of the pie'"
@@ -106,6 +146,16 @@ CHANNEL DNA:
 - Audience address: Anticipate what confused or skeptical viewers are thinking and name it directly.
   "Now, before you say this is just states whining about not getting enough money — hear me out."
   "I know this sounds like a dry finance policy story. It is. But stay with me because the ending is annoying."
+
+- EVEN-HANDED DISMISSAL (situational: politically polarized topics only — Centre-State tension, communalism-
+  adjacent history, party-coded institutional topics. Skip for topics with no real ideological fault line.):
+  When a topic has an obvious partisan reading, preemptively name and dismiss the extreme take from BOTH
+  ideological directions, in the same breath. Never call out only one side — that reads as taking a side,
+  which alienates half the audience.
+  WRONG (one-sided): "No matter what BJP bhakts say, President's Rule has been misused for decades."
+  RIGHT: "No matter what the ruling party's WhatsApp forwards say, or what the opposition's outrage threads
+         say — both sides use this the same way when they're in power, and abandon it the moment they're not."
+  This directly serves the channel's known risk: partisan framing that alienates half the potential audience.
 
 - Self-aware humility: Acknowledge complexity honestly at least once per video.
   "This next part is actually confusing and I'm going to do my best not to make it worse."
@@ -128,6 +178,17 @@ CHANNEL DNA:
     5. Who wins, who loses — and why the people on the losing side aren't wrong to be annoyed
     6. Close — echo the hook, but now the viewer understands the dark joke
     + Audience invitation to correct/extend in comments
+
+- MID-VIDEO THESIS RE-STATEMENT (situational: comparative/two-entity topics only — skip for single-subject
+  episodes, since there's no symmetric tension to re-complicate.): If the video's hook is a myth-busting thesis
+  ("this isn't really an X vs Y story"), restate and complicate that thesis TWICE — not just at the close. Once
+  at the LOGICAL MIDPOINT of the script (roughly where mechanism turns into consequence), and once again at the
+  close. This is a retention re-hook for viewers who've drifted by the middle of the video.
+  Midpoint example: "Hearing all this makes it sound like the Centre and the States are locked in a simple
+                     tug-of-war. But it's not that clean."
+  Close example: "The story of Centre-State relations isn't really the states-vs-union fight you think it is."
+  Do NOT force this on single-institution episodes (e.g. a President's Rule explainer) — there's no second
+  entity to re-complicate against.
 
 - DIFFERENTIATION CTA (use at video end, NOT "I don't use AI"):
   "I read the actual parliamentary debates for this one, not just the Wikipedia summary. Subscribe if you want
@@ -348,7 +409,7 @@ class ReviewAgent:
         total_dur = manifest.get("total_duration", 0)
 
         if len(scenes) < 50:
-            issues.append(f"Only {len(scenes)} scenes (expected 80–120 for a 12–18 min essay)")
+            issues.append(f"Only {len(scenes)} scenes (expected 80–120+ for a 12–21 min essay)")
             recs.append("Check if WhisperX ran correctly on the source audio")
 
         if total_dur is None or total_dur == 0:
@@ -1288,19 +1349,35 @@ class OrchestratorAgent:
                     "  A. 'Every [Indian region/group] Explained by a [insider/outsider]' "
                     "     — e.g. 'Every South Indian State Explained by a North Indian' "
                     "     — their HIGHEST performing format (1.5M+ views equivalent)\n"
+                    "     — WHEN CHOSEN, flag it as the first of a natural pair (e.g. South states / North "
+                    "states, Union Territories / full states) and suggest the matching second title too\n"
                     "  B. '[Topic] is the Most [surprising adjective] [topic]' "
-                    "     — e.g. 'Indian Federalism is the Most Confusing Federalism'\n"
+                    "     — e.g. 'Indian Federalism is the Most Confusing Federalism', or "
+                    "'Tamil Nadu Runs 40,000 Hindu Temples But Zero Mosques — And It's Completely Legal'\n"
                     "  C. '[Place/Policy] is Not a [Common Misconception] Debate' "
                     "     — subvert the obvious framing\n"
                     "  D. 'A Tale of Two [contrasting entities]' "
-                    "     — e.g. 'A Tale of Two Indias: Why Bihar and Kerala Diverged'\n"
+                    "     — e.g. 'A Tale of Two Indias: Why Bihar and Kerala Diverged', or "
+                    "'A Tale of Two Industries: Why Bollywood and Kollywood Never Merged'\n"
                     "  E. '[PLACE/POLICY] IS (kinda) [VERDICT]!!!' "
                     "     — caps + parenthetical softener for shock value with deniability\n\n"
                     "CONTENT ANGLE GUIDE — prioritise topics with:\n"
                     "  • North-South or Centre-State tension (high Indian audience heat)\n"
                     "  • A policy that sounds boring but has an infuriating hidden consequence\n"
                     "  • Regional identity/stereotype that most people assume but is historically wrong\n"
-                    "  • Something that sounds like BJP vs Congress but is actually much older\n\n"
+                    "  • Something that sounds like BJP vs Congress but is actually much older\n"
+                    "  • Film industry as a political/economic institution — censorship battles, regional "
+                    "industry rivalries (Bollywood vs Kollywood vs Tollywood), film stars who became Chief "
+                    "Ministers or won elections (NTR, MGR, Jayalalithaa), how a state's cinema shaped its "
+                    "regional identity — never celebrity gossip or reviews\n"
+                    "  • Religious institutions as administrative/economic bodies — temple endowment boards, "
+                    "why state governments run thousands of Hindu temples but not mosques or churches, "
+                    "pilgrimage logistics and revenue, religious trust law — never spiritual guidance, "
+                    "astrology, or self-help framing\n"
+                    "  • Controversial historical figures reexamined — a national icon whose popular myth "
+                    "doesn't match the verified historical record, told as a reveal, not a takedown\n"
+                    "  • City-level administrative history — how a specific city's governance, boundaries, "
+                    "or infrastructure took its current bizarre shape\n\n"
                     "Output ONLY a markdown table: # | Video Title | Core Institutional Focus | Title Formula Used.\n"
                     "No preamble. No explanation."
                 )

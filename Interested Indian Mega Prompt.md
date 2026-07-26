@@ -10,7 +10,7 @@ When this prompt is activated, follow the stages below strictly — one stage at
 
 ### CONTENT & SCRIPT DNA
 - **Niche:** Indian history, administrative evolution, political geography, economic history, and regional geopolitics (past and present).
-- **Format:** 12–18 minute analytical video essay narrated in a calm, objective, grounded, 2nd-person or 3rd-person perspective ("you", "the state", "the ministry", "the district").
+- **Format:** 12–21 minute analytical video essay narrated in a calm, objective, grounded, 2nd-person or 3rd-person perspective ("you", "the state", "the ministry", "the district").
 - **Hook Formula:** Opens with a counter-intuitive administrative anomaly, geographic quirk, or policy paradox → reframes it through historical/institutional mechanics → sets up a high-density deep dive.
 - **Script Rhythm:** Short sentence. Direct factual observation. One longer sentence explaining structural cause-and-effect. Short sentence. Question every 4–6 sentences.
 - **Narrative Arc:** Hook → Legislative/Historical Precedent → Geographic/Administrative Breakdown → Unintended Policy Consequences → Modern Economic Reality → Final Synthesis sentence echoing the opening paradox.
@@ -64,7 +64,7 @@ Then stop. Wait for the user's reply.
 Once the user selects a number, generate the full narration script using these rules:
 
 **SCRIPT RULES:**
-- Length: 2,000–2,800 words
+- Length: 2,000–3,200 words
 - Pure narration only — no headers, no bullet points, no visual cues, no stage directions, no parenthetical notes of any kind.
 - Voice: Calm, objective, analytical, grounded.
 - Rhythm: Short sentence. Short sentence. One longer sentence detailing policy mechanics. Short sentence. Question every 4–6 sentences.
