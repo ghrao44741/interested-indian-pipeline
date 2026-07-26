@@ -83,10 +83,12 @@ DEFAULT_MODEL_CLOUDTTS  = _voice_cfg.get("gemini_cloudtts_model", "gemini-3.1-fl
 DEFAULT_LOCALE_CLOUDTTS = _voice_cfg.get("gemini_cloudtts_locale", "en-IN")
 DEFAULT_STYLE_CLOUDTTS  = _voice_cfg.get("gemini_cloudtts_style", "")
 CLOUD_TTS_URL   = "https://texttospeech.googleapis.com/v1beta1/text:synthesize"
-CLOUDTTS_CHUNK_LIMIT = 4500   # conservative — not independently confirmed for this
-                               # Gemini-backed Cloud TTS endpoint; classic Cloud TTS
-                               # has a well-known 5000-char input limit, this mirrors
-                               # the same safety margin as GEMINI_CHUNK_LIMIT above.
+CLOUDTTS_CHUNK_LIMIT = 3500   # Google's official Gemini-TTS docs state the text field
+                               # (and the prompt field, separately) can be at most 4,000
+                               # BYTES — using chars here as a proxy, so 3500 leaves a
+                               # safety margin for any multi-byte characters plus the
+                               # ~130-char style_prompt, which counts against its own
+                               # separate 4,000-byte limit, not this one.
 
 SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 
