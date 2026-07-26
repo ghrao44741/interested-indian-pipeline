@@ -1,82 +1,110 @@
 # Tasks — The Interested Indian Pipeline
 
-## Active
+Last updated: 2026-07-26
 
-### 🚨 #25 — EP01 Publish Gate (DO NOT start EP02 until done)
-- [ ] **Generate CTA audio** — PowerShell: `python -m edge_tts --voice en-IN-PrabhatNeural --text "If this made you think, subscribe. New episode every week. The Interested Indian — Indian history and policy, explained clearly." --write-media common\cta\cta.mp3`
-- [ ] **Regen all 147 images** — `python pipeline_agents.py --project ep01 --only images`
-- [ ] **Re-stitch** — `python pipeline_agents.py --project ep01 --only stitch` (writes to ep01/output/ep01_final.mp4)
-- [ ] **Re-run metadata** — `python pipeline_agents.py --project ep01 --only metadata` (clean tags this time)
-- [ ] **Re-upload** — `python upload_youtube.py --project ep01`
-- [ ] **Thumbnail** — upload manually in YouTube Studio (API thumbnail upload needs 1000+ subs)
-- [ ] **Tags** — add manually in YouTube Studio
-- [ ] **Final review** — watch end-to-end, then set public
+## Immediate
 
-### #24 — Finalise Narration Voice
-- [ ] **Evaluate Indian voices** — ElevenLabs Indian accent voices + Google/Gemini TTS
-  - Current: ANX - Deep & Friendly (gYQ0co3BoppQZ8BDM3lj), quiet, needs loudnorm
-  - Use `preview_elevenlabs_voices.py` to A/B test candidates
-  - Once locked, regenerate CTA audio with same voice (currently using Edge TTS en-IN-PrabhatNeural as placeholder)
-
-### #21 — Add `--topic` override flag to pipeline
-- [ ] In `pipeline_agents.py`, let user pass `--topic "Article 356"` to skip the topics stage and inject directly into script stage
-
-### #22 — Add `--script-file` override flag to pipeline
-- [ ] In `pipeline_agents.py`, `--script-file path/to/script.txt` skips topics + script stages, starts from review-script
-
-## Waiting On
-
-### shorts_pipeline2 Git Setup
-- [ ] **Initialize and push** — waiting on user to do this locally:
+- [ ] **Generate CTA audio** — `common/cta/cta.mp3` is empty (0 bytes)
   ```powershell
-  cd C:\Bakcup_Asus\Aeonium_Glow\shorts_pipeline2
-  git init
-  git config user.name "Giri"
-  git config user.email "ghrao4474@gmail.com"
-  git add -A
-  git commit -m "Initial commit: shared pipeline scripts"
-  git remote add origin https://github.com/ghrao44741/shorts-pipeline2.git
-  git branch -M main
-  git push -u origin main
+  python generate_voice.py --text-file common\cta\cta_script.txt --out common\cta\cta.mp3
   ```
 
-### brand.json placement
-- [ ] Drop `{"pad_color": "#1A2B4C"}` into `interested_indian_pipeline/brand.json` (channel root) — stitch script picks it up via parent-fallback. Currently not committed.
+- [ ] **Git commit + push** — 85+ unstaged files from this session
+  ```powershell
+  Remove-Item '.git\index.lock' -Force -ErrorAction SilentlyContinue
+  git add -A
+  git commit -m "feat: xAI default, mascot fix, route_images, PIL overlay, type routing, map fixes, pipeline isolation, speaking rate"
+  git push
+  ```
 
-## Someday
+- [ ] **Test and tune Charon speaking rate** — preview at different rates, then lock in `channel_config.json`
+  ```powershell
+  python generate_source_audio.py --project test_script --preview 3 --speaking-rate 0.80
+  python generate_source_audio.py --project test_script --preview 3 --speaking-rate 0.85
+  python generate_source_audio.py --project test_script --preview 3 --speaking-rate 0.90
+  ```
 
-### #11 — CUDA PyTorch in transcription-tools venv
-- [ ] Install CUDA PyTorch so WhisperX runs on GPU (40 min → ~3 min per episode)
-  - `pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118`
-  - Test: `python -c "import torch; print(torch.cuda.is_available())"`
+## 🚨 EP01 — Publish Gate (do not start EP02 until done)
 
-### #12 — Fix banned word false positives in script reviewer
-- [ ] "genuinely" / "honestly" flagged even in legitimate conversational uses
-  - Approach: add context window check — only flag if not followed by a comma + subordinate clause
+- [ ] **Pick CTA for this episode** — edit `common\cta\cta_script.txt`, then regenerate audio
+  - EP01 (serious/systemic) → Option C: *"India is running a system most people don't know exists..."*
+  - Lighter/absurd topics → Option D: *"Okay. That's the one..."*
+  - Deep research ep → Option A: *"I spent three days reading things..."*
+  - All options saved in `common/cta/cta_options.txt`
+  ```powershell
+  python generate_source_audio.py --script common\cta\cta_script.txt --out common\cta\cta.mp3
+  ```
+- [ ] Regen all 147 images with correct mascot + routing: `python run_episode_v2.py --project ep01 --from-stage images`
+- [ ] Re-stitch: `python run_episode_v2.py --project ep01 --from-stage stitch`
+- [ ] Re-run metadata: `python run_episode_v2.py --project ep01 --from-stage metadata`
+- [ ] Re-upload: `python upload_youtube.py --project ep01`
+- [ ] Set thumbnail manually in YouTube Studio (API needs 1000+ subs)
+- [ ] Add tags manually in YouTube Studio
+- [ ] Watch end-to-end → set public
 
-### #13 — Tune question ratio threshold in script reviewer
-- [ ] 5–6 questions in 1800 words currently fails the check — threshold is too tight
-  - Adjust to ~1 question per 400 words (was every 250)
+## Pipeline Improvements
 
-### #15 — Build notification agent
-- [ ] Email or Telegram alert at human checkpoints (topic pick, script approve, upload complete)
-- [ ] Telegram bot is simplest: single HTTP POST to `api.telegram.org`
+- [ ] **#6** Fix banned word false positives in `review_script.py`
+  - "genuinely"/"honestly" flagged in conversational context where they're fine
+  - Add context check — only flag in formal/corporate phrasing
 
-### #16 — Build analytics feedback loop
-- [ ] 7-day post-publish YouTube Analytics pull → fed back into ResearchAgent competitive brief
-- [ ] Metrics: CTR, AVD, retention curve, top traffic sources
-- [ ] Store in `ep01/analytics_7day.json`
+- [ ] **#7** Tune question ratio threshold in `review_script.py`
+  - 5–6 questions in 1800 words should not fail (~1 per 400 words, not 250)
+
+- [ ] **#8** Add `--topic` override flag to `run_episode_v2.py`
+  - Skip ResearchAgent topics stage, inject user-supplied topic directly into script stage
+
+- [ ] **#9** Wire `generate_chart.py` as CHART route in `route_images.py`
+  - Currently CHART falls back to xAI Grok; should use matplotlib for accurate data visuals
+
+- [ ] **#10** Update `generate_thumbnail.py` to composite onto base images
+  - Use `common/thumbnails/base_light.png` (even episodes) / `base_dark.png` (odd episodes)
+  - PIL text composite for title + episode number
+
+## Infrastructure
+
+- [ ] **#5** Install CUDA PyTorch in `transcription-tools` venv
+  - WhisperX on CPU: ~40 min/episode. On GPU: ~3 min
+  ```powershell
+  pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+  python -c "import torch; print(torch.cuda.is_available())"
+  ```
+
+## Future
+
+- [ ] **#11** Build notification agent — Telegram or email at checkpoints and on completion
+
+- [ ] **#12** Build analytics feedback loop
+  - 7-day YouTube Analytics pull → feed CTR/retention into ResearchAgent for next topic
+  - Store in `ep##/analytics_7day.json`
 
 ## Done
 
-- [x] ~~#26 — Build review_script.py~~ (July 2026)
-  - Standalone Channel DNA + wittiness reviewer, three modes (quick/default/deep)
-  - Integrated as pipeline stage between script and voice
-- [x] ~~CHANNEL_DNA v2 — FLAM analysis~~ (July 2026)
-  - Opener template, 30-45s/5-10s/30s rhythm, meme framework technique
-  - One-liner region summaries, dark social commentary layer, audience invitation CTA
-- [x] ~~generate_image_prompts.py meme beat system~~ (July 2026)
-  - Meme reaction beat every 2-3 shots, photo cutout collage, no copyrighted names rule
-- [x] ~~pipeline_agents.py topics formula guide~~ (July 2026)
-  - 5 proven title formulas + content angle guide from FLAM research
-- [x] ~~Git push — FLAM session changes~~ (July 2026)
+- [x] Build `review_images.py` — AI image QA, 8-check rubric, Claude Haiku vision
+- [x] Build `generate_images_flux.py` — Replicate/xAI batch image generator
+- [x] Fix security — `Youtube_Interested_Indian_Upload.json` in `.gitignore`
+- [x] Build `generate_thumbnail.py`, `generate_chapters.py`, `upload_youtube.py`
+- [x] Integrate post-video stages into `pipeline_agents.py`
+- [x] Update CHANNEL_DNA to justaFLAM voice/style
+- [x] Build `generate_india_map.py` — geopandas GeoJSON renderer
+- [x] Build `search_pexels.py` — Pexels API photo fetcher
+- [x] Build `generate_chart.py` — matplotlib chart renderer
+- [x] Build `generate_country_map.py` — generalised map renderer (any country)
+- [x] Add `--theme dark|light|auto` to `generate_thumbnail.py`
+- [x] Find and finalise narration voice — Gemini TTS, Charon ✓
+- [x] Build `review_script.py` — Channel DNA & wittiness reviewer (quick/default/deep modes)
+- [x] Add `--script-file` override flag to pipeline
+- [x] Add TYPE + MAP_ARGS fields to `generate_image_prompts.py` output format
+- [x] Build `route_images.py` — scene type dispatcher (MAP/PHOTO/CARTOON/CHART)
+- [x] Wire `route_images.py` into `pipeline_agents.py`
+- [x] Switch default image backend from Replicate → xAI Grok
+- [x] Lock Indian mascot design in `STYLE_PREFIX` and `SYSTEM_PROMPT`
+- [x] Add CARTOON prompt guardrail — geography scenes don't generate maps
+- [x] Build PIL text overlay stage (`add_text_overlays.py`)
+- [x] Pipeline isolation — removed all Aeonium Glow folder references from `pipeline_agents.py`
+- [x] Fix map state labels — all states labelled by default
+- [x] Fix map output size — enforced 1280×720 (removed `bbox_inches="tight"`)
+- [x] Fix AI image size — `ensure_png()` resizes xAI output to 1280×720
+- [x] Add `--speaking-rate` to `generate_source_audio.py` + `channel_config.json`
+- [x] CTA audio guard in `stitch_video_longform.py` — skips gracefully if file empty
+- [x] Full pipeline test run — test_script episode end-to-end ✓

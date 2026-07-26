@@ -50,7 +50,7 @@
     "gemini_voice": "Charon",
     "gemini_model": "gemini-2.5-flash-preview-tts",
     "gemini_speaking_rate": 0.85,
-    "_speaking_rate_note": "0.25=slowest, 1.0=default, 4.0=fastest. Charon at 1.0 feels rushed — 0.85 is recommended starting point.",
+    "_speaking_rate_note": "0.25=slowest, 1.0=default, 4.0=fastest. Implemented via SSML <prosody rate='85%'>. Charon at 1.0 feels rushed — 0.85 is recommended starting point.",
     "gemini_note": "Charon selected 2026-07-25 — deep, authoritative, best for commentary. Tested vs Fenrir/Orus/Puck.",
     "elevenlabs_default": "gYQ0co3BoppQZ8BDM3lj",
     "elevenlabs_name": "ANX - Deep & Friendly",

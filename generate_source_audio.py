@@ -233,19 +233,23 @@ def _gemini_call(text: str, voice: str, api_key: str, model: str,
         sys.exit(1)
 
     client = genai.Client(api_key=api_key)
-    speech_cfg_kwargs = dict(
-        voice_config=types.VoiceConfig(
-            prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=voice)
-        )
-    )
+    # Wrap in SSML prosody tag to control speaking rate (SDK has no native speaking_rate field)
     if speaking_rate is not None:
-        speech_cfg_kwargs["speaking_rate"] = speaking_rate  # 0.25–4.0, default 1.0
+        rate_pct = f"{int(speaking_rate * 100)}%"
+        contents = f'<speak><prosody rate="{rate_pct}">{text}</prosody></speak>'
+    else:
+        contents = text
+
     response = client.models.generate_content(
         model=model,
-        contents=text,
+        contents=contents,
         config=types.GenerateContentConfig(
             response_modalities=["AUDIO"],
-            speech_config=types.SpeechConfig(**speech_cfg_kwargs),
+            speech_config=types.SpeechConfig(
+                voice_config=types.VoiceConfig(
+                    prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=voice)
+                )
+            ),
         ),
     )
     part = response.candidates[0].content.parts[0]
@@ -444,8 +448,8 @@ async def main():
             elevenlabs_list_voices()
         return
 
-    if not args.project or not args.script:
-        parser.error("--project and --script are required unless using --list-voices")
+    if not args.script:
+        parser.error("--script is required unless using --list-voices")
 
     # Resolve script path
     script_path = Path(args.script)
@@ -473,9 +477,6 @@ async def main():
     else:
         voice = args.voice or DEFAULT_VOICE_EDGE
 
-    source_audio_dir = Path(__file__).parent / args.project / "source_audio"
-    source_audio_dir.mkdir(parents=True, exist_ok=True)
-
     if args.preview:
         text = first_n_sentences(text, args.preview)
         output_filename = f"preview_{voice[:20].replace('/', '_')}.mp3"
@@ -484,7 +485,15 @@ async def main():
         output_filename = args.out
         print(f"\nGenerating full-script voiceover")
 
-    output_path = str(source_audio_dir / output_filename)
+    # If --out is absolute or no --project given, use it directly; else put in project/source_audio/
+    out_path = Path(output_filename)
+    if out_path.is_absolute() or not args.project:
+        output_path = str(out_path)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+    else:
+        source_audio_dir = Path(__file__).parent / args.project / "source_audio"
+        source_audio_dir.mkdir(parents=True, exist_ok=True)
+        output_path = str(source_audio_dir / output_filename)
 
     word_count = len(text.split())
     char_count = len(text)
