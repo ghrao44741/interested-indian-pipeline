@@ -479,7 +479,8 @@ async def main():
 
     if args.preview:
         text = first_n_sentences(text, args.preview)
-        output_filename = f"preview_{voice[:20].replace('/', '_')}.mp3"
+        rate_tag = f"_rate{int(args.speaking_rate * 100)}" if args.speaking_rate is not None else ""
+        output_filename = f"preview_{voice[:20].replace('/', '_')}{rate_tag}.mp3"
         print(f"\nGenerating voice preview ({args.preview} sentence(s))")
     else:
         output_filename = args.out
