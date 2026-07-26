@@ -844,3 +844,116 @@ Code fixes from last session: route_images.py (keyword classification), pipeline
 Immediate: (1) git push; (2) run test_script from prompts or voice stage; (3) run EP01 full pipeline.
 ```
 
+---
+
+## Session — CHANNEL_DNA Research Refinement, Backlog #7/#9/#10, Gemini 3.1 Cloud TTS Voice Switch (July 2026)
+
+*Note: this session's early turns (codebase orientation, `generate_country_map.py` review) were lost to a context-compaction gap before this section was written — reconstructed here from the post-compaction summary handed off internally. Everything below is accurate to what actually shipped, verified via git log/diff at write time.*
+
+### Competitive Research — @justaFLAM & @JustCuriousIndia (via Amplifiers/AIBMM + vidiq tools)
+- Re-researched justaFLAM (the channel `CHANNEL_DNA` was originally modeled on) and a newly-found channel, @JustCuriousIndia, to validate/refine the voice and content-angle guidance.
+- Findings fed into a `CHANNEL_DNA` refinement, approved via full Plan Mode (Explore → Plan → AskUserQuestion → ExitPlanMode), then implemented and validated against a real script-generation API call (not just reasoned about).
+
+### CHANNEL_DNA Refinement (`pipeline_agents.py`)
+- Niche expanded; format widened from "12–18 min" to **"12–21 minute"**.
+- 5 new situational technique blocks added: OPENER VARIANT (sibling/personification), RECURRING REFRAIN, JARGON ANCHORING, EVEN-HANDED DISMISSAL, MID-VIDEO THESIS RE-STATEMENT — all marked situational, not mandatory every episode.
+- `_stage_topics()` gained 4 new `CONTENT ANGLE GUIDE` bullets: cinema/film industry politics, religious-institution administration, controversial icons, city history — plus a paired-series note and Formula B/D seed examples.
+- **Bug found via `/but-for-real` + a real test script-generation run:** all of technique A/D's illustrative examples used the same subject ("Centre vs States"), so Claude was reproducing them near-verbatim in generated scripts instead of adapting the pattern. Fixed by diversifying examples to a different pairing (RBI vs Finance Ministry) and adding a general "adapt, don't copy" instruction.
+- **Second bug found the same way:** 4 places in `pipeline_agents.py` were still hardcoded to the old 2,000–2,800 word target after the 12–21 min widening (main script-generation instruction + 3 review/scoring checks). Updated to 2,000–3,200, ceiling 3,400.
+- Validated: technique A/D fire at the right structural position, C correctly stays absent on non-tour topics, B adapts rather than copies. `review_script.py --deep` scored the test script 6/10 — correctly, on pre-existing rules unrelated to this session's changes.
+- Test artifact: `test_channel_dna/`.
+
+### Backlog #7 — Question-Ratio Threshold (pipeline_agents.py)
+- **TASKS.md misnamed the file** — said "tune it in `review_script.py`"; that standalone tool has no question-ratio logic at all. The real (duplicated) check lives in `pipeline_agents.py`'s `ReviewAgent._review_script` and `_print_script_preview`.
+- **Confirmed non-blocking either way**: every `ReviewResult` uses `passed = score >= 7`, and this check never touches `score` — it's a diagnostic message only, not a gate.
+- Separately confirmed the *actual* pipeline gate (`review_script.py`'s Claude-based `OVERALL_SCORE`) doesn't over-penalize low question density — read a real `--deep` review's RHYTHM_SCORE rationale, which is entirely about sentence-length monotony, never mentions question marks. No fix needed there.
+- **Threshold recalibrated to 0.04** (was 0.08; an initial estimate of 0.05 was also checked and found still too strict) — done empirically against 4 real generated scripts' actual word/question counts (not an assumed words-per-sentence ratio): `ep01` (1,885 words/5 questions) → 0.0427; `ep01_v1` → 0.0000; `test_channel_dna` → 0.0238; `test_script` → 0.1282. 0.04 is the number that makes `ep01`'s real case pass while correctly still failing the two weak scripts.
+- Message text updated to match: "need ~1 per 25, roughly 1 per 400 words".
+
+### Backlog #9 — CHART Routing Wired End-to-End
+- Bigger than the backlog description implied ("wire route_images.py") — `route_images.py` had nowhere to route CHART shots *to*; no prompt file had ever contained structured chart data. Required a new `CHART_ARGS` schema in `generate_image_prompts.py` (mirrors `MAP_ARGS`) first — confirmed via an Explore agent, user approved full scope over the AskUserQuestion tool.
+- `generate_image_prompts.py`: new `CHART_ARGS format` instruction block (bar/stat/timeline/pie JSON shapes, single-line safety rules — forbids reserved words NARRATION/PROMPT/OVERLAY/CUE inside chart labels), `CHART_ARGS:` output line, `"chart_args"` key in `parse_claude_output()`, `chart_args_part` in `build_output_line()`.
+- `route_images.py`: new `_validate_chart_args()` (shlex-split + `--type` in bar/stat/timeline/pie + `--data` parses as non-empty JSON array), `parse_shots()` downgrades CHART→CARTOON with a warning on missing/invalid args (mirrors the existing MAP_ARGS-missing pattern), new `run_chart()` mirroring `run_map()`, `main()` gained the chart_shots list/dry-run listing/generation loop/failure summary.
+- Verified end-to-end: hand-authored a test prompts file with valid/missing/invalid `CHART_ARGS`, ran real (non-dry-run) generation, visually confirmed a correctly-rendered branded bar chart PNG — not just a clean exit code.
+
+### Backlog #10 — Thumbnail Base-Image Compositing
+- `generate_thumbnail.py` previously built thumbnails from a solid-color canvas, never touching `common/thumbnails/base_light.png` / `base_dark.png`.
+- Added `ImageOps.fit()` cover-fit-crop of the 1672×941 base art to 1280×720; `_resolve_theme()` now also returns the theme *name*; new `_render_on_base()` composites the title into a narrow center-ish text zone with a translucent scrim (base art already has "THE INTERESTED INDIAN" baked into its own footer, so no competing footer is redrawn), plus an "EPxx" badge in the corner opposite the mascot (`mascot_on_right = theme_name == "light"`).
+- **Found via visual iteration, not just code review:** first pass used a 56%-width text zone that overlapped the mascot's face/glasses on a long test title — narrowed to ~44% and made badge placement theme-aware, then re-verified on both a long and realistic-length title.
+- Original solid-canvas path preserved untouched as the fallback when base art is missing (verified via a simulated missing-file test).
+
+### Narration Voice — Switched to Gemini 3.1 Cloud TTS (en-IN, styled Charon)
+User raised that plain Gemini TTS "Charon" sounded generically American, not Indian, and shared a Google Cloud TTS Studio screenshot showing Gemini 3.1 Flash TTS with an `en-IN` locale + free-text style prompt. Investigated and built a standalone (non-pipeline) A/B tool: **`test_gemini31_en_in_voice.py`**.
+
+**Key technical distinction confirmed, not assumed:**
+- The existing `gemini` provider hits the **Gemini Developer API** (`generativelanguage.googleapis.com`) — simple API-key auth, no locale/style control, which is *why* it never sounded Indian (it never set a locale at all).
+- The Cloud TTS Studio screenshot uses a **different API**: **Google Cloud Text-to-Speech** (`texttospeech.googleapis.com/v1beta1/text:synthesize`) — supports `voice.languageCode` and a free-text `input.prompt` style field, on the newer `gemini-3.1-flash-tts-preview` model.
+- **Confirmed via a real 401, not assumed:** Cloud TTS rejects plain API keys outright ("API keys are not supported by this API") — requires OAuth2 user credentials or a service account. Solved via `gcloud auth print-access-token` (short-lived OAuth2 token, fetched via subprocess, never printed/logged).
+- **Windows-specific fix:** `subprocess.run(["gcloud", ...])` fails with `[WinError 2]` without `shell=True`, since `gcloud` is a `.cmd` batch wrapper that `CreateProcess` can't resolve directly.
+- Vertex AI routing confirmed: Gemini-TTS in Cloud TTS requires `aiplatform.endpoints.predict` (`roles/aiplatform.user`) — it's routed through Vertex AI infrastructure under the Cloud TTS surface.
+
+Generated two real A/B samples reusing the exact same sample text as the existing `gemini_Charon.wav` baseline: `voice_previews/gemini31_Charon_enIN.wav` (locale-only) and `voice_previews/gemini31_Charon_enIN_styled.wav` (locale + style prompt "warm, witty, conversational Indian English tone"). **User explicitly chose the styled version** — "let's do this - gemini31_Charon_enIN_styled.wav".
+
+**Wired into the real production pipeline** (not just the standalone script) as a new `gemini_cloudtts` provider:
+- `channel_config.json` — `voice.provider` default changed `"gemini"` → `"gemini_cloudtts"`; added `gemini_cloudtts_model` (`gemini-3.1-flash-tts-preview`), `gemini_cloudtts_locale` (`en-IN`), `gemini_cloudtts_style` (the warm/witty/conversational Indian English prompt), and a note documenting the gcloud-auth requirement + fallback behavior.
+- `generate_source_audio.py` — new `_get_gcloud_access_token()`, `_cloudtts_call()` (POSTs via `urllib.request` to match the file's existing style, requests MP3 directly), `cloudtts_generate()`. **Includes a real implemented fallback**: if gcloud isn't available, warns and calls the plain `gemini_generate()` instead of hard-failing — found via `/but-for-real` that this fallback was *documented* in `channel_config.json` but not actually implemented, then implemented and verified via a monkeypatch test simulating gcloud unavailability. `--provider` choices now `["gemini_cloudtts", "gemini", "elevenlabs", "edge"]`.
+- `pipeline_agents.py` `_stage_voice` — voice-resolution logic updated to treat `gemini`/`gemini_cloudtts` identically for voice-name lookup, reads `gemini_speaking_rate` for both.
+- **`CLOUDTTS_CHUNK_LIMIT` bug found and fixed:** initially copied the sibling Gemini path's 4500-char chunk limit without independent verification. Pricing research turned up Google's documented **hard 4,000-byte-per-field limit** for Cloud TTS's Gemini-TTS. Fixed to 3500 chars; verified against real scripts that byte overhead from em-dashes/curly quotes is only ~0.24%, so 3500 chars stays safely under 4,000 bytes.
+- Verified end-to-end via a real `--preview 3` run against `test_script`'s actual script — produced a valid 31.5s MP3 (confirmed via `mutagen.mp3.MP3`).
+
+### Pricing & Billing Investigation (Cloud TTS vs Gemini Developer API)
+- User asked for a clear auth comparison (above) plus **real** pricing — explicitly wanted no guessed numbers.
+- Confirmed via `ai.google.dev` official pricing: Gemini TTS billed at 25 tokens/second of audio output; `gemini-2.5-flash-preview-tts` = $0.50/$10 per 1M input/output tokens; `gemini-3.1-flash-tts-preview` = $1.00/$20.00 per 1M input/output tokens.
+- User authorized real GCP billing console access via Claude in Chrome (their authenticated session). Investigated `unseen-lever-auto-uploader` project: $9.82 total for the month, 73% of which was unrelated "Imagen 4 Generation" from a different project ("Rewired"). **No distinct Cloud TTS or Gemini 3.1 audio SKU appeared** — only a "Gemini 2.0 Flash TTS" line at $0.09 (likely leftover from earlier `gemini`/`test_gemini_tts.py` runs, not this session's Cloud TTS calls). Conclusion: today's Cloud TTS testing almost certainly fell inside free quota or hadn't posted yet — reconciled by confirming the visible SKU rows summed to the account's full total, rather than fighting the console's pagination further.
+- **Deferred, not resolved:** actual confirmed per-episode Cloud TTS cost. Recorded in `TASKS.md` as an open item to revisit in a couple of weeks once real episode-scale usage has accumulated and billing has posted.
+
+### Commits this session
+- `1e7ec28` — fix: backlog #7/#9/#10 (question ratio, CHART routing, thumbnail compositing)
+- `a3e2589` — feat: switch default narration voice to Gemini 3.1 Cloud TTS (en-IN, styled Charon)
+- `39b878a` — fix: correct CLOUDTTS_CHUNK_LIMIT to match Google's documented 4,000-byte limit
+- `6e1b582` — docs: record billing investigation findings for gemini_cloudtts, defer to later
+
+### Pending Tasks (Updated — see `TASKS.md` as source of truth)
+- **Confirm `gemini_cloudtts` actual billing** — revisit in a couple of weeks, deferred by user.
+- **#5** Install CUDA PyTorch in transcription-tools venv (WhisperX 40 min CPU → 3 min GPU)
+- Decide: keep or delete `run_episode_needed_or_not.py` (legacy orchestrator, stale CHANNEL_DNA copy, unreferenced)
+- Listen to speaking-rate previews (`test_script/source_audio/preview_Charon_rate80/85/90.mp3`) — likely superseded by the new voice decision, worth re-checking rate against the new Gemini 3.1 Cloud TTS voice specifically
+- Next actionable step (not yet run): validate `test_script` end-to-end with the new `gemini_cloudtts` voice, then run EP01's full pipeline — see `CLAUDE.md` "IMMEDIATE NEXT STEPS" for exact commands
+
+---
+
+## Session — WhisperX Venv Relocated + CUDA PyTorch Installed (Backlog #5, July 2026)
+
+User's idea: rather than just installing CUDA PyTorch in-place inside `Aeonium_Glow\transcription-tools\.venv` (the original #5 backlog wording), move the venv itself to a project-neutral shared location under `C:\Bakcup_Asus\` first, since it was already a de-facto shared dependency (both `interested_indian_pipeline` and `Aeonium_Glow\shorts_pipeline2` pointed at that one path) sitting oddly inside one specific project's folder. Done via full Plan Mode (Explore investigation → AskUserQuestion on 3 open decisions → approved plan → execution).
+
+### Investigation findings (before touching anything)
+- Old venv confirmed real: Python 3.11.8, `torch==2.8.0` **CPU-only** build, despite an NVIDIA RTX 4050 Laptop GPU (6GB VRAM, driver 566.07, reports CUDA 12.7) sitting unused on the machine (`torch.cuda.is_available()` was `False`).
+- `pip freeze` was the *only* record of what was installed — no requirements.txt existed anywhere in `transcription-tools\`. Full package list captured before migrating: `whisperx==3.8.6`, `faster-whisper==1.2.1`, `ctranslate2==4.8.0`, `pyannote-audio==4.0.5` (+ pyannote-core/database/metrics/pipeline), `torch/torchvision/torchaudio==2.8.0`.
+- Confirmed exactly two hardcoded reference points across two independent projects: `pipeline_agents.py:47` (`WHISPERX_PYTHON` constant) and `shorts_pipeline2\pipeline_config.json` (`transcription_venv_python` key + a `whisper_device: "cpu"` setting).
+- `pipeline_agents.py`'s `_stage_split` was hardcoding `--device cpu` even though the split script itself already defaulted to `--device cuda` — meaning the CPU-only bottleneck was two separate things stacked: no CUDA torch installed, *and* the pipeline explicitly overriding to CPU regardless.
+- **Real OOM risk surfaced via research, not assumption:** WhisperX's own README states `large-v2` (this pipeline's default model) needs "under 8GB" VRAM for transcription alone — tight against a 6GB card before even adding the alignment model. Researched actual PyTorch CUDA wheel compatibility (`cu126` chosen as the safe tag for a driver reporting CUDA 12.7) and a known Windows-specific ctranslate2/cuDNN-9 DLL pain point (`Could not locate cudnn_ops64_9.dll`), so both were treated as expected troubleshooting steps rather than surprises if hit.
+
+### User decisions (via AskUserQuestion)
+1. **Shared venv location:** user said "please suggest" — chose `C:\Bakcup_Asus\shared-tools\transcription-tools\.venv` (a `shared-tools` umbrella, leaving room for other cross-project venvs later, rather than baking one tool's name into the path).
+2. **OOM handling:** keep `large-v2` (don't downgrade model quality preemptively) + add safer defaults (`int8_float16` compute type, reduced batch size) as the first attempt, with `medium` model documented as the fallback if verification still OOMs.
+3. **Old venv:** delete it after the new one is verified working (not kept as a backup).
+
+### What was actually built/changed
+- New venv created at `C:\Bakcup_Asus\shared-tools\transcription-tools\.venv` from the same system Python 3.11.8. `torch/torchvision/torchaudio` installed via `--index-url https://download.pytorch.org/whl/cu126`, then `whisperx==3.8.6` installed after.
+- **Confirmed the exact risk the plan flagged, live:** installing `whisperx` (which depends on `torch` with no version/index pin) silently pulled the plain PyPI **CPU** wheel back in, undoing the CUDA install — `pip install torch ... --index-url cu126` afterward reported "Requirement already satisfied" and did nothing, since pip doesn't reinstall a satisfied unpinned requirement. Fixed with `pip install --force-reinstall --no-deps torch torchvision torchaudio --index-url .../cu126` (the `--no-deps` avoids re-triggering another resolution cascade). Verified clean afterward: `torch==2.13.0+cu126`, `torch.cuda.is_available() == True`, GPU correctly identified as the RTX 4050 Laptop.
+- Also found and fixed a smaller side effect: `torchcodec` (a `pyannote-audio` dependency) was installed at a version built against torch 2.8.0, producing a version-mismatch warning after the CUDA torch swap. Upgraded `torchcodec` to latest (0.15.0, `--no-deps`) — this resolved the version-mismatch message but surfaced a *different*, purely cosmetic FFmpeg-DLL-discovery warning from `pyannote.audio`'s own optional audio-decode path. Confirmed via reading `whisperx`'s own `load_audio()` source that it never uses `torchcodec` at all (it shells out to ffmpeg directly) — the warning only fires because `pyannote.audio` is imported as a WhisperX dependency, and this pipeline never uses pyannote's diarization features. Non-blocking, documented as a known cosmetic warning, not chased further.
+- `auto_split_scenes_v1_stage3_export.py` — added real `--compute-type` and `--batch-size` CLI flags (previously both were hardcoded inline: `"float16" if device=="cuda" else "int8"` and `batch_size=16`), threaded through `transcribe_with_timestamps()`.
+- `pipeline_agents.py` — `WHISPERX_PYTHON` repointed to the new shared path; `_stage_split` now passes `--device cuda --compute-type int8_float16 --batch-size 8` (safer than WhisperX's own float16/batch-16 defaults, per the user's chosen approach).
+- `Aeonium_Glow\shorts_pipeline2\pipeline_config.json` — `transcription_venv_python` repointed to the new shared path; `whisper_device` changed `"cpu"` → `"cuda"`.
+- `Aeonium_Glow\shorts_pipeline2\run_pipeline.py` — its own hardcoded fallback default (used only if the config key is missing) also repointed, so it doesn't silently point at a now-deleted path if that ever triggers.
+- Doc references updated in both projects: `interested_indian_pipeline\CLAUDE.md` (+ cleaned up several other stale "still to do" bullets that were actually already done in earlier sessions), `TASKS.md`, `memory_updated.md`, and `Aeonium_Glow\shorts_pipeline2\CLAUDE.md` (added a dated changelog note in its ENVIRONMENT section).
+
+### Verification (real runs, not just clean exit codes)
+- **`interested_indian_pipeline`:** copied `test_script`'s real `narration.mp3` into an isolated scratch project folder (to avoid clobbering `test_script`'s actual completed manifest/images/stitch state) and ran the split script directly through the new venv with `--device cuda --compute-type int8_float16 --batch-size 8`. First attempt via the Bash tool crashed on the final `print(f"✓ Transcribed...")` — the same known cp1252-console false alarm documented earlier in this file (Git Bash can't print `✓`), **not a real bug** — confirmed by re-running via PowerShell, which completed cleanly. **Result: ~39 seconds end-to-end** (transcription + forced alignment + scene-splitting for a 2.6-minute clip), producing a valid `manifest.json` with 37 correctly-timed scenes and a full proposed shot-split printout. Dramatically faster than the documented ~40 min/episode CPU baseline (different clip lengths, so not a strict 1:1 ratio, but the qualitative win is exactly what was expected).
+- **`Aeonium_Glow\shorts_pipeline2` spot-check:** copied `NewShort-01`'s real `narration.wav` into a separate scratch folder and ran *that* project's own (unmodified) `auto_split_scenes.py` — which still hardcodes `float16`/`batch_size=16`, the less-safe defaults — through the same new venv. **Completed in ~29 seconds with no OOM**, valid 13-scene manifest. Confirms the sibling project's repoint works too, and that even its riskier hardcoded settings are fine at Shorts-length audio on this GPU (flagged in the shorts_pipeline2 CLAUDE.md note that its script lacks the safer flags the sibling project's script now has, in case a longer/heavier short ever OOMs there).
+- Grepped both projects for any remaining reference to the old `Aeonium_Glow\transcription-tools` path before deleting — none found outside historical doc/session-log text (intentionally left as history, not live references).
+- Old venv (`Aeonium_Glow\transcription-tools\.venv`, 46,000+ site-packages files) deleted, freeing disk space; confirmed gone via a follow-up existence check.
+
+### Key learning for next time
+Never assume a `pip install <package> --index-url <cuda-wheel-index>` stays "locked in" after installing something else afterward that transitively depends on the same package unpinned — always re-verify `torch.cuda.is_available()` after *any* further pip install into a CUDA-enabled venv, not just right after the initial CUDA install. Documented as an explicit caveat in both projects' docs.
+

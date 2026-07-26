@@ -42,9 +42,10 @@ except ImportError:
 
 PIPELINE_DIR = Path(__file__).parent
 
-# WhisperX lives in a separate venv (heavy ML deps — torch, CUDA).
-# Use its Python for the split stage so the main env stays lightweight.
-WHISPERX_PYTHON = Path(r"C:\Bakcup_Asus\Aeonium_Glow\transcription-tools\.venv\Scripts\python.exe")
+# WhisperX lives in a separate, shared venv (heavy ML deps — torch, CUDA) so any
+# project can use it without duplicating the install. Use its Python for the
+# split stage so the main env stays lightweight.
+WHISPERX_PYTHON = Path(r"C:\Bakcup_Asus\shared-tools\transcription-tools\.venv\Scripts\python.exe")
 
 BANNED_WORDS = [
     "unleash", "unlock", "dive into", "delve into", "game-changer", "game changer",
@@ -1688,10 +1689,12 @@ class OrchestratorAgent:
         audio_path = mp3s[0]
         title = self.state["data"].get("title", "")
         cmd = [python, str(split),
-               "--audio",      audio_path.name,
-               "--project",    str(self.project_dir),
-               "--video-type", "LongVideo",
-               "--device",     "cpu"]
+               "--audio",        audio_path.name,
+               "--project",      str(self.project_dir),
+               "--video-type",   "LongVideo",
+               "--device",       "cuda",
+               "--compute-type", "int8_float16",
+               "--batch-size",   "8"]
         if title:
             cmd += ["--title", title]
         self._run_cmd(cmd, cwd=run_dir, label=split.name)

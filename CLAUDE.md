@@ -114,8 +114,8 @@ ELEVENLABS_API_KEY=...   # legacy, kept for reference — now using Gemini TTS
 
 YouTube OAuth: `Youtube_Interested_Indian_Upload.json` (in .gitignore)
 
-WhisperX venv: `C:\Bakcup_Asus\Aeonium_Glow\transcription-tools\.venv\Scripts\python.exe`
-(pipeline reads `WHISPERX_PYTHON` constant in `pipeline_agents.py`)
+WhisperX venv (shared across projects, CUDA-enabled): `C:\Bakcup_Asus\shared-tools\transcription-tools\.venv\Scripts\python.exe`
+(pipeline reads `WHISPERX_PYTHON` constant in `pipeline_agents.py`; `_stage_split` runs `--device cuda --compute-type int8_float16 --batch-size 8`)
 
 ---
 
@@ -205,20 +205,27 @@ Reference: `mascot_reference.png` | Session ID (AIBMM): `d9d31dea-1095-4a70-b57e
 - **Group images**: scenes sharing `visual_group_id` in manifest → one image per group, named `group-XX.png`
   `stitch_video_longform.py` `resolve_group_images()` copies group rep to all member filenames before stitch
 - **Pipeline isolation**: `pipeline_agents.py` uses local scripts only. Only external ref:
-  `WHISPERX_PYTHON` = `C:\Bakcup_Asus\Aeonium_Glow\transcription-tools\.venv\Scripts\python.exe`
+  `WHISPERX_PYTHON` = `C:\Bakcup_Asus\shared-tools\transcription-tools\.venv\Scripts\python.exe`
+  (shared with `Aeonium_Glow\shorts_pipeline2`, which points at the same venv via its own
+  `transcription_venv_python` config key — not duplicated per-project)
 
 ---
 
 ## KNOWN BUGS (fixed) & REMAINING TASKS
 
-**Fixed this session (2026-07-26):**
-- `route_images.py` — keyword classification now searches PROMPT field only (not full line incl. NARRATION)
+**Fixed (see TASKS.md for full history):**
+- `route_images.py` — keyword classification searches PROMPT field only (not full line incl. NARRATION)
 - `route_images.py` — MAP with no MAP_ARGS falls back to CARTOON (xAI) instead of blank GeoJSON map
-- `pipeline_agents.py _stage_voice` — now reads and passes `gemini_speaking_rate` from channel_config.json
+- `pipeline_agents.py _stage_voice` — reads and passes `gemini_speaking_rate` from channel_config.json
+- `route_images.py` / `generate_image_prompts.py` — CHART route wired via `CHART_ARGS` schema (#9)
+- `generate_thumbnail.py` — composites onto `base_dark.png` / `base_light.png` (#10)
+- `review_script.py` — banned word false positives fixed for first-person/interjection use (#6)
+- `pipeline_agents.py` — question-ratio threshold recalibrated to 0.04 (#7)
+- **CUDA PyTorch installed** in the shared WhisperX venv (#5) — `torch==2.13.0+cu126`, confirmed
+  `torch.cuda.is_available() == True` on the RTX 4050 Laptop GPU. `_stage_split` now runs
+  `--device cuda --compute-type int8_float16 --batch-size 8` (safer defaults than WhisperX's own
+  float16/batch-16 given the 6GB VRAM budget — fall back to `--model medium` if `large-v2` still OOMs).
 
 **Still to do (see TASKS.md for full list):**
-- Wire `generate_chart.py` as CHART route in `route_images.py` (currently falls back to xAI)
-- Update `generate_thumbnail.py` to composite text onto `base_dark.png` / `base_light.png`
-- Fix banned word false positives in `review_script.py` (#6)
-- Tune question ratio threshold in `review_script.py` (#7)
-- Install CUDA PyTorch in transcription-tools venv (WhisperX: 40 min CPU → 3 min GPU) (#5)
+- Confirm `gemini_cloudtts` actual per-episode billing (deferred a couple of weeks)
+- Decide: keep or delete `run_episode_needed_or_not.py`

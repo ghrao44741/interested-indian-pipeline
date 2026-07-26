@@ -106,12 +106,24 @@ Post-upload (manual in YouTube Studio):
 
 ## Infrastructure
 
-- [ ] **#5** Install CUDA PyTorch in `transcription-tools` venv
-  - WhisperX on CPU: ~40 min/episode. On GPU: ~3 min
-  ```powershell
-  pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-  python -c "import torch; print(torch.cuda.is_available())"
-  ```
+- [x] **#5** Install CUDA PyTorch in the WhisperX venv — done as part of relocating the venv
+  (see below) to a shared, cross-project location. `torch==2.13.0+cu126` installed, confirmed
+  `torch.cuda.is_available() == True` on the RTX 4050 Laptop (6GB VRAM). `pipeline_agents.py`
+  `_stage_split` now passes `--device cuda --compute-type int8_float16 --batch-size 8` (safer
+  than WhisperX's own float16/batch-16 defaults, given large-v2's own README says it needs
+  "under 8GB" VRAM for transcription alone — tight against 6GB once alignment is added). Real
+  speedup + a valid manifest confirmed via an actual transcription run (see verification below),
+  not just a clean exit code. Fallback documented if `large-v2` still OOMs: drop to `--model medium`.
+
+- [x] **Relocate shared WhisperX venv out of `Aeonium_Glow`** — previously lived at
+  `Aeonium_Glow\transcription-tools\.venv` even though both `interested_indian_pipeline`
+  (hardcoded `WHISPERX_PYTHON` in `pipeline_agents.py`) and `Aeonium_Glow\shorts_pipeline2`
+  (`transcription_venv_python` in its own `pipeline_config.json`) depend on it — structurally
+  confusing to have a shared dependency living inside one specific project's folder. Moved to
+  `C:\Bakcup_Asus\shared-tools\transcription-tools\.venv`, a project-neutral location. Both
+  projects' references updated and verified with real transcription runs (`interested_indian_pipeline`:
+  ~39s on a 2.6-min clip; `shorts_pipeline2`: ~29s on a Shorts-length clip, no VRAM OOM). Old venv
+  at the Aeonium_Glow path deleted after both projects confirmed working against the new path.
 
 ## Future
 

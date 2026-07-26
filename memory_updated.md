@@ -125,8 +125,10 @@ python generate_source_audio.py --script common\cta\cta_script.txt --out common\
 
 **WhisperX (only legitimate cross-project reference)**
 
-`WHISPERX_PYTHON = Path(r"C:\Bakcup_Asus\Aeonium_Glow\transcription-tools\.venv\Scripts\python.exe")`
-CPU mode: ~40 min/episode. CUDA upgrade pending (#5 in TASKS.md).
+`WHISPERX_PYTHON = Path(r"C:\Bakcup_Asus\shared-tools\transcription-tools\.venv\Scripts\python.exe")`
+Relocated out of `Aeonium_Glow` to a project-neutral shared location (also used by
+`shorts_pipeline2`). CUDA-enabled (#5 in TASKS.md, done) — `--device cuda --compute-type
+int8_float16 --batch-size 8`.
 
 ---
 

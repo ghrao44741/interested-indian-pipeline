@@ -82,7 +82,8 @@ def apply_brand_corrections(text: str) -> str:
         corrected = re.sub(pattern, replacement, corrected, flags=re.IGNORECASE)
     return corrected
 
-def transcribe_with_timestamps(audio_path: str, model_size: str = "base", device: str = "cuda") -> dict:
+def transcribe_with_timestamps(audio_path: str, model_size: str = "base", device: str = "cuda",
+                                compute_type: str = None, batch_size: int = 16) -> dict:
     """
     Run WhisperX locally: transcribe, then run forced phoneme alignment
     (wav2vec2) for word-level timestamps significantly more accurate than
@@ -90,14 +91,15 @@ def transcribe_with_timestamps(audio_path: str, model_size: str = "base", device
     only required for speaker diarization, which we don't use here since
     this is single-speaker TTS audio.
     """
-    compute_type = "float16" if device == "cuda" else "int8"
+    if compute_type is None:
+        compute_type = "float16" if device == "cuda" else "int8"
 
     print(f"Loading WhisperX model ({model_size}, {device}, {compute_type})...")
     model = whisperx.load_model(model_size, device=device, compute_type=compute_type)
 
     print(f"Transcribing {audio_path}...")
     audio = whisperx.load_audio(audio_path)
-    result = model.transcribe(audio, batch_size=16)
+    result = model.transcribe(audio, batch_size=batch_size)
 
     # Free the transcription model before loading the alignment model
     del model
@@ -388,6 +390,13 @@ def main():
     parser.add_argument("--model", default="large-v2", help="Whisper model size: tiny, base, small, medium, large-v2, large-v3")
     parser.add_argument("--device", default="cuda", choices=["cuda", "cpu"],
                          help="Run on GPU (cuda) or CPU. Use cpu if you don't have a CUDA GPU.")
+    parser.add_argument("--compute-type", default=None,
+                         help="WhisperX compute type (e.g. float16, int8_float16, int8). "
+                              "Defaults to float16 on cuda / int8 on cpu if not set. "
+                              "Use int8_float16 on GPUs with limited VRAM (<8GB) to reduce OOM risk.")
+    parser.add_argument("--batch-size", type=int, default=16,
+                         help="WhisperX transcription batch size. Lower it (e.g. 8) on GPUs with "
+                              "limited VRAM (<8GB) to reduce OOM risk.")
     parser.add_argument("--title", default="Untitled Episode", help="Episode title for manifest")
     parser.add_argument("--voice", default="en-US-JennyNeural", help="Voice used for original generation")
     parser.add_argument("--video-type", choices=["ShortVideo", "LongVideo"], default="ShortVideo",
@@ -412,7 +421,8 @@ def main():
         return
 
     # Step 1: Transcribe with word timestamps
-    whisper_result = transcribe_with_timestamps(audio_path, model_size=args.model, device=args.device)
+    whisper_result = transcribe_with_timestamps(audio_path, model_size=args.model, device=args.device,
+                                                 compute_type=args.compute_type, batch_size=args.batch_size)
     words = extract_words(whisper_result)
     print(f"\n✓ Transcribed {len(words)} words")
 
