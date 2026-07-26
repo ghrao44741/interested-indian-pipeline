@@ -4,42 +4,51 @@ Last updated: 2026-07-26
 
 ## Immediate
 
-- [ ] **Generate CTA audio** — `common/cta/cta.mp3` is empty (0 bytes)
-  ```powershell
-  python generate_voice.py --text-file common\cta\cta_script.txt --out common\cta\cta.mp3
-  ```
+- [x] **CTA audio generated** — `common/cta/cta.mp3` — 27,885 bytes ✓
 
-- [ ] **Git commit + push** — 85+ unstaged files from this session
+- [ ] **Listen to speaking rate previews** — `test_script\source_audio\preview_Charon_rate80/85/90.mp3`
+  - `channel_config.json` already has `gemini_speaking_rate: 0.85` (recommended starting point)
+  - If happy with 0.85: proceed as-is. If not: update `channel_config.json` `gemini_speaking_rate` before running voice stage.
+
+- [ ] **Git commit + push** — 90+ unstaged files (including this session's code fixes)
   ```powershell
+  cd C:\Bakcup_Asus\interested_indian_pipeline
   Remove-Item '.git\index.lock' -Force -ErrorAction SilentlyContinue
   git add -A
-  git commit -m "feat: xAI default, mascot fix, route_images, PIL overlay, type routing, map fixes, pipeline isolation, speaking rate"
+  git commit -m "fix: route_images keyword-search PROMPT-only, MAP no-args fallback, pipeline_agents speaking rate propagation"
   git push
   ```
 
-- [ ] **Test and tune Charon speaking rate** — preview at different rates, then lock in `channel_config.json`
-  ```powershell
-  python generate_source_audio.py --project test_script --preview 3 --speaking-rate 0.80
-  python generate_source_audio.py --project test_script --preview 3 --speaking-rate 0.85
-  python generate_source_audio.py --project test_script --preview 3 --speaking-rate 0.90
-  ```
+## 🧪 test_script — Validate Pipeline (then sign off)
 
-## 🚨 EP01 — Publish Gate (do not start EP02 until done)
+The test_script existing output has image issues (15P/5W/7F). Three code bugs fixed this session:
+1. `route_images.py` — keyword classification now searches PROMPT only (not NARRATION)
+2. `route_images.py` — MAP with no MAP_ARGS falls back to CARTOON (xAI) instead of blank map
+3. `pipeline_agents.py` — `_stage_voice` now passes `--speaking-rate` from `channel_config.json`
 
-- [ ] **Pick CTA for this episode** — edit `common\cta\cta_script.txt`, then regenerate audio
-  - EP01 (serious/systemic) → Option C: *"India is running a system most people don't know exists..."*
-  - Lighter/absurd topics → Option D: *"Okay. That's the one..."*
-  - Deep research ep → Option A: *"I spent three days reading things..."*
-  - All options saved in `common/cta/cta_options.txt`
-  ```powershell
-  python generate_source_audio.py --script common\cta\cta_script.txt --out common\cta\cta.mp3
-  ```
-- [ ] Regen all 147 images with correct mascot + routing: `python run_episode_v2.py --project ep01 --from-stage images`
-- [ ] Re-stitch: `python run_episode_v2.py --project ep01 --from-stage stitch`
-- [ ] Re-run metadata: `python run_episode_v2.py --project ep01 --from-stage metadata`
-- [ ] Re-upload: `python upload_youtube.py --project ep01`
-- [ ] Set thumbnail manually in YouTube Studio (API needs 1000+ subs)
-- [ ] Add tags manually in YouTube Studio
+**Option A — Full re-run (tests narration + all fixes, ~50 min total):**
+```powershell
+python run_episode_v2.py --project test_script --from-stage voice
+python local_mp4_analyzer.py test_script/output/test_script_final.mp4
+```
+
+**Option B — Image+stitch only (fast, ~15 min, skips narration re-gen):**
+```powershell
+python run_episode_v2.py --project test_script --from-stage prompts
+python local_mp4_analyzer.py test_script/output/test_script_final.mp4
+```
+
+## 🚨 EP01 — Full Pipeline Run
+
+After test_script validates, run EP01 full pipeline:
+```powershell
+python run_episode_v2.py --project ep01 --from-stage voice
+```
+This generates: Gemini TTS Charon at rate 0.85 → WhisperX split → prompts with TYPE+MAP_ARGS → images with fixed routing → overlays → stitch → metadata. Human checkpoint: watch video → set public.
+
+Post-upload (manual in YouTube Studio):
+- [ ] Set thumbnail
+- [ ] Add tags
 - [ ] Watch end-to-end → set public
 
 ## Pipeline Improvements

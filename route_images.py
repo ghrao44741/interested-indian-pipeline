@@ -56,8 +56,16 @@ def _field(line: str, name: str, until: list[str] | None = None) -> str:
 
 
 def _classify_by_keywords(line: str) -> str:
-    """Fallback classification for prompts without a TYPE field."""
-    text = line.lower()
+    """Fallback classification for prompts without a TYPE field.
+
+    Only searches the PROMPT field, NOT the full line.  Narration text frequently
+    mentions 'union territory', 'India map', etc. — searching the whole line causes
+    cartoon scenes to be mis-classified as MAP, generating generic geography images
+    with no highlights instead of the intended illustration.
+    """
+    # Extract only the PROMPT field (between PROMPT: and OVERLAY: / CUE: / end)
+    m = re.search(r'\bPROMPT:\s*(.+?)(?:\s+OVERLAY:|\s+CUE:|$)', line, re.IGNORECASE)
+    text = (m.group(1) if m else line).lower()
     if any(re.search(kw, text) for kw in _MAP_KEYWORDS):
         return "MAP"
     if any(re.search(kw, text) for kw in _CHART_KEYWORDS):
@@ -84,9 +92,15 @@ def parse_shots(prompts_path: Path) -> list[dict]:
             raw_type = _classify_by_keywords(line)
 
         # MAP_ARGS field (only meaningful for MAP type)
+        # If a scene is classified as MAP but has no MAP_ARGS (legacy prompts pre-dating
+        # the TYPE/MAP_ARGS feature), downgrade to CARTOON so xAI generates an illustrative
+        # version rather than a useless blank-highlight GeoJSON map.
         map_args = ""
         if raw_type == "MAP":
             map_args = _field(line, "MAP_ARGS", ["NARRATION", "PROMPT", "OVERLAY"])
+            if not map_args:
+                raw_type = "CARTOON"  # fallback: no highlight args → AI is better
+                print(f"  ⚠  SHOT {m_shot.group(1)}: MAP type but no MAP_ARGS — routing to AI (re-run prompts stage to get proper map args)")
 
         # Parse narration for Pexels keyword extraction
         m_narr = re.search(r'NARRATION:\s*"([^"]+)"', line)

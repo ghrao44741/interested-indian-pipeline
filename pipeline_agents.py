@@ -1528,9 +1528,10 @@ class OrchestratorAgent:
         gen_audio = PIPELINE_DIR / "generate_source_audio.py"
         script_path = Path(self.state["data"]["script_path"])
 
-        # Read provider + voice from channel_config.json
-        provider = "edge"
-        voice    = "en-US-GuyNeural"
+        # Read provider + voice + speaking rate from channel_config.json
+        provider      = "edge"
+        voice         = "en-US-GuyNeural"
+        speaking_rate = None   # None → omit flag → generate_source_audio.py uses its own default
         cfg_path = PIPELINE_DIR / "channel_config.json"
         if cfg_path.exists():
             import json as _json
@@ -1539,7 +1540,8 @@ class OrchestratorAgent:
             provider = vcfg.get("provider", provider)
             # Resolve voice by provider so Gemini/ElevenLabs/Edge each get the right key
             if provider == "gemini":
-                voice = vcfg.get("gemini_voice", "Charon")
+                voice         = vcfg.get("gemini_voice", "Charon")
+                speaking_rate = vcfg.get("gemini_speaking_rate")  # e.g. 0.85
             elif provider == "elevenlabs":
                 voice = vcfg.get("elevenlabs_default", vcfg.get("default", voice))
             else:
@@ -1552,14 +1554,14 @@ class OrchestratorAgent:
         if manifest_voice and manifest_voice != voice:
             voice = manifest_voice
 
-        self._run_cmd(
-            [sys.executable, str(gen_audio),
-             "--project",  str(self.project_dir),
-             "--script",   str(script_path),
-             "--provider", provider,
-             "--voice",    voice],
-            label="generate_source_audio.py"
-        )
+        cmd = [sys.executable, str(gen_audio),
+               "--project",  str(self.project_dir),
+               "--script",   str(script_path),
+               "--provider", provider,
+               "--voice",    voice]
+        if speaking_rate is not None:
+            cmd.extend(["--speaking-rate", str(speaking_rate)])
+        self._run_cmd(cmd, label="generate_source_audio.py")
 
     def _stage_split(self):
         split = self._find_script(PIPELINE_DIR, ["auto_split_scenes_v1_stage3_export.py", "auto_split_scenes.py"])

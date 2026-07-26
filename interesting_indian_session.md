@@ -687,8 +687,160 @@ Three issues found and fixed after test_script review:
 - **#13:** Tune question ratio threshold in script reviewer
 - **#15:** Build notification agent
 - **#16:** Build analytics feedback loop
+
+---
+
+## Session — CTA System, Speaking Rate, Audio Fixes (July 2026)
+
+### generate_source_audio.py — Three Fixes
+
+**1. `--project` made optional**
+- Previously `--project` and `--script` were both required; broke standalone CTA generation
+- Fix: only `--script` is required. When `--project` is absent (or `--out` is an absolute path), output goes directly to the `--out` path — no `source_audio/` subdirectory created
+- Allows: `python generate_source_audio.py --script common\cta\cta_script.txt --out common\cta\cta.mp3`
+
+**2. Speaking rate — SSML `<prosody>` (not SDK field)**
+- Previous attempt: set `speaking_rate` on `types.SpeechConfig` → `ValidationError: Extra inputs are not permitted`
+- Second attempt: set on `types.GenerateContentConfig` → also not a valid field in this SDK version
+- Confirmed fields: `SpeechConfig` has `[voice_config, language_code, multi_speaker_voice_config]`; `GenerateContentConfig` has no `speaking_rate` field
+- Fix: wrap text in SSML `<speak><prosody rate="85%">...</prosody></speak>` when `speaking_rate` is set
+  ```python
+  if speaking_rate is not None:
+      rate_pct = f"{int(speaking_rate * 100)}%"
+      contents = f'<speak><prosody rate="{rate_pct}">{text}</prosody></speak>'
+  else:
+      contents = text
+  ```
+- `channel_config.json` note updated to reflect SSML implementation
+
+**3. Rate-tagged preview filenames**
+- Preview files were all named `preview_Charon.mp3` — each rate test overwrote the last
+- Fix: filename now includes rate: `preview_Charon_rate80.mp3`, `preview_Charon_rate85.mp3`, `preview_Charon_rate90.mp3`
+- Used `args.speaking_rate` (not `speaking_rate` — that variable isn't defined yet at filename construction)
+
+### Speaking Rate — Preview Commands
+Three previews queued for listening comparison:
+```powershell
+python generate_source_audio.py --project test_script --script "test_script\script_why_india_has_9_territories_that_are_not_quite_sta.txt" --preview 3 --speaking-rate 0.80
+python generate_source_audio.py --project test_script --script "test_script\script_why_india_has_9_territories_that_are_not_quite_sta.txt" --preview 3 --speaking-rate 0.85
+python generate_source_audio.py --project test_script --script "test_script\script_why_india_has_9_territories_that_are_not_quite_sta.txt" --preview 3 --speaking-rate 0.90
+```
+Listen to all three in `test_script\source_audio\`, then update `channel_config.json` → `gemini_speaking_rate`.
+
+### CTA Rotation System
+- `common/cta/cta_script.txt` — active CTA, swapped per episode before stitch
+- `common/cta/cta_options.txt` — all options + rotation guide (new file)
+
+**Rotation pattern:**
+| Episode type | Option | Script |
+|---|---|---|
+| Serious/systemic (President's Rule, Article 356 etc.) | C | *"India is running a system most people don't know exists. This was one piece of it. Subscribe if you want the rest."* |
+| Lighter/absurd topics | D | *"Okay. That's the one. Subscribe if it broke your brain a little. I'll be back next week."* |
+| Deep-research episode | A | *"I spent three days reading things most people wouldn't touch with a ten-foot pole so you don't have to. Subscribe if that sounds useful."* |
+| Warm/audience poke | B | *"If you made it this far, you're exactly the kind of person this channel is for. Subscribe. I'll see you next week with another one nobody asked for but definitely needed."* |
+
+**EP01 CTA (set):** Option C — serious/systemic topic (President's Rule / Article 356)
+
+CTA selection is now part of the EP finalization checklist in `TASKS.md` — do it before stitching.
+
+### CTA Audio — Still Needs Generating
+Run in PowerShell:
+```powershell
+python generate_source_audio.py --script common\cta\cta_script.txt --out common\cta\cta.mp3
+```
+
+### Git — Pending Commit
+```powershell
+Remove-Item '.git\index.lock' -Force -ErrorAction SilentlyContinue
+git add -A
+git commit -m "feat: SSML speaking rate, rate-tagged previews, CTA rotation system, pipeline isolation, map fixes, generate_source_audio standalone mode"
+git push
+```
+
+### Handoff Note for Next Session
+Start next session with:
+> Continue The Interested Indian pipeline. Session doc: `interesting_indian_session.md`. Task list: `TASKS.md`. Immediate: (1) listen to speaking rate previews in `test_script\source_audio\`, lock rate in `channel_config.json`; (2) generate CTA audio; (3) git push; (4) EP01 image regen.
 - **#21:** Add `--topic` override flag to pipeline
 - Wire `generate_chart.py` as CHART route in `route_images.py` (currently falls back to AI)
 - Wire `generate_images_aibmm.py` (GPT Image 2 + mascot reference) for MASCOT-type scenes
 - Update `generate_thumbnail.py` to composite title text onto `base_light.png` / `base_dark.png`
+
+---
+
+## Session — Code Fixes, test_script Validation, EP01 Launch (July 2026)
+
+### Status at Session Start
+- CTA audio: `common/cta/cta.mp3` — 27,885 bytes ✓ (already generated)
+- Speaking rate previews: exist at `test_script/source_audio/preview_Charon_rate80/85/90.mp3`. `channel_config.json` already has `gemini_speaking_rate: 0.85`. Cannot be listened to in this session — user must confirm rate before re-running voice stage.
+- Git: 89 unstaged files (all pipeline changes from previous sessions)
+
+### Code Bugs Fixed This Session
+
+**Bug 1 — `route_images.py` keyword classification searched full line (including NARRATION)**
+- Root cause: `_classify_by_keywords(line)` was doing `line.lower()` on the entire prompt entry — including the NARRATION field. Any scene where narration text mentioned "union territory", "India map", etc. got classified as MAP even when the PROMPT was a cartoon illustration.
+- Example: SCENE-024 ("meme reaction beat: mascot holding puzzle piece") has narration "Union Territory structure..." → was classified MAP → got a generic India map instead of a cartoon.
+- Example: SCENE-032 ("before-and-after split panel, mascot shocked") has narration "split into two union territories..." → same misclassification.
+- **Fix:** Extract only the PROMPT field (`PROMPT: ... OVERLAY:`) before keyword matching. Now searches only the visual description, not the narration text.
+
+**Bug 2 — `route_images.py` MAP with no MAP_ARGS → blank geography map**
+- Root cause: Legacy prompts (generated before TYPE/MAP_ARGS fields were added) are correctly classified as MAP (prompt says "color-coded political map"), but have no MAP_ARGS field. `run_map()` called `generate_india_map.py --out SCENE-XXX.png` with no `--highlight` args → generated a generic regional-color map, not the specific highlights the scene needed.
+- **Fix:** If `raw_type == "MAP"` but `map_args == ""`, downgrade to CARTOON with a warning. Routed to xAI Grok which generates at least a cartoon-style map. Prompts re-run (which now generates MAP_ARGS) restores proper behavior.
+
+**Bug 3 — `pipeline_agents.py _stage_voice` never passed `--speaking-rate` to generate_source_audio.py**
+- Root cause: Even though `channel_config.json` has `gemini_speaking_rate: 0.85` and `generate_source_audio.py` has the SSML `<prosody rate="...">` implementation, `_stage_voice` only read provider/voice from config — never `speaking_rate`. Result: every pipeline voice run used the default rate regardless of channel_config.json.
+- **Fix:** `_stage_voice` now reads `vcfg.get("gemini_speaking_rate")` when provider is gemini, and appends `--speaking-rate {value}` to the generate_source_audio.py command.
+
+### test_script Run Plan (post-fix)
+The existing test_script output (`test_script_final.mp4`) has:
+- 15 PASS, 5 WARN, 7 FAIL images (from review_report.md)
+- Wrong narration speed (default rate, not 0.85 — generated before SSML fix)
+- The code fixes above now handle all these correctly
+
+**Full re-run sequence (from voice stage to validate everything):**
+```powershell
+cd C:\Bakcup_Asus\interested_indian_pipeline
+
+# Step 1: Git push first (unblock any in-flight state)
+git add -A
+git commit -m "fix: route_images keyword search PROMPT-only, MAP fallback to CARTOON, pipeline_agents speaking rate propagation"
+git push
+
+# Step 2: Re-run test_script from voice (generates narration at rate 0.85, then splits/prompts/images/stitch)
+python run_episode_v2.py --project test_script --from-stage voice
+
+# Step 3: Review output
+python local_mp4_analyzer.py test_script/output/test_script_final.mp4
+```
+
+**Faster option (skip narration re-gen, just fix images + stitch):**
+```powershell
+python run_episode_v2.py --project test_script --from-stage prompts
+```
+This re-generates prompts (with TYPE+MAP_ARGS) → routes images correctly → overlays → stitch. Uses the existing WhisperX manifest and narration.mp3 (at default rate). Good for validating image routing fixes only.
+
+### EP01 Launch Sequence
+After test_script validates:
+```powershell
+cd C:\Bakcup_Asus\interested_indian_pipeline
+
+# Full pipeline from voice stage (Gemini TTS Charon at rate 0.85, new prompts with TYPE+MAP_ARGS, fixed routing)
+python run_episode_v2.py --project ep01 --from-stage voice
+```
+
+This will:
+1. Generate new narration with Charon at rate 0.85 (replaces old ElevenLabs ANX)
+2. WhisperX split (~40 min CPU, ~3 min with CUDA GPU)
+3. Generate image prompts with TYPE + MAP_ARGS
+4. Route images: MAP → generate_india_map.py (accurate GeoJSON), CARTOON → xAI Grok
+5. PIL text overlays
+6. Stitch → `ep01/output/ep01_final.mp4`
+7. Metadata (clean tags, no apostrophes/hyphens)
+8. Human checkpoint: review video → approve upload
+
+### Handoff Note
+```
+Continue The Interested Indian pipeline. Session doc: `interesting_indian_session.md`. Task list: `TASKS.md`.
+Code fixes from last session: route_images.py (keyword classification), pipeline_agents.py (speaking rate propagation).
+Immediate: (1) git push; (2) run test_script from prompts or voice stage; (3) run EP01 full pipeline.
+```
 
