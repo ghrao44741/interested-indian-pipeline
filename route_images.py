@@ -176,7 +176,7 @@ def run_map(shot: dict, images_dir: Path, script_dir: Path) -> bool:
             # Malformed quoted string — pass as single arg, map script will error clearly
             cmd.append(shot["map_args"])
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if result.returncode != 0:
         err = (result.stderr or result.stdout or "unknown error").strip()[:200]
         print(f"✗  {err}")
@@ -197,7 +197,7 @@ def run_chart(shot: dict, images_dir: Path, script_dir: Path) -> bool:
             # Malformed quoted string — pass as single arg, chart script will error clearly
             cmd.append(shot["chart_args"])
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if result.returncode != 0:
         err = (result.stderr or result.stdout or "unknown error").strip()[:200]
         print(f"✗  {err}")
@@ -216,7 +216,7 @@ def run_pexels(shot: dict, images_dir: Path, script_dir: Path) -> bool:
            "--query", query,
            "--out", str(out_path)]
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
     if result.returncode != 0:
         err = (result.stderr or result.stdout or "unknown error").strip()[:200]
         print(f"✗  {err}")
