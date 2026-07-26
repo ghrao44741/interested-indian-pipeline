@@ -6,18 +6,42 @@ Last updated: 2026-07-26
 
 - [x] **CTA audio generated** — `common/cta/cta.mp3` — 27,885 bytes ✓
 
+- [x] **Git commit + push** — route_images.py / pipeline_agents.py fixes pushed (`7dc9abf`)
+
+- [x] **CHANNEL_DNA refined + niche expanded** (`03bc2da`) — 5 new FLAM-derived techniques
+  (sibling opener, recurring refrain, jargon anchor, even-handed dismissal, mid-video
+  restatement, all situational), niche expanded to cinema/religious institutions/
+  controversial icons/city history, format widened 12–18 → 12–21 min. Verified against
+  real FLAM + @JustCuriousIndia data.
+
+- [x] **CHANNEL_DNA validated against a real script-generation run** — generated a real
+  script on a comparative topic (Centre vs. States) via the actual `_stage_script` API
+  call. Confirmed techniques A/D fire correctly (including at the right structural
+  position), C correctly stays absent on non-tour topics, B adapts rather than copies.
+  Found and fixed: (1) my own A/D examples were being reproduced near-verbatim because
+  they all used the same illustrative topic — diversified to a different pairing (RBI /
+  Finance Ministry) and added a general "adapt, don't copy" instruction to CHANNEL_DNA;
+  (2) `pipeline_agents.py` had 4 places still hard-coded to the old 2,000–2,800 word
+  target after last session's 12–21 min widening (the actual script-generation
+  instruction plus 3 review/scoring checks) — all updated to 2,000–3,200 / ceiling 3,400.
+  `review_script.py --deep` scored the test script 6/10 ("needs work") — correctly, on
+  pre-existing rules (hook number, humor density), not on anything added this session.
+  Artifact: `test_channel_dna/`.
+
+- [x] **`generate_country_map.py` implemented + tested** (`774a196`) — name-field
+  auto-detect + latitude aspect correction verified against India (regression-checked)
+  and a real UK GeoJSON (non-equatorial). `--india-regions` stays opt-in by design
+  (documented in the script's own `--help`). Not yet wired into any pipeline stage —
+  still a standalone tool for future comparative episodes.
+
+- [ ] **Decide: keep or delete `run_episode_needed_or_not.py`** — renamed from
+  `run_episode.py` this session; it's a legacy single-agent orchestrator with its own
+  stale, unsynced `CHANNEL_DNA` copy, superseded by `run_episode_v2.py` +
+  `pipeline_agents.py`. Not referenced by any current documented workflow.
+
 - [ ] **Listen to speaking rate previews** — `test_script\source_audio\preview_Charon_rate80/85/90.mp3`
   - `channel_config.json` already has `gemini_speaking_rate: 0.85` (recommended starting point)
   - If happy with 0.85: proceed as-is. If not: update `channel_config.json` `gemini_speaking_rate` before running voice stage.
-
-- [ ] **Git commit + push** — 90+ unstaged files (including this session's code fixes)
-  ```powershell
-  cd C:\Bakcup_Asus\interested_indian_pipeline
-  Remove-Item '.git\index.lock' -Force -ErrorAction SilentlyContinue
-  git add -A
-  git commit -m "fix: route_images keyword-search PROMPT-only, MAP no-args fallback, pipeline_agents speaking rate propagation"
-  git push
-  ```
 
 ## 🧪 test_script — Validate Pipeline (then sign off)
 
@@ -53,15 +77,8 @@ Post-upload (manual in YouTube Studio):
 
 ## Pipeline Improvements
 
-- [ ] **#6** Fix banned word false positives in `review_script.py`
-  - "genuinely"/"honestly" flagged in conversational context where they're fine
-  - Add context check — only flag in formal/corporate phrasing
-
 - [ ] **#7** Tune question ratio threshold in `review_script.py`
   - 5–6 questions in 1800 words should not fail (~1 per 400 words, not 250)
-
-- [ ] **#8** Add `--topic` override flag to `run_episode_v2.py`
-  - Skip ResearchAgent topics stage, inject user-supplied topic directly into script stage
 
 - [ ] **#9** Wire `generate_chart.py` as CHART route in `route_images.py`
   - Currently CHART falls back to xAI Grok; should use matplotlib for accurate data visuals
@@ -117,3 +134,11 @@ Post-upload (manual in YouTube Studio):
 - [x] Add `--speaking-rate` to `generate_source_audio.py` + `channel_config.json`
 - [x] CTA audio guard in `stitch_video_longform.py` — skips gracefully if file empty
 - [x] Full pipeline test run — test_script episode end-to-end ✓
+- [x] **#6** Fix banned word false positives in `review_script.py` — "genuinely"/"honestly"
+  no longer flagged in first-person conversational use or sentence-opening interjections
+  ("Honestly, ..."), only in formal/corporate-sounding phrasing. Verified against 7 test
+  sentences + no regression on `test_script`'s baseline.
+- [x] **#8** Add `--topic` override flag to `run_episode_v2.py` — skips only the topics
+  stage (`OrchestratorAgent.inject_topic`), script generation still runs normally with
+  the supplied topic. Mutually exclusive with `--script-file`. Verified state transitions
+  in isolation (stage→script, topics marked complete) without an API call.

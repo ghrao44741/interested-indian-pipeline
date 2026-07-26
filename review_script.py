@@ -131,11 +131,37 @@ def _split_paragraphs(text: str) -> list[str]:
 
 # ── Deterministic checks ───────────────────────────────────────────────────────
 
+# "genuinely" / "honestly" read as corporate filler in formal phrasing ("we genuinely care about...")
+# but are normal, on-voice conversational asides in this channel's first-person style
+# ("I honestly don't know", "I'm genuinely surprised"). Only flag them when the containing
+# sentence has no first-person marker — i.e. when they're NOT being used conversationally.
+CONTEXT_SENSITIVE_WORDS = {"genuinely", "honestly"}
+_FIRST_PERSON_RE = re.compile(r"\bi\b|\bi'm\b|\bi've\b|\bi'll\b|\bi'd\b|\bmy\b|\bme\b", re.IGNORECASE)
+
+
+def _sentence_containing(text: str, pos: int) -> str:
+    """Return the sentence spanning position `pos`, bounded by . ! ? or newlines."""
+    start = pos
+    while start > 0 and text[start - 1] not in ".!?\n":
+        start -= 1
+    end = pos
+    while end < len(text) and text[end] not in ".!?\n":
+        end += 1
+    return text[start:end + 1]
+
+
 def check_banned_words(text: str) -> list[dict]:
     issues = []
     for word in BANNED_WORDS:
         pattern = re.compile(r'\b' + re.escape(word) + r'\b', re.IGNORECASE)
         for m in pattern.finditer(text):
+            if word in CONTEXT_SENSITIVE_WORDS:
+                sentence = _sentence_containing(text, m.start())
+                # Conversational if the sentence has a first-person marker, OR the word is a
+                # sentence-opening interjection ("Honestly, ..." / "Genuinely, ...").
+                is_interjection = sentence.strip().lower().startswith(word + ",")
+                if is_interjection or _FIRST_PERSON_RE.search(sentence):
+                    continue  # conversational use — not a corporate cliché
             line_no = text[:m.start()].count('\n') + 1
             issues.append({"word": word, "line": line_no, "context": _snippet(text, m.start())})
     return issues

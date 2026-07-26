@@ -60,6 +60,10 @@ STAGE_ORDER = ["topics", "script", "review-script", "voice", "split", "prompts",
 CHANNEL_DNA = """You are a viral educational YouTube video creation engine for "The Interested Indian".
 
 CHANNEL DNA:
+- IMPORTANT — every WRONG/RIGHT example below demonstrates a STYLE PATTERN, not text to reuse. If the
+  actual topic happens to resemble an example's subject matter, write an original line that follows the
+  same pattern — never reuse an example's exact wording in the real script.
+
 - Niche: Indian history, administrative evolution, political geography, economic history, regional
   geopolitics, society & sociology (regional identity, language, class, stereotypes), Indian cinema as an
   institution (film industry economics, censorship, regional industry rivalries — never celebrity gossip),
@@ -85,10 +89,11 @@ CHANNEL DNA:
   there's nothing to personify, and forcing it will read as false.):
   Instead of the standard OPENER TEMPLATE above, introduce the two entities as characters/siblings in tension,
   then fire off a rapid paired-contrast list BEFORE explaining any facts.
-  WRONG (for a two-entity topic): "And this is fiscal federalism. While most coverage shows you tax formulas..."
-  RIGHT: "Meet India's two federal siblings: the Centre and the States. You'd think sharing one constitution
-         would make them get along, right? Nope. One controls the money, the other does the governing. One
-         writes the rules, the other has to explain them to angry voters."
+  WRONG (for a two-entity topic): "And this is monetary policy. While most coverage shows you interest rates..."
+  RIGHT: "Meet two institutions that are supposed to be on the same team: the RBI and the Finance Ministry.
+         You'd think one government, one economy, would mean everyone's rowing the same direction, right?
+         Nope. One prints the money and worries about inflation. The other spends the money and worries
+         about winning the next election."
   After the paired-contrast list, transition straight into the Hook as normal.
 
 - Hook: A policy paradox that sounds genuinely absurd out of context. Opens within the first 4 lines. Make the
@@ -184,9 +189,10 @@ CHANNEL DNA:
   ("this isn't really an X vs Y story"), restate and complicate that thesis TWICE — not just at the close. Once
   at the LOGICAL MIDPOINT of the script (roughly where mechanism turns into consequence), and once again at the
   close. This is a retention re-hook for viewers who've drifted by the middle of the video.
-  Midpoint example: "Hearing all this makes it sound like the Centre and the States are locked in a simple
-                     tug-of-war. But it's not that clean."
-  Close example: "The story of Centre-State relations isn't really the states-vs-union fight you think it is."
+  Midpoint example: "Hearing all this makes it sound like the RBI and the Finance Ministry are locked in a
+                     simple turf war. But it's not that clean."
+  Close example: "The story of the RBI and the Finance Ministry isn't really the independence-vs-control
+                 fight you think it is."
   Do NOT force this on single-institution episodes (e.g. a President's Rule explainer) — there's no second
   entity to re-complicate against.
 
@@ -315,11 +321,11 @@ class ReviewAgent:
 
         # Rule: word count
         if wc < 1800:
-            issues.append(f"Script too short: {wc} words (minimum 2,000)")
-            recs.append("Regenerate with explicit 2,000–2,800 word target")
-        elif wc > 3000:
-            issues.append(f"Script too long: {wc} words (maximum 2,800)")
-            recs.append("Trim to under 2,800 words")
+            issues.append(f"Script too short: {wc} words (target 2,000–3,200)")
+            recs.append("Regenerate with explicit 2,000–3,200 word target")
+        elif wc > 3400:
+            issues.append(f"Script too long: {wc} words (target 2,000–3,200)")
+            recs.append("Trim to under 3,200 words")
 
         # Rule: banned words
         text_lower = text.lower()
@@ -354,7 +360,7 @@ class ReviewAgent:
         # Weighted score: start from Claude score, penalise rule failures
         score = result.get("score", 7)
         score -= len(found_banned) * 1
-        if wc < 1800 or wc > 3000:
+        if wc < 1800 or wc > 3400:
             score -= 2
         score = max(0, min(10, score))
 
@@ -1164,6 +1170,31 @@ class OrchestratorAgent:
         self.state["stage"] = "review-script"
         self._save_state()
 
+    def inject_topic(self, topic: str):
+        """
+        Bypass the topics-brainstorming stage by injecting a user-supplied topic.
+        Unlike inject_script_file, this only skips 'topics' — the script stage still
+        runs normally (ResearchAgent + Claude script generation) using this topic.
+
+        Called by run_episode_v2.py --topic before run_pipeline().
+        """
+        topic = topic.strip()
+        if not topic:
+            print("❌ --topic cannot be empty")
+            sys.exit(1)
+
+        print(f"\n  ✓ Topic injected: {topic}")
+
+        if "topics" not in self.state["completed"]:
+            self.state["completed"].append("topics")
+
+        self.state["data"].update({
+            "topic_choice": topic,
+            "topic_ideas":  f"1 | {topic} | User-supplied topic (--topic flag)",
+        })
+        self.state["stage"] = "script"
+        self._save_state()
+
     # ── Pipeline runner ────────────────────────────────────────────────────────
 
     def run_pipeline(self, from_stage: Optional[str] = None):
@@ -1417,7 +1448,7 @@ class OrchestratorAgent:
                     f"Selected: {topic_choice}\n\n"
                     f"{research_context}\n\n"
                     "Write the full narration script:\n"
-                    "- 2,000–2,800 words of pure narration\n"
+                    "- 2,000–3,200 words of pure narration\n"
                     "- No headers, no bullets, no stage directions\n"
                     "- Use verified facts from the research brief above\n"
                     "- Weave in specific dates, acts, statistics naturally\n"
@@ -1539,11 +1570,11 @@ class OrchestratorAgent:
         q_ratio = q_count / sent_count
         found_banned = [w for w in BANNED_WORDS if w in script_text.lower()]
 
-        wc_flag    = "✓" if 1800 <= wc <= 3000 else "✗"
+        wc_flag    = "✓" if 1800 <= wc <= 3400 else "✗"
         q_flag     = "✓" if q_ratio >= 0.08 else "⚠"
         ban_flag   = "✓" if not found_banned else "✗"
 
-        print(f"  {wc_flag}  Words   : {wc}  (target 2,000–2,800)")
+        print(f"  {wc_flag}  Words   : {wc}  (target 2,000–3,200)")
         print(f"  {q_flag}  Questions: {q_count} / ~{sent_count} sentences  ({q_ratio:.0%})")
         print(f"  {ban_flag}  Banned  : {', '.join(found_banned) if found_banned else 'none'}")
 

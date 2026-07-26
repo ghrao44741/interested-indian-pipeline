@@ -14,6 +14,9 @@ Usage:
     # Supply your own script — skips topics + script stages, starts from review-script:
     python run_episode_v2.py --project ep02 --script-file my_script.txt
 
+    # Supply your own topic — skips topic brainstorming, starts from script generation:
+    python run_episode_v2.py --project ep02 --topic "Why X Actually Works Like Y"
+
 Requires:
     ANTHROPIC_API_KEY  environment variable
     pip install anthropic duckduckgo-search pydub --break-system-packages
@@ -81,8 +84,15 @@ def main():
     parser.add_argument("--script-file", default=None,
                         help="Path to your own script .txt — skips topics + script stages, "
                              "starts from review-script. Optionally put 'TITLE: ...' on line 1.")
+    parser.add_argument("--topic",       default=None,
+                        help="Skip the topic-brainstorming stage — inject this topic directly "
+                             "and start from script generation. Mutually exclusive with --script-file.")
     parser.add_argument("--status",      action="store_true", help="Show pipeline status and exit")
     args = parser.parse_args()
+
+    if args.script_file and args.topic:
+        print("❌ --script-file and --topic are mutually exclusive — pick one.")
+        sys.exit(1)
 
     project_dir = Path(args.project)
     if not project_dir.is_absolute():
@@ -107,6 +117,8 @@ def main():
 
     if args.script_file:
         orchestrator.inject_script_file(Path(args.script_file))
+    elif args.topic:
+        orchestrator.inject_topic(args.topic)
 
     orchestrator.run_pipeline(from_stage=args.from_stage)
 
