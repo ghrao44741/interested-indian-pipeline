@@ -242,15 +242,26 @@ def generate_image_grok(shot_prompt: str, model_key: str, xai_client) -> bytes:
 # ENSURE REAL PNG  (Grok returns JPEG bytes regardless of requested format)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+TARGET_W, TARGET_H = 1280, 720  # All pipeline images must match this size
+
 def ensure_png(path: Path) -> Path:
     """
-    If the file at `path` is actually JPEG data (despite having a .png extension),
-    re-encode it as a real PNG in-place. Returns the (possibly updated) path.
+    Ensure file is a real PNG at exactly 1280×720.
+    - Converts JPEG-encoded data (Grok often returns JPEG with .png extension)
+    - Resizes if xAI returned a non-standard size
+    Returns the (possibly updated) path.
     """
     try:
         from PIL import Image as _Image
         img = _Image.open(path)
+        changed = False
         if img.format == "JPEG":
+            img = img.convert("RGB")
+            changed = True
+        if img.size != (TARGET_W, TARGET_H):
+            img = img.resize((TARGET_W, TARGET_H), _Image.LANCZOS)
+            changed = True
+        if changed:
             img.save(path, format="PNG")
     except Exception:
         pass   # PIL not available or file unreadable — leave as-is

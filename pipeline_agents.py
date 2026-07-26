@@ -41,7 +41,6 @@ except ImportError:
 # ── Constants ──────────────────────────────────────────────────────────────────
 
 PIPELINE_DIR = Path(__file__).parent
-SHORTS_DIR   = PIPELINE_DIR.parent / "Aeonium_Glow" / "shorts_pipeline2"
 
 # WhisperX lives in a separate venv (heavy ML deps — torch, CUDA).
 # Use its Python for the split stage so the main env stays lightweight.
@@ -1563,15 +1562,8 @@ class OrchestratorAgent:
         )
 
     def _stage_split(self):
-        # Prefer the versioned script in PIPELINE_DIR (has duration fixes);
-        # fall back to shorts_pipeline2 versions if not found here.
-        versioned = PIPELINE_DIR / "auto_split_scenes_v1_stage3_export.py"
-        if versioned.exists():
-            split = versioned
-            run_dir = PIPELINE_DIR
-        else:
-            split = self._find_script(SHORTS_DIR, ["auto_split_scenes_v1_stage3_export.py", "auto_split_scenes.py"])
-            run_dir = SHORTS_DIR
+        split = self._find_script(PIPELINE_DIR, ["auto_split_scenes_v1_stage3_export.py", "auto_split_scenes.py"])
+        run_dir = PIPELINE_DIR
 
         # Use the whisperx venv Python if available; fall back to current interpreter.
         python = str(WHISPERX_PYTHON) if WHISPERX_PYTHON.exists() else sys.executable
@@ -1635,10 +1627,10 @@ class OrchestratorAgent:
         )
 
     def _stage_stitch(self):
-        stitch = SHORTS_DIR / "stitch_video_longform.py"
+        stitch = PIPELINE_DIR / "stitch_video_longform.py"
         self._run_cmd(
             [sys.executable, str(stitch), "--project", str(self.project_dir)],
-            cwd=SHORTS_DIR, label="stitch_video_longform.py"
+            cwd=PIPELINE_DIR, label="stitch_video_longform.py"
         )
 
     def _stage_metadata(self):

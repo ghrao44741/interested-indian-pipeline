@@ -1,12 +1,13 @@
 {
-  "stage": "images",
+  "stage": "stitch",
   "completed": [
     "topics",
     "script",
     "review-script",
     "voice",
     "split",
-    "prompts"
+    "prompts",
+    "overlays"
   ],
   "data": {
     "title": "Why India Has 9 Territories That Are Not Quite States",

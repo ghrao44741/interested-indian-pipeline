@@ -208,12 +208,10 @@ def render_map(
                 ax=ax, facecolor="none", edgecolor=color, linewidth=2.8, zorder=2
             )
 
-    # State name labels
+    # State name labels — always show all states; highlighted ones get bold + stroke
     for _, row in gdf.iterrows():
         sname = row[name_col]
         is_hi = sname in all_highlighted
-        if not is_hi and not all_labels:
-            continue
         try:
             centroid = row.geometry.centroid
         except Exception:
@@ -268,9 +266,19 @@ def render_map(
     if out_path is None:
         out_path = Path("india_map.png")
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    plt.savefig(str(out_path), dpi=100, bbox_inches="tight",
+    # Save without bbox_inches="tight" so the canvas stays exactly 1280×720
+    plt.savefig(str(out_path), dpi=100,
                 facecolor="none" if transparent else BG_COLOR)
     plt.close()
+    # Enforce exact 1280×720 so map images match AI-generated images in the stitch
+    try:
+        from PIL import Image as _PILImage
+        img = _PILImage.open(str(out_path))
+        if img.size != (1280, 720):
+            img = img.resize((1280, 720), _PILImage.LANCZOS)
+            img.save(str(out_path))
+    except Exception:
+        pass  # PIL not available — size may differ
     print(f"  ✓ Map saved → {out_path}  (1280×720)")
 
 

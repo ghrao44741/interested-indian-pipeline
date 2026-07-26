@@ -556,3 +556,139 @@ Indian pop culture: cricket, food delivery, gaming, zomato, swiggy, whatsapp, ol
 - #26 ✓ Build review_script.py — COMPLETE
 - #11, #12, #13, #14, #15, #16, #21, #22, #24 — see above
 
+---
+
+## Session — xAI Switch, Mascot Fix, Route Images, Pipeline Isolation (July 2026)
+
+### Voice Finalised — Gemini TTS Charon
+- Provider switched from ElevenLabs → Gemini TTS
+- Voice: **Charon** (`gemini-2.5-flash-preview-tts`) — deep, authoritative; selected 2026-07-25 after A/B test vs Fenrir/Orus/Puck
+- Gemini TTS returns raw PCM → wrapped in WAV headers via Python `wave` module (24kHz, 16-bit, mono)
+- `channel_config.json` updated: `voice.provider = "gemini"`, `voice.gemini_voice = "Charon"`, `voice.gemini_model = "gemini-2.5-flash-preview-tts"`
+
+### xAI Grok — Default Image Backend
+- `generate_images_flux.py` default backend changed from `"replicate"` → `"grok"`
+- Replicate was throttling (429 errors, 18/27 test_script images failed)
+- xAI Grok: faster, no throttling, same flat cartoon output quality
+
+### Mascot Fix — Indian Design Locked
+- **Root cause of regression:** `STYLE_PREFIX` in `generate_images_flux.py` and `SYSTEM_PROMPT` in `generate_image_prompts.py` had generic descriptions — AI was generating a pale-skinned generic Asian character
+- **Fix:** Both files updated with full locked description:
+  - Chubby round Indian cartoon boy, amber/gold round glasses, spiky black hair, warm tan brown skin (#D4A85C), cream kurta, off-white baggy pajama trousers with gathered ankles, brown leather sandals
+  - Explicit "NOT a generic Asian character, NOT pale-skinned, NOT in Western clothing"
+- **Reference sheet locked:** `mascot_reference.png` — 4 expressions (NEUTRAL, SHOCKED, CONFUSED, SMUG), AIBMM session `d9d31dea-1095-4a70-b57e-9c0de7eaca7b`
+
+### Thumbnail Bases — Regenerated
+- Two GPT Image 2 base images generated (AIBMM MCP), session `ff68bd11-2791-4e85-9712-fbb7e2475769`:
+  - **Light** (even episodes): cream bg (#FAF7F2), mascot right pointing up, India map left, amber footer bar → `common/thumbnails/base_light.png`
+  - **Dark** (odd episodes): navy bg (#0C1828), mascot left pointing up, India silhouette right, amber footer bar → `common/thumbnails/base_dark.png`
+- URLs and session ID stored in `channel_config.json` under `thumbnail_bases`
+- Download locally (PowerShell):
+  ```powershell
+  Invoke-WebRequest "https://rqkumunldqvmynqxibca.supabase.co/storage/v1/object/public/generated-images/adhoc-1785033137395.png" -OutFile "common\thumbnails\base_light.png"
+  Invoke-WebRequest "https://rqkumunldqvmynqxibca.supabase.co/storage/v1/object/public/generated-images/adhoc-1785033172185.png" -OutFile "common\thumbnails\base_dark.png"
+  ```
+
+### 4-Type Scene Architecture — Fully Wired
+Scene types, generators, and routing:
+
+| Type | Generator | Method |
+|---|---|---|
+| CARTOON | `generate_images_flux.py` | xAI Grok — mascot + concept illustrations |
+| MAP | `generate_india_map.py` | geopandas + GeoJSON (accurate geography, never AI) |
+| CHART | `generate_images_flux.py` (fallback) | future: `generate_chart.py` |
+| PHOTO | `search_pexels.py` | Pexels API — real-world context shots |
+
+**TYPE + MAP_ARGS fields** added to `generate_image_prompts.py` output format — placed BEFORE NARRATION so existing parsers (regex for CUE, OVERLAY) remain unbroken.
+
+**`route_images.py`** (new dispatcher):
+- Reads `image_prompts_one_line_per_prompt.md`, routes by TYPE
+- Legacy prompts without TYPE → keyword fallback classification
+- MAP failures auto-noted; PHOTO failures fall back to AI
+- `--dry-run` and `--overwrite` flags
+- Wired into `pipeline_agents.py` `_stage_images`
+
+### CARTOON Prompt Guardrail (generate_image_prompts.py)
+- Added explicit rule: if TYPE=CARTOON and scene *mentions* a place, do NOT describe a geographic map in PROMPT
+- Wrong: scene about Lakshadweep population → AI draws a map
+- Right: mascot standing next to small island icon labelled "Lakshadweep", tiny crowd of 5 cartoon people
+- Wrong/right examples added directly to SYSTEM_PROMPT so Claude classifies correctly every run
+
+### PIL Text Overlay — add_text_overlays.py
+- Burns OVERLAY text from prompts file onto images post-generation
+- Navy banner at bottom, white bold text, amber badge
+- Backs up originals as `_orig.png`
+- Inserted between images and stitch stages in `STAGE_ORDER`
+- AI prompts explicitly forbid rendering text — all text goes through PIL (eliminates AI typos)
+
+### Pipeline Isolation — No External Folder References
+- `pipeline_agents.py` previously called `stitch_video_longform.py` and `auto_split_scenes_v1_stage3_export.py` from `C:\Bakcup_Asus\Aeonium_Glow\shorts_pipeline2\`
+- **Fixed:** `SHORTS_DIR` variable removed. Both `_stage_stitch` and `_stage_split` now use `PIPELINE_DIR` (local copies in `interested_indian_pipeline\`)
+- The two projects (`interested_indian_pipeline` and `shorts_pipeline2`) are now fully independent
+- **Only legitimate external reference remaining:** `WHISPERX_PYTHON` pointing to `Aeonium_Glow\transcription-tools\.venv\Scripts\python.exe` — WhisperX is shared heavy ML tooling, not pipeline code
+
+### Stitch Bug Fixes
+- **CTA audio guard:** `find_cta()` in `stitch_video_longform.py` now checks file size ≥1024 bytes before returning the CTA path — prints a clear warning and skips gracefully if `cta.mp3` is empty (was crashing with `HeaderNotFoundError`). Applied to both `interested_indian_pipeline\stitch_video_longform.py` and `Aeonium_Glow\shorts_pipeline2\stitch_video_longform.py`
+- **resolve_group_images logging:** Added print line so group image copies are visible in stitch output (was silently failing)
+- **Group member images:** Stitch expects one image per scene; generator creates one per shot (deduped by visual_group_id). `resolve_group_images()` in stitch handles the copy automatically — but only after images exist. If overlays run before stitch's copy step, group secondaries may be missing. Workaround for now: ensure stitch runs after all images (including overlays) are complete.
+
+### test_script Run — Results
+- Episode: "Why India Has 9 Territories That Are Not Quite States" — 27 shots, 36 scenes
+- Stages completed: topics ✓ script ✓ review-script ✓ voice ✓ split ✓ prompts ✓ images ✓ overlays ✓ stitch ✓
+- Image review round 1: 19 PASS / 2 WARN / 6 FAIL
+- Persistent FAILs (all 3 rounds): SCENE-003, 019, 021, 024, 027, 032 — geography-mentioned CARTOON scenes where xAI generated maps instead of illustrations → fixed by CARTOON prompt guardrail above
+- Stitch: initially blocked by empty `cta.mp3` → fixed by CTA guard; completed successfully
+- Output: `test_script/output/test_script_final.mp4`, `test_script_captioned.mp4`, `test_script_captions.srt`
+- Duration: 170s (171s manifest — 1s floating-point rounding, not missing content; proceed accepted)
+- **#28 COMPLETE** — full pipeline end-to-end validated
+
+### CTA Audio — Still Needs Generating
+`common/cta/cta.mp3` is empty (0 bytes). Generate with:
+```powershell
+cd C:\Bakcup_Asus\interested_indian_pipeline
+python generate_voice.py --text-file common\cta\cta_script.txt --out common\cta\cta.mp3
+```
+CTA script: *"If this made you think, subscribe. New episode every week. The Interested Indian — Indian history and policy, explained clearly."*
+
+### Git — Large Unstaged Batch Pending
+85 files unstaged (all pipeline changes from this session + thumbnail bases + test_script run). After CTA fix and stitch completes:
+```powershell
+Remove-Item 'C:\Bakcup_Asus\interested_indian_pipeline\.git\index.lock' -Force  # if lock exists
+git add -A
+git commit -m "feat: xAI default, mascot fix, route_images, PIL overlay, type routing, thumbnail bases, pipeline isolation"
+git push
+```
+
+### Map + Image Size Fixes
+Three issues found and fixed after test_script review:
+
+**1. India map state labels hidden by default**
+- Root cause: `generate_india_map.py` only labeled highlighted states; non-highlighted states required `--all-labels` flag
+- Fix: removed the `if not is_hi and not all_labels: continue` guard — all states now always get labels. Highlighted states get bold white text with colored stroke; non-highlighted get small brown labels.
+
+**2. India map wrong output size**
+- Root cause: `plt.savefig(..., bbox_inches="tight")` crops the figure to content bounds, destroying the 1280×720 canvas. Actual output was 490×574 despite the script printing "1280×720" (a lie).
+- Fix: removed `bbox_inches="tight"`. Added PIL resize step after save to enforce exactly 1280×720.
+
+**3. AI images (xAI Grok) wrong size**
+- Root cause: `generate_images_flux.py` saved xAI output as-is; xAI returns variable sizes (some 517×574, some 1280×720).
+- Fix: extended `ensure_png()` to also resize to 1280×720 when size doesn't match. All pipeline images now guaranteed 1280×720.
+
+**PIL overlay on maps:** `add_text_overlays.py` processes all `.png` files in the images folder regardless of source — maps automatically get OVERLAY text burned on, same as AI images. No extra work needed.
+
+### Pending Tasks (Updated)
+- **IMMEDIATE:** Generate CTA audio: `python generate_voice.py --text-file common\cta\cta_script.txt --out common\cta\cta.mp3`
+- **IMMEDIATE:** Git commit all session changes (85+ unstaged files)
+- **#28 ✓** Full pipeline test run — COMPLETE
+- **#25:** Finalize EP01 — regen 147 images with correct mascot + routing, re-stitch, re-upload
+- **#14:** EP01 image regen (147 scenes, all with correct mascot)
+- **#11:** Install CUDA PyTorch in transcription-tools venv (WhisperX: 40min CPU → 3min GPU)
+- **#12:** Fix banned word false positives in script reviewer
+- **#13:** Tune question ratio threshold in script reviewer
+- **#15:** Build notification agent
+- **#16:** Build analytics feedback loop
+- **#21:** Add `--topic` override flag to pipeline
+- Wire `generate_chart.py` as CHART route in `route_images.py` (currently falls back to AI)
+- Wire `generate_images_aibmm.py` (GPT Image 2 + mascot reference) for MASCOT-type scenes
+- Update `generate_thumbnail.py` to composite title text onto `base_light.png` / `base_dark.png`
+

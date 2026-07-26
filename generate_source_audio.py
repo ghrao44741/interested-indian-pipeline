@@ -67,8 +67,9 @@ DEFAULT_MODEL_EL   = _voice_cfg.get("model", "eleven_multilingual_v2")
 DEFAULT_STABILITY  = _voice_cfg.get("stability", 0.5)
 DEFAULT_SIMILARITY = _voice_cfg.get("similarity_boost", 0.75)
 DEFAULT_VOICE_EDGE   = "en-US-GuyNeural"
-DEFAULT_VOICE_GEMINI = _voice_cfg.get("gemini_voice", "Charon")
-DEFAULT_MODEL_GEMINI = "gemini-2.5-flash-preview-tts"
+DEFAULT_VOICE_GEMINI   = _voice_cfg.get("gemini_voice", "Charon")
+DEFAULT_MODEL_GEMINI   = "gemini-2.5-flash-preview-tts"
+DEFAULT_SPEAKING_RATE  = _voice_cfg.get("gemini_speaking_rate", None)  # None = Gemini default (1.0)
 GEMINI_CHUNK_LIMIT   = 4500   # conservative limit per API call for long scripts
 
 SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
@@ -221,7 +222,8 @@ GEMINI_VOICES = [
 ]
 
 
-def _gemini_call(text: str, voice: str, api_key: str, model: str) -> bytes:
+def _gemini_call(text: str, voice: str, api_key: str, model: str,
+                 speaking_rate: float | None = None) -> bytes:
     """Single Gemini TTS call → raw audio bytes (WAV or MP3)."""
     try:
         from google import genai
@@ -231,16 +233,19 @@ def _gemini_call(text: str, voice: str, api_key: str, model: str) -> bytes:
         sys.exit(1)
 
     client = genai.Client(api_key=api_key)
+    speech_cfg_kwargs = dict(
+        voice_config=types.VoiceConfig(
+            prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=voice)
+        )
+    )
+    if speaking_rate is not None:
+        speech_cfg_kwargs["speaking_rate"] = speaking_rate  # 0.25–4.0, default 1.0
     response = client.models.generate_content(
         model=model,
         contents=text,
         config=types.GenerateContentConfig(
             response_modalities=["AUDIO"],
-            speech_config=types.SpeechConfig(
-                voice_config=types.VoiceConfig(
-                    prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=voice)
-                )
-            ),
+            speech_config=types.SpeechConfig(**speech_cfg_kwargs),
         ),
     )
     part = response.candidates[0].content.parts[0]
@@ -289,21 +294,28 @@ def _wav_to_mp3(wav_bytes: bytes, output_path: str):
 
 
 def gemini_generate(text: str, voice: str, output_path: str,
-                    model: str = DEFAULT_MODEL_GEMINI):
-    """Generate full narration via Gemini TTS, chunking long scripts."""
+                    model: str = DEFAULT_MODEL_GEMINI,
+                    speaking_rate: float | None = None):
+    """Generate full narration via Gemini TTS, chunking long scripts.
+
+    speaking_rate: 0.25 (very slow) – 4.0 (very fast). Default (None) = 1.0.
+    Recommended range for Charon narration: 0.80–0.95.
+    """
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
         print("❌ GEMINI_API_KEY not set in .env")
         print("   Get one free at: https://aistudio.google.com")
         sys.exit(1)
 
+    rate_label = f"  speaking_rate={speaking_rate}" if speaking_rate is not None else ""
     chunks = _split_into_chunks(text, max_chars=GEMINI_CHUNK_LIMIT)
-    print(f"  Gemini TTS: {len(chunks)} chunk(s), voice={voice}, model={model}")
+    print(f"  Gemini TTS: {len(chunks)} chunk(s), voice={voice}, model={model}{rate_label}")
 
     all_wav_chunks = []
     for i, chunk in enumerate(chunks, 1):
         print(f"  ⏳ Chunk {i}/{len(chunks)} ({len(chunk)} chars)...", end=" ", flush=True)
-        audio_data, mime_type = _gemini_call(chunk, voice, api_key, model)
+        audio_data, mime_type = _gemini_call(chunk, voice, api_key, model,
+                                              speaking_rate=speaking_rate)
 
         # Convert to WAV if raw PCM
         if "mp3" in mime_type or "mpeg" in mime_type:
@@ -417,6 +429,9 @@ async def main():
                         help="List available voices for the selected provider and exit")
     parser.add_argument("--locale",    default="en-US",
                         help="Locale filter for --list-voices with edge provider (e.g. en-IN)")
+    parser.add_argument("--speaking-rate", type=float, default=None, metavar="RATE",
+                        help="Gemini TTS speed: 0.25 (slowest) – 4.0 (fastest). Default=1.0. "
+                             "Try 0.85 for a slightly slower Charon pace.")
     args = parser.parse_args()
 
     # ── List voices ──
@@ -480,7 +495,9 @@ async def main():
     print(f"{'─' * 55}")
 
     if args.provider == "gemini":
-        gemini_generate(text, voice, output_path)
+        # CLI flag overrides config; config overrides Gemini default (1.0)
+        rate = args.speaking_rate if args.speaking_rate is not None else DEFAULT_SPEAKING_RATE
+        gemini_generate(text, voice, output_path, speaking_rate=rate)
     elif args.provider == "elevenlabs":
         elevenlabs_generate(text, voice, output_path)
     else:

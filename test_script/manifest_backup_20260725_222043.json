@@ -3,7 +3,7 @@
   "title": "Why India Has 9 Territories That Are Not Quite States",
   "voice": "en-US-JennyNeural",
   "word_segments_file": "source_audio/narration_words.json",
-  "total_duration": 171.36,
+  "total_duration": 158.435,
   "scenes": [
     {
       "id": "SCENE-001",
@@ -12,11 +12,9 @@
       "script": "And this is Union Territories.",
       "scene_type": "grouped",
       "visual_group_id": "group-01",
-      "duration": 2.712,
+      "duration": 2.362,
       "whisperx_start": 0.171,
-      "whisperx_end": 2.533,
-      "start": 0.0,
-      "end": 2.712
+      "whisperx_end": 2.533
     },
     {
       "id": "SCENE-002",
@@ -25,11 +23,9 @@
       "script": "While most coverage of Indian governance shows you the 28 states, the chief ministers, the assembly elections, the coalition dramas, there's this whole other layer that nobody talks about.",
       "scene_type": "grouped",
       "visual_group_id": "group-01",
-      "duration": 10.056,
+      "duration": 9.688,
       "whisperx_start": 3.233,
-      "whisperx_end": 12.921,
-      "start": 2.712,
-      "end": 12.768
+      "whisperx_end": 12.921
     },
     {
       "id": "SCENE-003",
@@ -38,11 +34,9 @@
       "script": "Nine territories where the central government runs things directly.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 3.288,
+      "duration": 2.922,
       "whisperx_start": 13.521,
-      "whisperx_end": 16.443,
-      "start": 12.768,
-      "end": 16.056
+      "whisperx_end": 16.443
     },
     {
       "id": "SCENE-004",
@@ -51,11 +45,9 @@
       "script": "Your local elected government has roughly the power of a very enthusiastic suggestion box.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 4.752,
+      "duration": 4.404,
       "whisperx_start": 16.883,
-      "whisperx_end": 21.287,
-      "start": 16.056,
-      "end": 20.808
+      "whisperx_end": 21.287
     },
     {
       "id": "SCENE-005",
@@ -64,11 +56,9 @@
       "script": "And sometimes there isn't even a legislature at all.",
       "scene_type": "grouped",
       "visual_group_id": "group-02",
-      "duration": 2.52,
+      "duration": 2.162,
       "whisperx_start": 21.747,
-      "whisperx_end": 23.909,
-      "start": 20.808,
-      "end": 23.328
+      "whisperx_end": 23.909
     },
     {
       "id": "SCENE-006",
@@ -77,11 +67,9 @@
       "script": "I found this out the hard way when I was trying to explain Indian federalism to someone, and they asked me, so who runs Delhi?",
       "scene_type": "grouped",
       "visual_group_id": "group-02",
-      "duration": 6.432,
+      "duration": 6.063,
       "whisperx_start": 24.569,
-      "whisperx_end": 30.632,
-      "start": 23.328,
-      "end": 29.76
+      "whisperx_end": 30.632
     },
     {
       "id": "SCENE-007",
@@ -90,11 +78,9 @@
       "script": "And I confidently said, the chief minister, obviously.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 3.12,
+      "duration": 2.761,
       "whisperx_start": 31.132,
-      "whisperx_end": 33.893,
-      "start": 29.76,
-      "end": 32.88
+      "whisperx_end": 33.893
     },
     {
       "id": "SCENE-008",
@@ -103,11 +89,9 @@
       "script": "Which is technically true, and also deeply misleading.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 3.432,
+      "duration": 3.081,
       "whisperx_start": 34.394,
-      "whisperx_end": 37.475,
-      "start": 32.88,
-      "end": 36.312
+      "whisperx_end": 37.475
     },
     {
       "id": "SCENE-009",
@@ -116,11 +100,9 @@
       "script": "Because the Delhi government controls schools, local roads, some services, but the police, the land, the bureaucracy, that belongs to the lieutenant governor,",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 8.976,
+      "duration": 8.605,
       "whisperx_start": 38.115,
-      "whisperx_end": 46.72,
-      "start": 36.312,
-      "end": 45.288
+      "whisperx_end": 46.72
     },
     {
       "id": "SCENE-010",
@@ -129,11 +111,9 @@
       "script": "who is appointed by the central government, who can, and occasionally does, just overrule the elected government entirely.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 6.552,
+      "duration": 6.203,
       "whisperx_start": 47.16,
-      "whisperx_end": 53.363,
-      "start": 45.288,
-      "end": 51.84
+      "whisperx_end": 53.363
     },
     {
       "id": "SCENE-011",
@@ -142,11 +122,9 @@
       "script": "This played out most visibly between 2015 and 2022, when the Aam Aadmi Party won Delhi's assembly with a historic majority,",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 7.104,
+      "duration": 6.743,
       "whisperx_start": 54.083,
-      "whisperx_end": 60.826,
-      "start": 51.84,
-      "end": 58.944
+      "whisperx_end": 60.826
     },
     {
       "id": "SCENE-012",
@@ -155,11 +133,9 @@
       "script": "and then spent the next seven years in a constitutional tug-of-war over who actually ran the city.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 4.992,
+      "duration": 4.621,
       "whisperx_start": 61.266,
-      "whisperx_end": 65.887,
-      "start": 58.944,
-      "end": 63.936
+      "whisperx_end": 65.887
     },
     {
       "id": "SCENE-013",
@@ -168,11 +144,9 @@
       "script": "Courts got involved, multiple times.",
       "scene_type": "grouped",
       "visual_group_id": "group-03",
-      "duration": 1.968,
+      "duration": 1.62,
       "whisperx_start": 66.488,
-      "whisperx_end": 68.108,
-      "start": 63.936,
-      "end": 65.904
+      "whisperx_end": 68.108
     },
     {
       "id": "SCENE-014",
@@ -181,11 +155,9 @@
       "script": "The Supreme Court ruled in Delhi's favour in 2023, and then Parliament passed a law three weeks later that effectively reversed the ruling.",
       "scene_type": "grouped",
       "visual_group_id": "group-03",
-      "duration": 7.152,
+      "duration": 6.783,
       "whisperx_start": 68.568,
-      "whisperx_end": 75.351,
-      "start": 65.904,
-      "end": 73.056
+      "whisperx_end": 75.351
     },
     {
       "id": "SCENE-015",
@@ -194,11 +166,9 @@
       "script": "Which is either impressive legislative efficiency, or something else entirely, depending on your politics.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.088,
+      "duration": 4.722,
       "whisperx_start": 75.951,
-      "whisperx_end": 80.673,
-      "start": 73.056,
-      "end": 78.144
+      "whisperx_end": 80.673
     },
     {
       "id": "SCENE-016",
@@ -207,11 +177,9 @@
       "script": "But why does this system exist at all?",
       "scene_type": "grouped",
       "visual_group_id": "group-04",
-      "duration": 2.112,
+      "duration": 1.763,
       "whisperx_start": 81.373,
-      "whisperx_end": 83.136,
-      "start": 78.144,
-      "end": 80.256
+      "whisperx_end": 83.136
     },
     {
       "id": "SCENE-017",
@@ -220,11 +188,9 @@
       "script": "The short answer, India inherited places that didn't fit neatly into any state.",
       "scene_type": "grouped",
       "visual_group_id": "group-04",
-      "duration": 4.416,
+      "duration": 4.066,
       "whisperx_start": 83.816,
-      "whisperx_end": 87.882,
-      "start": 80.256,
-      "end": 84.672
+      "whisperx_end": 87.882
     },
     {
       "id": "SCENE-018",
@@ -233,11 +199,9 @@
       "script": "Pondicherry was French until 1954, a proper colony, not just a trading post, and couldn't simply be absorbed into Tamil Nadu overnight.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 7.632,
+      "duration": 7.27,
       "whisperx_start": 88.422,
-      "whisperx_end": 95.692,
-      "start": 84.672,
-      "end": 92.304
+      "whisperx_end": 95.692
     },
     {
       "id": "SCENE-019",
@@ -246,11 +210,9 @@
       "script": "Goa was Portuguese until 1961.",
       "scene_type": "grouped",
       "visual_group_id": "group-05",
-      "duration": 1.704,
+      "duration": 1.342,
       "whisperx_start": 96.253,
-      "whisperx_end": 97.595,
-      "start": 92.304,
-      "end": 94.008
+      "whisperx_end": 97.595
     },
     {
       "id": "SCENE-020",
@@ -259,11 +221,9 @@
       "script": "The Andaman Islands sit 1,400 kilometers from the mainland, strategically important and logistically complicated.",
       "scene_type": "grouped",
       "visual_group_id": "group-05",
-      "duration": 5.736,
+      "duration": 5.384,
       "whisperx_start": 98.796,
-      "whisperx_end": 104.18,
-      "start": 94.008,
-      "end": 99.744
+      "whisperx_end": 104.18
     },
     {
       "id": "SCENE-021",
@@ -272,11 +232,9 @@
       "script": "And Lakshadweep has a population of around 64,000 people.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 3.456,
+      "duration": 3.103,
       "whisperx_start": 104.68,
-      "whisperx_end": 107.783,
-      "start": 99.744,
-      "end": 103.2
+      "whisperx_end": 107.783
     },
     {
       "id": "SCENE-022",
@@ -285,11 +243,9 @@
       "script": "That's smaller than most Indian towns.",
       "scene_type": "grouped",
       "visual_group_id": "group-06",
-      "duration": 1.992,
+      "duration": 1.621,
       "whisperx_start": 108.243,
-      "whisperx_end": 109.864,
-      "start": 103.2,
-      "end": 105.192
+      "whisperx_end": 109.864
     },
     {
       "id": "SCENE-023",
@@ -298,11 +254,9 @@
       "script": "Making it a full state would mean a chief minister, a state legislature, a high court, a complete administrative apparatus for 64,000 people.",
       "scene_type": "grouped",
       "visual_group_id": "group-06",
-      "duration": 7.512,
+      "duration": 7.146,
       "whisperx_start": 110.424,
-      "whisperx_end": 117.57,
-      "start": 105.192,
-      "end": 112.704
+      "whisperx_end": 117.57
     },
     {
       "id": "SCENE-024",
@@ -311,11 +265,9 @@
       "script": "The math doesn't work.",
       "scene_type": "grouped",
       "visual_group_id": "group-07",
-      "duration": 1.2,
+      "duration": 0.841,
       "whisperx_start": 118.07,
-      "whisperx_end": 118.911,
-      "start": 112.704,
-      "end": 113.904
+      "whisperx_end": 118.911
     },
     {
       "id": "SCENE-025",
@@ -324,24 +276,20 @@
       "script": "So the Union Territory structure is essentially India's solution to the this-doesn't-quite-fit problem.",
       "scene_type": "grouped",
       "visual_group_id": "group-07",
-      "duration": 5.424,
+      "duration": 5.064,
       "whisperx_start": 119.491,
-      "whisperx_end": 124.555,
-      "start": 113.904,
-      "end": 119.328
+      "whisperx_end": 124.555
     },
     {
       "id": "SCENE-026",
       "image": "images/SCENE-026.png",
       "audio": "audio/SCENE-026.mp3",
-      "script": "Some UTs have their own legislatures – Delhi, Puducherry, and Jammu and Kashmir – since 2019.",
+      "script": "Some UTs have their own legislatures \u2013 Delhi, Puducherry, and Jammu and Kashmir \u2013 since 2019.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.232,
+      "duration": 4.861,
       "whisperx_start": 125.215,
-      "whisperx_end": 130.076,
-      "start": 119.328,
-      "end": 124.56
+      "whisperx_end": 130.076
     },
     {
       "id": "SCENE-027",
@@ -350,11 +298,9 @@
       "script": "Some don't.",
       "scene_type": "grouped",
       "visual_group_id": "group-08",
-      "duration": 0.768,
+      "duration": 0.42,
       "whisperx_start": 130.597,
-      "whisperx_end": 131.017,
-      "start": 124.56,
-      "end": 125.328
+      "whisperx_end": 131.017
     },
     {
       "id": "SCENE-028",
@@ -363,24 +309,20 @@
       "script": "Chandigarh exists purely as a shared capital city between Punjab and Haryana, because when the two states were bifurcated in 1966,",
       "scene_type": "grouped",
       "visual_group_id": "group-08",
-      "duration": 6.552,
+      "duration": 6.202,
       "whisperx_start": 131.557,
-      "whisperx_end": 137.759,
-      "start": 125.328,
-      "end": 131.88
+      "whisperx_end": 137.759
     },
     {
       "id": "SCENE-029",
       "image": "images/SCENE-029.png",
       "audio": "audio/SCENE-029.mp3",
-      "script": "nobody could agree on who got to keep the original Punjab capital, so it became nobody's – or rather everybody's – governed directly from Delhi.",
+      "script": "nobody could agree on who got to keep the original Punjab capital, so it became nobody's \u2013 or rather everybody's \u2013 governed directly from Delhi.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 7.008,
+      "duration": 6.642,
       "whisperx_start": 138.399,
-      "whisperx_end": 145.041,
-      "start": 131.88,
-      "end": 138.888
+      "whisperx_end": 145.041
     },
     {
       "id": "SCENE-030",
@@ -389,11 +331,9 @@
       "script": "And then there's Jammu and Kashmir, which is its own entirely separate essay.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 3.576,
+      "duration": 3.222,
       "whisperx_start": 145.681,
-      "whisperx_end": 148.903,
-      "start": 138.888,
-      "end": 142.464
+      "whisperx_end": 148.903
     },
     {
       "id": "SCENE-031",
@@ -402,11 +342,9 @@
       "script": "It was a full state with special constitutional status under Article 370 for 72 years.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 4.704,
+      "duration": 4.343,
       "whisperx_start": 149.443,
-      "whisperx_end": 153.786,
-      "start": 142.464,
-      "end": 147.168
+      "whisperx_end": 153.786
     },
     {
       "id": "SCENE-032",
@@ -415,11 +353,9 @@
       "script": "Then in August 2019, in roughly 48 hours of parliamentary action, it was split into two union territories, Jammu and Kashmir and Ladakh, and Article 370 was revoked.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 9.528,
+      "duration": 9.165,
       "whisperx_start": 154.286,
-      "whisperx_end": 163.451,
-      "start": 147.168,
-      "end": 156.696
+      "whisperx_end": 163.451
     },
     {
       "id": "SCENE-033",
@@ -428,11 +364,9 @@
       "script": "Whether that was constitutionally valid is still being argued in court.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 3.096,
+      "duration": 2.742,
       "whisperx_start": 163.991,
-      "whisperx_end": 166.733,
-      "start": 156.696,
-      "end": 159.792
+      "whisperx_end": 166.733
     },
     {
       "id": "SCENE-034",
@@ -441,11 +375,9 @@
       "script": "The point is, union territories aren't an administrative accident.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 3.36,
+      "duration": 2.991,
       "whisperx_start": 167.393,
-      "whisperx_end": 170.384,
-      "start": 159.792,
-      "end": 163.152
+      "whisperx_end": 170.384
     },
     {
       "id": "SCENE-035",
@@ -454,11 +386,9 @@
       "script": "They're a deliberate design choice.",
       "scene_type": "grouped",
       "visual_group_id": "group-09",
-      "duration": 1.632,
+      "duration": 1.265,
       "whisperx_start": 170.725,
-      "whisperx_end": 171.99,
-      "start": 163.152,
-      "end": 164.784
+      "whisperx_end": 171.99
     },
     {
       "id": "SCENE-036",
@@ -467,11 +397,9 @@
       "script": "And like most design choices in the Indian constitution, they tell you exactly what the framers were worried about and what they weren't sure how to solve.",
       "scene_type": "grouped",
       "visual_group_id": "group-09",
-      "duration": 6.576,
+      "duration": 6.242,
       "whisperx_start": 172.371,
-      "whisperx_end": 178.613,
-      "start": 164.784,
-      "end": 171.36
+      "whisperx_end": 178.613
     }
   ]
 }

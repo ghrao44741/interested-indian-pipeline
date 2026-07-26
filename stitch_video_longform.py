@@ -253,6 +253,11 @@ def find_cta(project_dir: str) -> tuple:
             image = candidate
             break
     if os.path.exists(mp3) and image:
+        # Guard: skip empty/corrupt CTA audio rather than crashing at stitch time
+        if os.path.getsize(mp3) < 1024:
+            print(f"  ⚠ CTA audio is empty or too small ({os.path.getsize(mp3)} bytes) — skipping CTA.")
+            print(f"    Generate it with: python generate_voice.py --text-file common/cta/cta_script.txt --out common/cta/cta.mp3")
+            return None, None
         return mp3, image
     return None, None
 
@@ -478,6 +483,9 @@ def resolve_group_images(project_dir: str, scenes: list) -> None:
         gid = scene.get("visual_group_id")
         if gid:
             group_members.setdefault(gid, []).append(scene["id"])
+
+    if group_members:
+        print(f"  [resolve_group_images] {len(group_members)} group(s) found — filling missing member images...")
 
     for gid, members in group_members.items():
         # Find the first member that has an image (the representative)
