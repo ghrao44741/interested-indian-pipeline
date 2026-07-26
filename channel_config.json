@@ -15,6 +15,21 @@
     "locked_date": "2026-07-23"
   },
 
+  "thumbnail_bases": {
+    "session_id": "ff68bd11-2791-4e85-9712-fbb7e2475769",
+    "light": {
+      "url": "https://rqkumunldqvmynqxibca.supabase.co/storage/v1/object/public/generated-images/adhoc-1785033137395.png",
+      "local": "common/thumbnails/base_light.png",
+      "description": "Cream bg (#FAF7F2), mascot right pointing up, India map left, amber footer bar. Even episodes."
+    },
+    "dark": {
+      "url": "https://rqkumunldqvmynqxibca.supabase.co/storage/v1/object/public/generated-images/adhoc-1785033172185.png",
+      "local": "common/thumbnails/base_dark.png",
+      "description": "Navy bg (#0C1828), mascot left pointing up, India silhouette right, amber footer bar. Odd episodes."
+    },
+    "generated_date": "2026-07-26"
+  },
+
   "thumbnail": {
     "themes": {
       "auto": "odd episodes = dark, even episodes = light",
@@ -31,13 +46,16 @@
   },
 
   "voice": {
-    "provider": "elevenlabs",
-    "default": "gYQ0co3BoppQZ8BDM3lj",
-    "default_name": "ANX - Deep & Friendly",
+    "provider": "gemini",
+    "gemini_voice": "Charon",
+    "gemini_model": "gemini-2.5-flash-preview-tts",
+    "gemini_note": "Charon selected 2026-07-25 — deep, authoritative, best for commentary. Tested vs Fenrir/Orus/Puck.",
+    "elevenlabs_default": "gYQ0co3BoppQZ8BDM3lj",
+    "elevenlabs_name": "ANX - Deep & Friendly",
     "model": "eleven_multilingual_v2",
     "stability": 0.5,
     "similarity_boost": 0.75,
-    "note": "Provider: 'elevenlabs' or 'edge'. ElevenLabs voice ID stored here. Edge TTS fallback voices: en-US-GuyNeural, en-US-AndrewNeural, en-IN-PrabhatNeural."
+    "note": "Provider: 'gemini' (default), 'elevenlabs', or 'edge'. Switch provider here or pass --provider flag."
   },
 
   "stitch": {

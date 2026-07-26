@@ -1,0 +1,18 @@
+{
+  "stage": "images",
+  "completed": [
+    "topics",
+    "script",
+    "review-script",
+    "voice",
+    "split",
+    "prompts"
+  ],
+  "data": {
+    "title": "Why India Has 9 Territories That Are Not Quite States",
+    "slug": "why_india_has_9_territories_that_are_not_quite_sta",
+    "script_path": "C:\\Bakcup_Asus\\interested_indian_pipeline\\test_script\\script_why_india_has_9_territories_that_are_not_quite_sta.txt",
+    "topic_choice": "Why India Has 9 Territories That Are Not Quite States"
+  },
+  "retry_counts": {}
+}

@@ -116,8 +116,11 @@ STYLE_PREFIX = (
     "Flat digital cartoon illustration, warm cream background (#FAF7F2), "
     "bold black outlines, expressive characters, vibrant colors. "
     "Channel: The Interested Indian — friendly, approachable, educational. "
-    "Mascot: chubby round cartoon character with big round glasses, thick expressive eyebrows, "
-    "short stubby arms. NOT a stick figure. Expressive cartoon faces. "
+    "MASCOT (use this EXACT description every time): chubby round Indian cartoon boy, "
+    "gold/amber round glasses, spiky black hair, warm tan brown skin (#D4A85C), "
+    "cream kurta, off-white baggy pajama trousers with gathered ankles, brown leather sandals. "
+    "Expressive face, thick eyebrows, short arms. NOT a generic Asian character, NOT pale-skinned, "
+    "NOT in Western clothing. He is distinctly Indian — kurta and sandals are mandatory. "
     "No photorealism, no 3D rendering. 16:9 landscape composition. "
 )
 
@@ -264,8 +267,8 @@ def main():
     )
     parser.add_argument("--project", required=True,
                         help="Project folder (e.g. ep01), relative or absolute")
-    parser.add_argument("--backend", choices=["replicate", "grok"], default="replicate",
-                        help="Image generation backend (default: replicate)")
+    parser.add_argument("--backend", choices=["replicate", "grok"], default="grok",
+                        help="Image generation backend (default: grok)")
     parser.add_argument("--model", default=None,
                         help=("Flux: schnell/dev/pro  |  Grok: grok/grok-hd  "
                               "(defaults: dev for Flux, grok for Grok)"))

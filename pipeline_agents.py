@@ -1048,6 +1048,62 @@ class OrchestratorAgent:
             self.state["stage"] = STAGE_ORDER[idx + 1]
         self._save_state()
 
+    # ── Script injection (--script-file bypass) ────────────────────────────────
+
+    def inject_script_file(self, script_file: Path):
+        """
+        Bypass topics + script stages by injecting a user-supplied script file.
+        Copies the file into the project folder, wires state so the pipeline
+        starts from review-script onward.
+
+        Called by run_episode_v2.py --script-file before run_pipeline().
+        """
+        if not script_file.exists():
+            print(f"❌ Script file not found: {script_file}")
+            sys.exit(1)
+
+        script_text = script_file.read_text(encoding="utf-8").strip()
+
+        # Derive title: honour "TITLE: ..." on first line, else use filename
+        lines = script_text.splitlines()
+        title_line = next((l for l in lines if l.upper().startswith("TITLE:")), None)
+        if title_line:
+            title = title_line.split(":", 1)[1].strip()
+            script_text = "\n".join(l for l in lines if not l.upper().startswith("TITLE:")).strip()
+        else:
+            # Build a readable title from the filename (strip script_ prefix, _ → spaces)
+            stem = script_file.stem
+            if stem.startswith("script_"):
+                stem = stem[len("script_"):]
+            title = stem.replace("_", " ").title()
+
+        slug = re.sub(r'[^a-z0-9]+', '_', title.lower())[:50].strip('_')
+
+        # Copy into project dir with standard naming (idempotent if already there)
+        dest = self.project_dir / f"script_{slug}.txt"
+        if dest.resolve() != script_file.resolve():
+            dest.write_text(script_text, encoding="utf-8")
+
+        wc = len(script_text.split())
+        print(f"\n  ✓ Script injected from: {script_file.name}")
+        print(f"    Title : {title}")
+        print(f"    Words : {wc}")
+        print(f"    Saved : {dest.name}")
+
+        # Mark topics + script as done, start from review-script
+        for stage in ("topics", "script"):
+            if stage not in self.state["completed"]:
+                self.state["completed"].append(stage)
+
+        self.state["data"].update({
+            "title":       title,
+            "slug":        slug,
+            "script_path": str(dest),
+            "topic_choice": title,       # so _stage_voice label is sensible
+        })
+        self.state["stage"] = "review-script"
+        self._save_state()
+
     # ── Pipeline runner ────────────────────────────────────────────────────────
 
     def run_pipeline(self, from_stage: Optional[str] = None):
@@ -1353,7 +1409,9 @@ class OrchestratorAgent:
             label="review_script.py (full)"
         )
 
-        # Parse overall score from report
+        # Parse overall score from report.
+        # Matches both plain "OVERALL_SCORE: N/10" and the HTML-comment form
+        # "<!-- OVERALL_SCORE: N/10 -->" written by review_script.py.
         score = None
         if report_path.exists():
             m = re.search(r"OVERALL_SCORE:\s*(\d+)/10", report_path.read_text(encoding="utf-8"))
@@ -1477,10 +1535,16 @@ class OrchestratorAgent:
         cfg_path = PIPELINE_DIR / "channel_config.json"
         if cfg_path.exists():
             import json as _json
-            cfg       = _json.loads(cfg_path.read_text(encoding="utf-8"))
-            vcfg      = cfg.get("voice", {})
-            provider  = vcfg.get("provider", provider)
-            voice     = vcfg.get("default", voice)
+            cfg      = _json.loads(cfg_path.read_text(encoding="utf-8"))
+            vcfg     = cfg.get("voice", {})
+            provider = vcfg.get("provider", provider)
+            # Resolve voice by provider so Gemini/ElevenLabs/Edge each get the right key
+            if provider == "gemini":
+                voice = vcfg.get("gemini_voice", "Charon")
+            elif provider == "elevenlabs":
+                voice = vcfg.get("elevenlabs_default", vcfg.get("default", voice))
+            else:
+                voice = vcfg.get("default", voice)
 
         # Manifest voice overrides channel_config (per-episode override)
         manifest_voice = self.state.get("data", {}).get("voice") or \
@@ -1534,10 +1598,14 @@ class OrchestratorAgent:
         self._run_cmd([sys.executable, str(gen), "--project", str(self.project_dir)], label="generate_image_prompts.py")
 
     def _stage_images(self):
-        gen    = PIPELINE_DIR / "generate_images_flux.py"
+        router = PIPELINE_DIR / "route_images.py"    # MAP→GeoJSON, rest→xAI
+        gen    = PIPELINE_DIR / "generate_images_flux.py"  # used for FAIL regen only
         review = PIPELINE_DIR / "review_images.py"
 
-        self._run_cmd([sys.executable, str(gen), "--project", str(self.project_dir)], label="Initial image generation")
+        self._run_cmd(
+            [sys.executable, str(router), "--project", str(self.project_dir)],
+            label="route_images.py (MAP→GeoJSON · AI→xAI Grok)"
+        )
 
         for round_num in range(1, 6):
             print(f"\n  Review round {round_num}...")
@@ -1550,9 +1618,10 @@ class OrchestratorAgent:
                 print(f"  FAILs: {fails}")
                 if fails == 0:
                     break
+                # Re-run full router for FAILed shots (it re-routes by type)
                 self._run_cmd(
-                    [sys.executable, str(gen), "--project", str(self.project_dir), "--from-report", "--overwrite"],
-                    label="Regenerating FAIL shots"
+                    [sys.executable, str(router), "--project", str(self.project_dir), "--overwrite"],
+                    label="Re-routing FAIL shots"
                 )
 
     def _stage_overlays(self):

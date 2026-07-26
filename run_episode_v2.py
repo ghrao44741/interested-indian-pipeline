@@ -11,6 +11,9 @@ Usage:
     python run_episode_v2.py --project ep02 --from-stage script
     python run_episode_v2.py --project ep02 --status
 
+    # Supply your own script — skips topics + script stages, starts from review-script:
+    python run_episode_v2.py --project ep02 --script-file my_script.txt
+
 Requires:
     ANTHROPIC_API_KEY  environment variable
     pip install anthropic duckduckgo-search pydub --break-system-packages
@@ -72,10 +75,13 @@ def show_status(project_dir: Path):
 
 def main():
     parser = argparse.ArgumentParser(description="The Interested Indian — Multi-Agent Pipeline")
-    parser.add_argument("--project",    required=True,  help="Episode folder (e.g. ep02)")
-    parser.add_argument("--from-stage", default=None,   help="Force-start from a stage",
+    parser.add_argument("--project",     required=True,  help="Episode folder (e.g. ep02)")
+    parser.add_argument("--from-stage",  default=None,   help="Force-start from a stage",
                         choices=STAGE_ORDER)
-    parser.add_argument("--status",     action="store_true", help="Show pipeline status and exit")
+    parser.add_argument("--script-file", default=None,
+                        help="Path to your own script .txt — skips topics + script stages, "
+                             "starts from review-script. Optionally put 'TITLE: ...' on line 1.")
+    parser.add_argument("--status",      action="store_true", help="Show pipeline status and exit")
     args = parser.parse_args()
 
     project_dir = Path(args.project)
@@ -98,6 +104,9 @@ def main():
     review_agent   = ReviewAgent(client)
     research_agent = ResearchAgent(client)
     orchestrator   = OrchestratorAgent(client, project_dir, review_agent, research_agent)
+
+    if args.script_file:
+        orchestrator.inject_script_file(Path(args.script_file))
 
     orchestrator.run_pipeline(from_stage=args.from_stage)
 

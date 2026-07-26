@@ -318,6 +318,15 @@ def _parse_scores(raw: str) -> dict:
         m = re.search(rf"{key}_SCORE:\s*(\d+)/10", raw)
         if m:
             scores[key] = int(m.group(1))
+
+    # If Claude skipped OVERALL or returned a non-integer (e.g. "?"),
+    # compute it as the average of the other seven dimensions.
+    if "OVERALL" not in scores:
+        sub_keys = ["HOOK", "HUMOR", "JARGON", "RHYTHM", "AUDIENCE", "WITTINESS", "ARC"]
+        sub_vals = [scores[k] for k in sub_keys if k in scores]
+        if sub_vals:
+            scores["OVERALL"] = round(sum(sub_vals) / len(sub_vals))
+
     return scores
 
 
@@ -538,6 +547,10 @@ def _write_report(project_dir, out_arg, script_path, paragraphs,
 
     if claude_result:
         lines += ["## Claude Analysis", "", claude_result["raw"], ""]
+
+    # Machine-readable score line — parsed by pipeline_agents.py _stage_review_script
+    if scores and "OVERALL" in scores:
+        lines += ["", f"<!-- OVERALL_SCORE: {scores['OVERALL']}/10 -->"]
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text("\n".join(lines), encoding="utf-8")

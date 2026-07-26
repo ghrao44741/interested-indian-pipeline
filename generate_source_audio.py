@@ -2,8 +2,9 @@
 generate_source_audio.py
 The Interested Indian — Full-Script Voiceover Generator
 
-Supports two providers:
-  - elevenlabs  (default, reads from channel_config.json + ELEVENLABS_API_KEY in .env)
+Supports three providers:
+  - gemini      (Google Gemini TTS — default, reads GEMINI_API_KEY from .env)
+  - elevenlabs  (reads from channel_config.json + ELEVENLABS_API_KEY in .env)
   - edge        (free Edge TTS, no API key needed)
 
 The script produces one continuous voiceover MP3 in {project}/source_audio/,
@@ -22,6 +23,9 @@ USAGE — full generation:
         --script ep01/script_*.txt
 
     Override voice or provider:
+    python generate_source_audio.py --project ep01 \\
+        --script ep01/script_*.txt \\
+        --provider gemini --voice Charon
     python generate_source_audio.py --project ep01 \\
         --script ep01/script_*.txt \\
         --provider elevenlabs --voice gYQ0co3BoppQZ8BDM3lj
@@ -57,12 +61,15 @@ if _cfg_path.exists():
     except Exception:
         pass
 
-DEFAULT_PROVIDER   = _voice_cfg.get("provider", "elevenlabs")
+DEFAULT_PROVIDER   = _voice_cfg.get("provider", "gemini")
 DEFAULT_VOICE_EL   = _voice_cfg.get("default", "gYQ0co3BoppQZ8BDM3lj")
 DEFAULT_MODEL_EL   = _voice_cfg.get("model", "eleven_multilingual_v2")
 DEFAULT_STABILITY  = _voice_cfg.get("stability", 0.5)
 DEFAULT_SIMILARITY = _voice_cfg.get("similarity_boost", 0.75)
-DEFAULT_VOICE_EDGE = "en-US-GuyNeural"
+DEFAULT_VOICE_EDGE   = "en-US-GuyNeural"
+DEFAULT_VOICE_GEMINI = _voice_cfg.get("gemini_voice", "Charon")
+DEFAULT_MODEL_GEMINI = "gemini-2.5-flash-preview-tts"
+GEMINI_CHUNK_LIMIT   = 4500   # conservative limit per API call for long scripts
 
 SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
 
@@ -203,6 +210,155 @@ def elevenlabs_list_voices():
         print(f"  {v.get('name',''):<45} {v.get('voice_id','')}")
 
 
+# ── Gemini TTS provider ────────────────────────────────────────────────────────
+
+GEMINI_VOICES = [
+    "Zephyr", "Puck", "Charon", "Kore", "Fenrir", "Leda", "Orus",
+    "Aoede", "Callirrhoe", "Autonoe", "Enceladus", "Iapetus", "Umbriel",
+    "Algieba", "Despina", "Erinome", "Algenib", "Rasalghul", "Laomedeia",
+    "Achernar", "Alnilam", "Sulafat", "Schedar", "Gacrux", "Pulcherrima",
+    "Achird", "Zubenelgenubi", "Vindemiatrix", "Sadachbia", "Sadaltager", "Electra",
+]
+
+
+def _gemini_call(text: str, voice: str, api_key: str, model: str) -> bytes:
+    """Single Gemini TTS call → raw audio bytes (WAV or MP3)."""
+    try:
+        from google import genai
+        from google.genai import types
+    except ImportError:
+        print("❌ google-genai not installed. Run: pip install google-genai --break-system-packages")
+        sys.exit(1)
+
+    client = genai.Client(api_key=api_key)
+    response = client.models.generate_content(
+        model=model,
+        contents=text,
+        config=types.GenerateContentConfig(
+            response_modalities=["AUDIO"],
+            speech_config=types.SpeechConfig(
+                voice_config=types.VoiceConfig(
+                    prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=voice)
+                )
+            ),
+        ),
+    )
+    part = response.candidates[0].content.parts[0]
+    return part.inline_data.data, part.inline_data.mime_type
+
+
+def _pcm_to_wav(pcm_bytes: bytes, mime_type: str) -> bytes:
+    """Wrap raw PCM bytes in a WAV container."""
+    import io
+    import wave as wavemod
+    rate = 24000
+    if "rate=" in mime_type:
+        try:
+            rate = int(mime_type.split("rate=")[1].split(";")[0])
+        except Exception:
+            pass
+    buf = io.BytesIO()
+    with wavemod.open(buf, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(rate)
+        wf.writeframes(pcm_bytes)
+    return buf.getvalue()
+
+
+def _wav_to_mp3(wav_bytes: bytes, output_path: str):
+    """Convert WAV bytes → MP3 file via pydub (ffmpeg backend)."""
+    try:
+        import io
+        from pydub import AudioSegment
+        seg = AudioSegment.from_wav(io.BytesIO(wav_bytes))
+        seg.export(output_path, format="mp3")
+        return
+    except ImportError:
+        pass
+    # Fallback: write wav to disk, ffmpeg convert
+    import subprocess, tempfile
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        tmp.write(wav_bytes)
+        tmp_path = tmp.name
+    subprocess.run(
+        ["ffmpeg", "-y", "-i", tmp_path, output_path],
+        check=True, capture_output=True
+    )
+    Path(tmp_path).unlink(missing_ok=True)
+
+
+def gemini_generate(text: str, voice: str, output_path: str,
+                    model: str = DEFAULT_MODEL_GEMINI):
+    """Generate full narration via Gemini TTS, chunking long scripts."""
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        print("❌ GEMINI_API_KEY not set in .env")
+        print("   Get one free at: https://aistudio.google.com")
+        sys.exit(1)
+
+    chunks = _split_into_chunks(text, max_chars=GEMINI_CHUNK_LIMIT)
+    print(f"  Gemini TTS: {len(chunks)} chunk(s), voice={voice}, model={model}")
+
+    all_wav_chunks = []
+    for i, chunk in enumerate(chunks, 1):
+        print(f"  ⏳ Chunk {i}/{len(chunks)} ({len(chunk)} chars)...", end=" ", flush=True)
+        audio_data, mime_type = _gemini_call(chunk, voice, api_key, model)
+
+        # Convert to WAV if raw PCM
+        if "mp3" in mime_type or "mpeg" in mime_type:
+            # Already MP3 — write directly if single chunk, else we need WAV for concat
+            if len(chunks) == 1:
+                Path(output_path).write_bytes(audio_data)
+                print(f"✓")
+                return
+            # Multi-chunk MP3: convert each to WAV for concatenation
+            try:
+                import io
+                from pydub import AudioSegment
+                wav_bytes = AudioSegment.from_mp3(io.BytesIO(audio_data)).raw_data
+                # Store pydub segment instead
+                all_wav_chunks.append(("mp3", audio_data))
+            except Exception:
+                all_wav_chunks.append(("mp3", audio_data))
+        else:
+            wav_bytes = _pcm_to_wav(audio_data, mime_type)
+            all_wav_chunks.append(("wav", wav_bytes))
+        print("✓")
+
+    if len(all_wav_chunks) == 1:
+        fmt, data = all_wav_chunks[0]
+        if fmt == "wav":
+            _wav_to_mp3(data, output_path)
+        else:
+            Path(output_path).write_bytes(data)
+    else:
+        # Concatenate all chunks via pydub
+        try:
+            import io
+            from pydub import AudioSegment
+            combined = AudioSegment.empty()
+            for fmt, data in all_wav_chunks:
+                if fmt == "wav":
+                    combined += AudioSegment.from_wav(io.BytesIO(data))
+                else:
+                    combined += AudioSegment.from_mp3(io.BytesIO(data))
+            print(f"  Concatenating {len(all_wav_chunks)} chunks...")
+            combined.export(output_path, format="mp3")
+        except ImportError:
+            print("❌ pydub required for multi-chunk Gemini audio. Run: pip install pydub --break-system-packages")
+            sys.exit(1)
+
+
+def gemini_list_voices():
+    print(f"\nGemini TTS voices ({len(GEMINI_VOICES)} available):")
+    print(f"{'─' * 40}")
+    for v in GEMINI_VOICES:
+        print(f"  {v}")
+    print(f"\nCurrent default: {DEFAULT_VOICE_GEMINI}")
+    print("Test voices: python test_gemini_tts.py --voice <name>")
+
+
 # ── Edge TTS provider ──────────────────────────────────────────────────────────
 
 async def edge_list_voices(locale: str = "en-US"):
@@ -249,7 +405,7 @@ async def main():
     parser.add_argument("--project",   help="Episode folder (e.g. ep01)")
     parser.add_argument("--script",    help="Path to narration .txt file")
     parser.add_argument("--provider",  default=DEFAULT_PROVIDER,
-                        choices=["elevenlabs", "edge"],
+                        choices=["gemini", "elevenlabs", "edge"],
                         help=f"TTS provider (default from channel_config: {DEFAULT_PROVIDER})")
     parser.add_argument("--voice",     default=None,
                         help="Voice ID (ElevenLabs) or voice name (Edge TTS). Defaults from channel_config.json.")
@@ -267,6 +423,8 @@ async def main():
     if args.list_voices:
         if args.provider == "edge":
             await edge_list_voices(args.locale)
+        elif args.provider == "gemini":
+            gemini_list_voices()
         else:
             elevenlabs_list_voices()
         return
@@ -293,7 +451,9 @@ async def main():
         sys.exit(1)
 
     # Resolve voice
-    if args.provider == "elevenlabs":
+    if args.provider == "gemini":
+        voice = args.voice or DEFAULT_VOICE_GEMINI
+    elif args.provider == "elevenlabs":
         voice = args.voice or DEFAULT_VOICE_EL
     else:
         voice = args.voice or DEFAULT_VOICE_EDGE
@@ -319,7 +479,9 @@ async def main():
     print(f"Output  : {output_path}")
     print(f"{'─' * 55}")
 
-    if args.provider == "elevenlabs":
+    if args.provider == "gemini":
+        gemini_generate(text, voice, output_path)
+    elif args.provider == "elevenlabs":
         elevenlabs_generate(text, voice, output_path)
     else:
         await edge_generate(text, voice, output_path)
