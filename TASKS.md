@@ -14,6 +14,20 @@ Last updated: 2026-07-26
   auto-falls-back to the plain `gemini` provider if gcloud isn't available, verified
   by simulating that failure directly (not just reading the code). Real end-to-end
   preview generation via the actual pipeline entry point confirmed a valid 31.5s MP3.
+  Fixed `CLOUDTTS_CHUNK_LIMIT` (4500→3500 chars) to match Google's documented
+  4,000-byte-per-field limit, found while researching pricing — verified against
+  real scripts that byte overhead from em-dashes/curly quotes is only ~0.24%, so
+  3500 chars stays safely under the byte limit.
+
+- [ ] **Confirm `gemini_cloudtts` actual billing** — checked the GCP billing console
+  (`unseen-lever-auto-uploader` project) after testing: $9.82 total this month, 73%
+  of which is unrelated "Imagen 4 Generation" from a different project ("Rewired").
+  No distinct Cloud Text-to-Speech or Gemini 3.1 audio SKU appeared — only line was
+  "Gemini 2.0 Flash TTS" audio tokens at $0.09 (likely leftover from earlier
+  `gemini`/`test_gemini_tts.py` runs, not today's Cloud TTS calls). Likely means
+  today's Cloud TTS testing fell inside the free quota or hadn't posted yet.
+  Revisit in a couple of weeks once real episode-scale usage has accumulated and
+  billing has had time to post, to get an actual confirmed cost-per-episode figure.
 
 - [x] **CTA audio generated** — `common/cta/cta.mp3` — 27,885 bytes ✓
 
