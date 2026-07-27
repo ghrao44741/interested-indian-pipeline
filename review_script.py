@@ -252,7 +252,8 @@ def _snippet(text: str, pos: int, radius: int = 60) -> str:
 
 # ── Claude qualitative review ──────────────────────────────────────────────────
 
-def claude_review(client, script_text: str, boring_runs: list[dict], deep: bool) -> dict:
+def claude_review(client, script_text: str, boring_runs: list[dict], deep: bool,
+                   previous_review: str | None = None) -> dict:
     """Ask Claude to score and flag boring sections, optionally rewrite them."""
 
     boring_context = ""
@@ -260,6 +261,14 @@ def claude_review(client, script_text: str, boring_runs: list[dict], deep: bool)
         boring_context = "\n\nThe following paragraph ranges were flagged as likely lacking humor:\n"
         for run in boring_runs[:5]:  # limit to top 5
             boring_context += f"  - {run['msg']}\n"
+
+    previous_context = ""
+    if previous_review:
+        previous_context = (
+            "\n\nPREVIOUS REVIEW (this is a rewrite attempt) — the prior draft scored below "
+            "threshold for these specific reasons. Check explicitly whether EACH one was fixed, "
+            "and call out any that weren't:\n\n" + previous_review + "\n"
+        )
 
     mode_instruction = ""
     if deep:
@@ -285,7 +294,7 @@ SCRIPT TO REVIEW ({len(script_text.split())} words):
 {script_text}
 
 {boring_context}
-
+{previous_context}
 ---
 
 YOUR TASK:
@@ -389,7 +398,18 @@ def main():
                         help="Deterministic checks only — no Claude call (free, instant)")
     parser.add_argument("--out",     default=None,
                         help="Output path for report (default: {project}/script_review.md)")
+    parser.add_argument("--previous-review", default=None,
+                        help="Path to a prior script_review.md snapshot — if this is a rewrite "
+                             "attempt, Claude checks whether the prior review's specific issues were fixed")
     args = parser.parse_args()
+
+    previous_review_text = None
+    if args.previous_review:
+        prev_path = Path(args.previous_review)
+        if prev_path.exists():
+            previous_review_text = prev_path.read_text(encoding="utf-8")
+        else:
+            print(f"⚠ --previous-review path not found: {prev_path} — reviewing without it")
 
     project_dir = None
     if args.project:
@@ -469,7 +489,8 @@ def main():
     print(f"\n{BOLD}── CLAUDE REVIEW {'(deep — rewrites included)' if args.deep else '(standard)'} ──{RESET}")
     print("  Analysing...")
 
-    result = claude_review(client, script_text, humor_gaps, deep=args.deep)
+    result = claude_review(client, script_text, humor_gaps, deep=args.deep,
+                            previous_review=previous_review_text)
     raw    = result["raw"]
     scores = _parse_scores(raw)
 

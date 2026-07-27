@@ -68,6 +68,89 @@ Last updated: 2026-07-26
   - `channel_config.json` already has `gemini_speaking_rate: 0.85` (recommended starting point)
   - If happy with 0.85: proceed as-is. If not: update `channel_config.json` `gemini_speaking_rate` before running voice stage.
 
+## 🧪 test_2min — Full Pipeline Validation Test (Complete)
+
+Ran a real, fresh 2-minute episode end-to-end (script → DNA review → voice →
+CUDA split → prompts → images → overlays → stitch) on a genuinely current
+topic (the July 2026 NEET-UG paper leak / "Cockroach Janta Party" protests /
+Dharmendra Pradhan's resignation) to validate the whole pipeline in one pass,
+not just individual stages. Driven stage-by-stage manually rather than via
+`run_episode_v2.py`'s automatic runner, to avoid an unattended real YouTube
+upload attempt at the end.
+
+- **DNA review loop worked for real**: 3 rounds, 6/10 → 6/10 (different
+  issues each pass) → 8/10 PASS. Round 1 caught a genuine one-sidedness
+  problem on the politically live topic — directly led to Check C below.
+- **CUDA split confirmed on real fresh content**: ~40s for a 2.3-min clip,
+  27 scenes, valid manifest.
+- **Found and fixed a real bug**: `route_images.py`'s 3 `subprocess.run()`
+  calls (map/chart/pexels) had no explicit encoding, crashing (non-fatally,
+  in a background thread) on non-cp1252 bytes in `search_pexels.py`'s
+  photographer-credit output. Fixed with `encoding="utf-8", errors="replace"`,
+  verified by re-triggering the exact failing call directly. Pushed (`9cb571d`).
+- **Found the caption pipeline was silently broken**: `stitch_video_longform.py`
+  needs `stamp_manifest.py`/`generate_srt.py`, which only existed in the
+  sibling `shorts_pipeline2` project — every video from this project was
+  missing burned-in captions. User copied both files in; re-stitch confirmed
+  it now produces a valid SRT + captioned MP4.
+- **Caught a stale CTA by ear**: `common/cta/cta.mp3` was still using a
+  pre-`gemini_cloudtts` voice. Regenerated with current settings — directly
+  motivated Check B below (an automatic version of "caught by ear").
+- **Real, if minor, transcription defect found**: WhisperX misheard "if there
+  weren't already" as "if they want already" and "2024 leak" as "2024
+  league" — confirmed the error flows all the way into burned-in captions.
+  Directly motivated Check A below.
+- Artifact: `test_2min/` (disposable test content — not a real episode).
+
+## Video-Pipeline Checks — Transcription Accuracy, CTA Freshness, Evenhandedness (Complete)
+
+Three checks added to the review agents, each grounded in something the
+`test_2min` test actually surfaced (not hypothetical):
+
+- **Check A** — `ReviewAgent._review_split` now diffs WhisperX's
+  reconstructed transcript against the original script (`difflib`, stdlib —
+  no fuzzy-match library exists in this repo) to catch ASR mishearings
+  before they reach captions. Numeric tokens (digits + spelled-out numbers)
+  are stripped before diffing, since WhisperX routinely normalizes those
+  and a naive diff would flag it constantly — this channel's content is
+  statistics-heavy. Single-word swaps with >0.8 character-similarity
+  (e.g. "janta"/"janata") are also suppressed as transliteration variants,
+  not real mishearings. Verified against real `test_2min` data: catches the
+  exact "2024 league" mismatch, zero false positives on `test_2min` or a
+  second, unrelated real project (`test_script`, 36 scenes, 0 flags).
+- **Check B** — `generate_source_audio.py` now writes a
+  `{output}.voice.json` sidecar recording which provider/voice/model/locale/
+  style produced each audio file (there was previously no way to answer
+  "what voice made this file" other than re-listening).
+  `ReviewAgent._review_stitch` compares `common/cta/cta.mp3`'s sidecar
+  against `channel_config.json`'s currently active voice config and flags
+  drift. Verified with a real CTA regeneration (fresh, no flag), a
+  simulated mismatch (hand-edited config, confirmed flagged, reverted
+  cleanly), and — found via `/but-for-real` — an `edge`-provider resolution
+  gap that would've always false-flagged if the channel ever switched to
+  `edge`; fixed and verified in an isolated scratch environment.
+- **Check C** — `review_script.py` gains a 9th scored dimension,
+  `EVENHANDEDNESS_SCORE`, with its own independent gate in
+  `_stage_review_script` (separate from `OVERALL_SCORE` — confirmed no
+  sub-dimension gated anything before this). Verified end-to-end with a
+  real Claude call against `test_2min`'s script: scored 8/10, consistent
+  with the earlier manual fix that added audience-address balance to that
+  same script.
+- **Bonus fix found via `/but-for-real`**: `run_episode_v2.py`'s
+  `show_status()` `labels` dict was missing `"review-script"`/`"overlays"`
+  despite both being in `STAGE_ORDER` — confirmed this made `--status`
+  raise `KeyError` for every project, always. Fixed and verified against
+  a real project (`test_2min --status` now prints cleanly).
+- A fourth originally-planned item, "wire `review_images.py` into the
+  loop," turned out to already be built — `_stage_images` already runs it
+  in a 5-round regen loop and `ReviewAgent._review_images` already gates
+  on 0 FAILs; it only looked unwired because the `test_2min` test drove
+  stages manually. Confirmed with user, dropped from scope.
+- `.gitignore`: added `*.voice.json` (the new sidecars describe
+  already-gitignored regenerable audio — tracking one without the other
+  is a confusing orphaned-metadata state).
+- Pushed (`55af19e`).
+
 ## 🧪 test_script — Validate Pipeline (then sign off)
 
 The test_script existing output has image issues (15P/5W/7F). Three code bugs fixed this session:

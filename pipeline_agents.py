@@ -12,10 +12,12 @@ import difflib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -747,6 +749,41 @@ class ReviewAgent:
                     issues.append(f"CTA audio voice config is stale ({mismatch}) — regenerate common/cta/cta.mp3")
             except Exception as e:
                 recs.append(f"Could not check CTA voice freshness: {e}")
+
+        # Final-video transcript check — the only check in the pipeline that
+        # listens to what the *actual rendered MP4* says, as opposed to the
+        # pre-stitch manifest (which Check A already covers). Deliberately
+        # narrow: confirm the expected CTA text shows up near the end of the
+        # transcript, since that's the exact failure mode (a stale/wrong CTA)
+        # that was previously only caught by a human transcribing the finished
+        # video by hand. Lazy-imported and fully guarded — a missing
+        # whisper/pydub install degrades this one check, not the whole agent.
+        try:
+            import local_mp4_analyzer
+            cta_script_path = PIPELINE_DIR / "common" / "cta" / "cta_script.txt"
+            if cta_script_path.exists():
+                analysis = local_mp4_analyzer.analyze_mp4(str(output_file), whisper_model="base")
+                if analysis["transcript_available"]:
+                    cta_text = cta_script_path.read_text(encoding="utf-8").strip().lower()
+                    # The CTA is always last — only check the transcript's tail.
+                    tail = analysis["full_text"][-400:].lower()
+                    # Use longest-contiguous-match coverage of the CTA text, not a
+                    # whole-string ratio() — ratio() measures overall document
+                    # similarity, which gets diluted by unrelated narration ahead
+                    # of the CTA in the same 400-char tail window even when the
+                    # CTA itself is an exact match (confirmed empirically: a real
+                    # exact-match CTA scored ratio=0.39, just under a naive 0.4
+                    # cutoff, while longest-match coverage correctly scored 1.0).
+                    sm = difflib.SequenceMatcher(None, tail, cta_text)
+                    match = sm.find_longest_match(0, len(tail), 0, len(cta_text))
+                    coverage = match.size / len(cta_text) if cta_text else 0
+                    if coverage < 0.6:
+                        issues.append("Final video's actual audio doesn't seem to contain the expected CTA text — possible stale/wrong/missing CTA")
+                        recs.append(f"Expected CTA: \"{cta_text[:80]}...\" — check the final minutes of {output_file.name}")
+        except ImportError:
+            recs.append("local_mp4_analyzer.py's whisper/pydub deps not installed — skipping final-video transcript check")
+        except Exception as e:
+            recs.append(f"Could not run final-video transcript check: {e}")
 
         score = 10 - len(issues) * 2
         score = max(0, min(10, score))
@@ -1594,6 +1631,19 @@ class OrchestratorAgent:
         self.state["data"]["research_brief"] = brief
         self._save_state()
 
+        # If this is a rewrite (a previous attempt was rejected by DNA review),
+        # tell Claude exactly what was wrong instead of generating fresh with
+        # no memory of the failure. Read-only here — _stage_review_script owns
+        # clearing this key once the rewrite's re-review has also consumed it.
+        rewrite_context = ""
+        previous_review_path = self.state["data"].get("previous_review_path")
+        if previous_review_path and Path(previous_review_path).exists():
+            prev_issues = Path(previous_review_path).read_text(encoding="utf-8")
+            rewrite_context = (
+                "\n\nPREVIOUS ATTEMPT WAS REJECTED for these specific reasons — "
+                f"fix each one explicitly in this rewrite:\n{prev_issues}\n"
+            )
+
         print("  Generating script...")
         response = self.client.messages.create(
             model="claude-sonnet-4-5",
@@ -1604,7 +1654,8 @@ class OrchestratorAgent:
                 "content": (
                     f"Topic ideas:\n{topic_ideas}\n\n"
                     f"Selected: {topic_choice}\n\n"
-                    f"{research_context}\n\n"
+                    f"{research_context}"
+                    f"{rewrite_context}\n\n"
                     "Write the full narration script:\n"
                     "- 2,000–3,200 words of pure narration\n"
                     "- No headers, no bullets, no stage directions\n"
@@ -1666,13 +1717,18 @@ class OrchestratorAgent:
             label="review_script.py (quick)"
         )
 
-        # Run full Claude review — generates script_review.md
+        # Run full Claude review — generates script_review.md. If this is a
+        # re-review after a rewrite, pass the previous attempt's snapshotted
+        # review so Claude checks whether those specific issues were fixed,
+        # instead of scoring the rewrite fresh with no memory of what failed.
         report_path = self.project_dir / "script_review.md"
-        self._run_cmd(
-            [sys.executable, str(reviewer), "--script", str(script_path),
-             "--out", str(report_path)],
-            label="review_script.py (full)"
-        )
+        review_cmd = [sys.executable, str(reviewer), "--script", str(script_path),
+                      "--out", str(report_path)]
+        previous_review_path = self.state["data"].pop("previous_review_path", None)
+        if previous_review_path and Path(previous_review_path).exists():
+            review_cmd += ["--previous-review", previous_review_path]
+            self._save_state()
+        self._run_cmd(review_cmd, label="review_script.py (full)")
 
         # Parse overall score from report.
         # Matches both plain "OVERALL_SCORE: N/10" and the HTML-comment form
@@ -1690,6 +1746,14 @@ class OrchestratorAgent:
                 print(f"  Review: {report_path}")
                 answer = input("  [r]ewrite script / [s]kip and continue anyway / [q]uit > ").strip().lower()
                 if answer in ("r", "rewrite"):
+                    # Snapshot this review before the next run overwrites script_review.md —
+                    # otherwise the rewrite gets scored fresh with zero memory of what was
+                    # wrong, and the only record of the failure is gone before anyone (human
+                    # or Claude) can compare it against the new attempt.
+                    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    snapshot_path = self.project_dir / f"script_review_backup_{ts}.md"
+                    shutil.copy2(report_path, snapshot_path)
+                    self.state["data"]["previous_review_path"] = str(snapshot_path)
                     self.state["completed"] = [s for s in self.state["completed"] if s != "script"]
                     self.state["stage"] = "script"
                     self._save_state()

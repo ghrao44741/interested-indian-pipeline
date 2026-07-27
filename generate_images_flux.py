@@ -51,7 +51,7 @@ import argparse
 import os
 import re
 import sys
-import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import requests
@@ -106,8 +106,6 @@ COST_MAP = {
     "grok":     0.020,
     "grok-hd":  0.060,
 }
-
-DELAY_BETWEEN_CALLS = 1.0   # seconds
 
 # ── style prefix injected before every prompt ──────────────────────────────────
 # This is the key to style consistency — every prompt starts with the same
@@ -289,6 +287,10 @@ def main():
                         help="Only regenerate shots marked FAIL or WARN in review_report.md")
     parser.add_argument("--overwrite", action="store_true",
                         help="Overwrite images that already exist in images/")
+    parser.add_argument("--workers", type=int, default=4,
+                        help="Concurrent image-generation requests (default: 4). "
+                             "Each scene's image is independent, so this is safe to raise; "
+                             "lower it if the backend ever starts rate-limiting.")
     args = parser.parse_args()
 
     # Resolve default model per backend
@@ -401,14 +403,14 @@ def main():
     print(f"{'═' * 55}\n")
 
     # ── generation loop ────────────────────────────────────────────────────────
-    done = 0
-    failed = []
-
-    for i, shot in enumerate(shots, 1):
+    # Each shot's image is fully independent (own prompt, own output file) — no
+    # shared state between them — so this fans out across a small thread pool
+    # instead of one request at a time. The openai-compatible client already
+    # has its own default max_retries=2 for transient errors; no manual
+    # backoff/sleep is needed once requests aren't all sequential.
+    def _generate_one(shot):
         filename    = shot["filename"]
         output_path = images_dir / filename
-        print(f"[{i:02d}/{len(shots)}] {shot['shot']} · {filename}", end="  ", flush=True)
-
         try:
             if args.backend == "replicate":
                 img_bytes = generate_image_flux(shot["prompt"], args.model)
@@ -418,14 +420,23 @@ def main():
             # Ensure the saved file is real PNG (Grok returns JPEG bytes with .png ext)
             output_path = ensure_png(output_path)
             size_kb = len(output_path.read_bytes()) // 1024
-            print(f"✓  ({size_kb} KB)")
-            done += 1
+            return shot, size_kb, None
         except Exception as e:
-            print(f"✗  ERROR — {e}")
-            failed.append({"shot": shot["shot"], "filename": filename, "error": str(e)})
+            return shot, None, str(e)
 
-        if i < len(shots):
-            time.sleep(DELAY_BETWEEN_CALLS)
+    done = 0
+    failed = []
+
+    with ThreadPoolExecutor(max_workers=args.workers) as pool:
+        futures = {pool.submit(_generate_one, shot): shot for shot in shots}
+        for i, future in enumerate(as_completed(futures), 1):
+            shot, size_kb, error = future.result()
+            if error:
+                print(f"[{i:02d}/{len(shots)}] {shot['shot']} · {shot['filename']}  ✗  ERROR — {error}")
+                failed.append({"shot": shot["shot"], "filename": shot["filename"], "error": error})
+            else:
+                print(f"[{i:02d}/{len(shots)}] {shot['shot']} · {shot['filename']}  ✓  ({size_kb} KB)")
+                done += 1
 
     # ── summary ────────────────────────────────────────────────────────────────
     print(f"\n{'═' * 55}")
