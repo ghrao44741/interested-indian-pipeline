@@ -8,6 +8,7 @@ ResearchAgent      Web-searches for verified facts before script generation.
 Each agent uses Claude API. The orchestrator coordinates the other two.
 """
 
+import difflib
 import json
 import os
 import re
@@ -57,6 +58,125 @@ BANNED_WORDS = [
 
 STAGE_ORDER = ["topics", "script", "review-script", "voice", "split", "prompts", "images",
                "overlays", "stitch", "metadata", "thumbnail", "chapters", "upload"]
+
+# ── Transcription-accuracy helper (used by ReviewAgent._review_split) ──────────
+
+_NUMBER_WORDS = {
+    "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+    "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen",
+    "nineteen", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
+    "hundred", "thousand", "lakh", "lakhs", "crore", "crores", "million", "billion",
+}
+_STOPWORDS_SKIP = {"a", "an", "the", "is", "was", "of", "to", "in", "on", "and"}
+
+
+def _normalize_for_diff(text: str) -> list:
+    """Lowercase, strip punctuation, tokenize, and drop numeric/number-word tokens.
+
+    WhisperX routinely normalizes spelled-out numbers to digits (e.g. "Twenty-two
+    lakh" -> "22 lakh") — completely benign, but this channel's content is
+    administrative/statistical, so numbers are everywhere. Diffing raw text would
+    flag this constantly and get ignored, so numeric content is treated as
+    "don't care" here — this check targets mis-heard grammar/content words
+    (e.g. "if there weren't already" -> "if they want already"), not number format.
+    """
+    text = text.lower().replace("'", "").replace("’", "")  # drop apostrophes (don't split "student's")
+    text = re.sub(r"[^\w\s]", " ", text)
+    tokens = text.split()
+    return [t for t in tokens if not t.isdigit() and t not in _NUMBER_WORDS]
+
+
+def _find_transcription_mismatches(source_text: str, manifest_scenes: list) -> list:
+    """Diff the original human-written script against WhisperX's reconstructed
+    transcript (manifest scenes' "script" fields, joined in order) to catch ASR
+    mishearings before they reach burned-in captions. Returns a list of
+    {"scene_id": ..., "source": ..., "transcript": ...} for each flagged mismatch.
+    Pure function — no side effects — so it's easy to test standalone.
+    """
+    # Track cumulative (normalized) word count per scene so a mismatch position
+    # in the reconstructed transcript can be mapped back to a scene id.
+    scene_bounds = []  # (scene_id, start_word_idx, end_word_idx)
+    transcript_tokens = []
+    for scene in manifest_scenes:
+        toks = _normalize_for_diff(scene.get("script", ""))
+        start = len(transcript_tokens)
+        transcript_tokens.extend(toks)
+        scene_bounds.append((scene.get("id", "?"), start, len(transcript_tokens)))
+
+    source_tokens = _normalize_for_diff(source_text)
+
+    matcher = difflib.SequenceMatcher(None, source_tokens, transcript_tokens)
+    mismatches = []
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag != "replace":
+            continue
+        src_words = source_tokens[i1:i2]
+        got_words = transcript_tokens[j1:j2]
+        # Skip trivial single-stopword swaps (e.g. "a" <-> "the") — noise, not signal.
+        if len(src_words) <= 1 and len(got_words) <= 1:
+            if (src_words and src_words[0] in _STOPWORDS_SKIP) or \
+               (got_words and got_words[0] in _STOPWORDS_SKIP):
+                continue
+        # Skip single-word swaps that are orthographically very close (e.g.
+        # "janta" <-> "janata") — almost always a transliteration/spelling
+        # variant of a proper noun, not a real ASR mishearing. Empirically
+        # separated from real mishearings (e.g. "leak"/"league" ratio 0.60,
+        # "weren"/"want" ratio 0.44) at a 0.8 character-similarity threshold.
+        if len(src_words) == 1 and len(got_words) == 1:
+            if difflib.SequenceMatcher(None, src_words[0], got_words[0]).ratio() >= 0.8:
+                continue
+        # Map the transcript-side position back to a scene id.
+        scene_id = next((sid for sid, s, e in scene_bounds if s <= j1 < e), "?")
+        mismatches.append({
+            "scene_id": scene_id,
+            "source": " ".join(src_words),
+            "transcript": " ".join(got_words),
+        })
+    return mismatches
+
+
+# ── CTA voice-freshness helper (used by ReviewAgent._review_stitch) ────────────
+
+def _check_cta_freshness() -> str:
+    """Compare common/cta/cta.mp3's recorded voice config (sidecar written by
+    generate_source_audio.py) against channel_config.json's CURRENTLY active
+    voice settings. common/cta/cta.mp3 is a SHARED asset (not per-project) that
+    previously went stale (wrong voice) after a provider switch, unnoticed until
+    a human caught it by ear — this replaces "notice by ear" with an automatic
+    diff. Returns a human-readable mismatch description, or "" if fields match.
+    Assumes both files exist — caller is responsible for the exists() checks
+    (missing sidecar and missing config are different situations to report).
+    """
+    sidecar_path = PIPELINE_DIR / "common" / "cta" / "cta.mp3.voice.json"
+    cfg_path = PIPELINE_DIR / "channel_config.json"
+    sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+    vcfg = cfg.get("voice", {})
+    cur_provider = vcfg.get("provider", "")
+
+    cur_voice = ""
+    cur_model = ""
+    if cur_provider in ("gemini", "gemini_cloudtts"):
+        cur_voice = vcfg.get("gemini_voice", "")
+        # Two separate config keys for two different providers — pick the right one.
+        cur_model = vcfg.get(
+            "gemini_cloudtts_model" if cur_provider == "gemini_cloudtts" else "gemini_model", ""
+        )
+    elif cur_provider == "elevenlabs":
+        cur_voice = vcfg.get("elevenlabs_default", vcfg.get("default", ""))
+    elif cur_provider == "edge":
+        cur_voice = vcfg.get("default", "en-US-GuyNeural")
+
+    mismatches = []
+    if sidecar.get("provider") != cur_provider:
+        mismatches.append(f"provider {sidecar.get('provider')!r} vs current {cur_provider!r}")
+    if sidecar.get("voice") != cur_voice:
+        mismatches.append(f"voice {sidecar.get('voice')!r} vs current {cur_voice!r}")
+    if cur_model and sidecar.get("model") != cur_model:
+        mismatches.append(f"model {sidecar.get('model')!r} vs current {cur_model!r}")
+
+    return "; ".join(mismatches)
+
 
 CHANNEL_DNA = """You are a viral educational YouTube video creation engine for "The Interested Indian".
 
@@ -436,6 +556,26 @@ class ReviewAgent:
         if dupes:
             issues.append(f"Duplicate scene IDs: {set(dupes)}")
 
+        # Transcription-accuracy check: diff WhisperX's reconstructed transcript
+        # against the original human-written script to catch ASR mishearings
+        # (e.g. "if there weren't already" -> "if they want already") before they
+        # reach burned-in captions. One combined issue regardless of count, so a
+        # handful of small mishearings doesn't crash the score the same way a
+        # structural problem (duplicate IDs, too few scenes) does.
+        script_matches = sorted(project_dir.glob("script_*.txt"))
+        if script_matches:
+            source_text = script_matches[-1].read_text(encoding="utf-8")
+            mismatches = _find_transcription_mismatches(source_text, scenes)
+            if mismatches:
+                issues.append(f"{len(mismatches)} possible transcription mismatch(es) — see recommendations")
+                for m in mismatches[:5]:
+                    recs.append(
+                        f"{m['scene_id']}: script says \"{m['source']}\", "
+                        f"transcript says \"{m['transcript']}\" — check caption"
+                    )
+                if len(mismatches) > 5:
+                    recs.append(f"+ {len(mismatches) - 5} more possible mismatch(es) — see full manifest")
+
         score = 10 if not issues else (6 if len(issues) == 1 else 3)
         return ReviewResult(
             passed=score >= self.PASS_THRESHOLD,
@@ -591,6 +731,22 @@ class ReviewAgent:
 
         except Exception as e:
             issues.append(f"Could not analyse video audio: {e}")
+
+        # CTA voice-freshness check — common/cta/cta.mp3 is shared across every
+        # project; catch it going stale automatically instead of by ear.
+        cta_sidecar = PIPELINE_DIR / "common" / "cta" / "cta.mp3.voice.json"
+        if not cta_sidecar.exists():
+            recs.append(
+                "common/cta/cta.mp3 has no voice-config sidecar yet (predates this check) — "
+                "regenerate it once via generate_source_audio.py to enable freshness tracking"
+            )
+        else:
+            try:
+                mismatch = _check_cta_freshness()
+                if mismatch:
+                    issues.append(f"CTA audio voice config is stale ({mismatch}) — regenerate common/cta/cta.mp3")
+            except Exception as e:
+                recs.append(f"Could not check CTA voice freshness: {e}")
 
         score = 10 - len(issues) * 2
         score = max(0, min(10, score))
@@ -1551,6 +1707,23 @@ class OrchestratorAgent:
             print(f"  ⚠ Could not parse score from {report_path.name} — review manually")
             print(f"  Report: {report_path}")
             input("  Press ENTER to continue > ")
+
+        # Independent evenhandedness gate — separate from OVERALL_SCORE. Added
+        # after review_script.py's Claude review incidentally caught a real
+        # one-sidedness problem on a politically live topic; as the channel
+        # covers more of these, it deserves its own dedicated, gated check
+        # rather than being a stray recommendation buried in AUDIENCE_SCORE.
+        # Lower-friction than the OVERALL<6 flow (single-key continue/abort,
+        # not rewrite/skip/quit) — this is a narrower, more surgical concern.
+        if report_path.exists():
+            m = re.search(r"EVENHANDEDNESS_SCORE:\s*(\d+)/10", report_path.read_text(encoding="utf-8"))
+            if m:
+                even_score = int(m.group(1))
+                print(f"  Evenhandedness score: {even_score}/10")
+                if even_score < 5:
+                    print(f"\n  ⚠ Script scored {even_score}/10 on evenhandedness — may present a "
+                          f"contested claim one-sidedly. Review {report_path.name} before proceeding.")
+                    input("  Press ENTER to continue or Ctrl+C to abort > ")
 
     def _print_script_preview(self, script_text: str):
         """Print a human-readable script QA summary before the checkpoint."""

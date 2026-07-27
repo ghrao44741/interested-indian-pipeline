@@ -298,7 +298,11 @@ Score this script on each dimension (1–10, be harsh):
 5. AUDIENCE_SCORE: Does it anticipate viewer skepticism and name it?
 6. WITTINESS_SCORE: Overall entertainment. Would you watch this at 1x speed?
 7. ARC_SCORE: Hook → explain → mechanism → consequence → close. Does the arc land?
-8. OVERALL_SCORE: Overall quality.
+8. EVENHANDEDNESS_SCORE: On politically or socially contested claims, does the script present the tension
+   evenhandedly rather than taking a side? 10 = no contested claims present, or handled with genuine balance.
+   Low = one-sided framing on a live controversy (e.g. only naming skepticism from one ideological direction,
+   presenting a disputed protest/police account as settled fact).
+9. OVERALL_SCORE: Overall quality.
 
 Then:
 BEST_MOMENTS: Quote 2-3 sentences that are working brilliantly.
@@ -313,6 +317,7 @@ RHYTHM_SCORE: N/10
 AUDIENCE_SCORE: N/10
 WITTINESS_SCORE: N/10
 ARC_SCORE: N/10
+EVENHANDEDNESS_SCORE: N/10
 OVERALL_SCORE: N/10
 
 BEST_MOMENTS:
@@ -341,13 +346,18 @@ RECOMMENDATIONS:
 
 def _parse_scores(raw: str) -> dict:
     scores = {}
-    for key in ["HOOK", "HUMOR", "JARGON", "RHYTHM", "AUDIENCE", "WITTINESS", "ARC", "OVERALL"]:
+    for key in ["HOOK", "HUMOR", "JARGON", "RHYTHM", "AUDIENCE", "WITTINESS", "ARC",
+                "EVENHANDEDNESS", "OVERALL"]:
         m = re.search(rf"{key}_SCORE:\s*(\d+)/10", raw)
         if m:
             scores[key] = int(m.group(1))
 
     # If Claude skipped OVERALL or returned a non-integer (e.g. "?"),
-    # compute it as the average of the other seven dimensions.
+    # compute it as the average of the other seven dimensions. EVENHANDEDNESS is
+    # deliberately excluded from this fallback average — OVERALL is normally
+    # Claude's own independent holistic judgment, not a computed average, so a
+    # 9th dimension should only ever influence it the same way Claude itself
+    # already weighs it in, not get force-averaged in only on this rare fallback path.
     if "OVERALL" not in scores:
         sub_keys = ["HOOK", "HUMOR", "JARGON", "RHYTHM", "AUDIENCE", "WITTINESS", "ARC"]
         sub_vals = [scores[k] for k in sub_keys if k in scores]
@@ -472,6 +482,7 @@ def main():
         ("AUDIENCE",  "Audience addr. "),
         ("WITTINESS", "Wittiness      "),
         ("ARC",       "Narrative arc  "),
+        ("EVENHANDEDNESS", "Evenhandedness "),
         ("OVERALL",   "OVERALL        "),
     ]:
         score = scores.get(dim, "?")
@@ -533,7 +544,8 @@ def _write_report(project_dir, out_arg, script_path, paragraphs,
             ("HOOK", "Hook quality"), ("HUMOR", "Humor density"),
             ("JARGON", "Jargon clarity"), ("RHYTHM", "Sentence rhythm"),
             ("AUDIENCE", "Audience address"), ("WITTINESS", "Wittiness"),
-            ("ARC", "Narrative arc"), ("OVERALL", "**OVERALL**"),
+            ("ARC", "Narrative arc"), ("EVENHANDEDNESS", "Evenhandedness"),
+            ("OVERALL", "**OVERALL**"),
         ]:
             s = scores.get(dim, "?")
             bar = ("█" * s + "░" * (10 - s)) if isinstance(s, int) else "?"
@@ -575,9 +587,11 @@ def _write_report(project_dir, out_arg, script_path, paragraphs,
     if claude_result:
         lines += ["## Claude Analysis", "", claude_result["raw"], ""]
 
-    # Machine-readable score line — parsed by pipeline_agents.py _stage_review_script
+    # Machine-readable score lines — parsed by pipeline_agents.py _stage_review_script
     if scores and "OVERALL" in scores:
         lines += ["", f"<!-- OVERALL_SCORE: {scores['OVERALL']}/10 -->"]
+    if scores and "EVENHANDEDNESS" in scores:
+        lines += [f"<!-- EVENHANDEDNESS_SCORE: {scores['EVENHANDEDNESS']}/10 -->"]
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text("\n".join(lines), encoding="utf-8")

@@ -34,6 +34,12 @@ common/bgm/
 # Voice preview audio (ElevenLabs test clips — regenerable)
 voice_previews/
 
+# Voice-config sidecars written alongside every generated audio file — describe
+# a regenerable binary that's itself already gitignored (e.g. common/cta/*.mp3,
+# */source_audio/*); tracking the sidecar without the audio it describes is
+# a confusing orphaned-metadata state, so treat both the same way.
+*.voice.json
+
 # CTA / channel images (binary, store separately)
 common/cta/*.png
 

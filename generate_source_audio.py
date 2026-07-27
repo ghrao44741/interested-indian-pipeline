@@ -48,6 +48,7 @@ import re
 import subprocess
 import sys
 import urllib.request
+from datetime import datetime
 from pathlib import Path
 
 # ── Auto-load .env ─────────────────────────────────────────────────────────────
@@ -560,6 +561,35 @@ def get_duration(path: str) -> float:
         return 0.0
 
 
+def _write_voice_sidecar(output_path: str, provider: str, voice: str, speaking_rate) -> None:
+    """Record which voice config produced this audio file, alongside it as
+    {output_path}.voice.json. Without this, there's no way to later answer
+    "what voice made this file" other than re-listening — the exact gap that
+    let common/cta/cta.mp3 go stale (wrong voice) unnoticed for a while.
+    """
+    sidecar = {
+        "provider": provider,
+        "voice": voice,
+        "speaking_rate": speaking_rate,
+        "generated_at": datetime.now().isoformat(timespec="seconds"),
+    }
+    if provider == "gemini_cloudtts":
+        sidecar["model"]  = DEFAULT_MODEL_CLOUDTTS
+        sidecar["locale"] = DEFAULT_LOCALE_CLOUDTTS
+        sidecar["style"]  = DEFAULT_STYLE_CLOUDTTS
+    elif provider == "gemini":
+        sidecar["model"] = DEFAULT_MODEL_GEMINI
+    elif provider == "elevenlabs":
+        sidecar["model"] = DEFAULT_MODEL_EL
+
+    try:
+        Path(f"{output_path}.voice.json").write_text(
+            json.dumps(sidecar, indent=2), encoding="utf-8"
+        )
+    except OSError as e:
+        print(f"  ⚠ Could not write voice-config sidecar: {e}")
+
+
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 async def main():
@@ -651,17 +681,21 @@ async def main():
     print(f"Output  : {output_path}")
     print(f"{'─' * 55}")
 
+    rate = args.speaking_rate if args.speaking_rate is not None else DEFAULT_SPEAKING_RATE
+
     if args.provider == "gemini_cloudtts":
-        # CLI flag overrides config; config overrides Gemini default (1.0)
-        rate = args.speaking_rate if args.speaking_rate is not None else DEFAULT_SPEAKING_RATE
         cloudtts_generate(text, voice, output_path, speaking_rate=rate)
     elif args.provider == "gemini":
-        rate = args.speaking_rate if args.speaking_rate is not None else DEFAULT_SPEAKING_RATE
         gemini_generate(text, voice, output_path, speaking_rate=rate)
     elif args.provider == "elevenlabs":
         elevenlabs_generate(text, voice, output_path)
     else:
         await edge_generate(text, voice, output_path)
+
+    # Write a voice-config sidecar alongside the audio — otherwise there's no
+    # way to later answer "what voice made this file" other than re-listening
+    # (exactly the gap that let common/cta/cta.mp3 go stale unnoticed).
+    _write_voice_sidecar(output_path, args.provider, voice, rate)
 
     duration = get_duration(output_path)
     if duration:
