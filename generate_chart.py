@@ -179,24 +179,31 @@ def render_timeline(data: list[dict], title: str, out_path: Path):
     fig, ax, plt = _setup_fig()
     ax.set_axis_off()
 
-    years  = [int(d["year"]) for d in data]
+    labels = [d["year"] for d in data]
     events = [d["event"] for d in data]
     colors = [d.get("color", BAR_PALETTE[i % len(BAR_PALETTE)]) for i, d in enumerate(data)]
 
-    if not years:
+    if not labels:
         _save(fig, plt, out_path)
         return
 
-    yr_min, yr_max = min(years), max(years)
-    span = max(yr_max - yr_min, 1)
-
-    # Normalise x positions to [0.05, 0.95]
-    xs = [0.05 + 0.90 * (y - yr_min) / span for y in years]
+    # "year" is usually a plain year (int), but a timeline can also span dates
+    # within a single year (e.g. "Jul 20-21") — those aren't parseable as int,
+    # so fall back to evenly-spaced positions and display the label as-is
+    # instead of assuming a numeric axis.
+    try:
+        years = [int(y) for y in labels]
+        yr_min, yr_max = min(years), max(years)
+        span = max(yr_max - yr_min, 1)
+        xs = [0.05 + 0.90 * (y - yr_min) / span for y in years]
+    except ValueError:
+        n = max(len(labels) - 1, 1)
+        xs = [0.05 + 0.90 * i / n for i in range(len(labels))]
 
     # Spine line
     ax.axhline(y=0.5, xmin=0.03, xmax=0.97, color="#C0392B", linewidth=2.5)
 
-    for i, (x, year, event, color) in enumerate(zip(xs, years, events, colors)):
+    for i, (x, label, event, color) in enumerate(zip(xs, labels, events, colors)):
         # Dot on timeline
         ax.plot(x, 0.5, "o", markersize=14, color=color,
                 transform=ax.transAxes, zorder=3)
@@ -206,8 +213,8 @@ def render_timeline(data: list[dict], title: str, out_path: Path):
         y_year  = 0.63 if above else 0.35
         va_text = "bottom" if above else "top"
 
-        # Year label
-        ax.text(x, y_year, str(year),
+        # Year/date label
+        ax.text(x, y_year, str(label),
                 transform=ax.transAxes,
                 ha="center", va=va_text,
                 fontsize=11, fontweight="bold", color=color)

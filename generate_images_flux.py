@@ -291,6 +291,10 @@ def main():
                         help="Concurrent image-generation requests (default: 4). "
                              "Each scene's image is independent, so this is safe to raise; "
                              "lower it if the backend ever starts rate-limiting.")
+    parser.add_argument("--prompt-override", default=None,
+                        help="Use this exact text as the shot's PROMPT instead of the one in "
+                             "the markdown file — for regenerating a single --shot with extra "
+                             "instructions (e.g. reviewer feedback) without editing the source file.")
     args = parser.parse_args()
 
     # Resolve default model per backend
@@ -357,6 +361,12 @@ def main():
         if not shots:
             print(f"❌ {target} not found in prompts file.")
             sys.exit(1)
+
+    if args.prompt_override is not None:
+        if args.shot is None:
+            print("❌ --prompt-override only makes sense together with --shot (one shot at a time).")
+            sys.exit(1)
+        shots[0]["prompt"] = args.prompt_override
 
     # ── filter: from report ────────────────────────────────────────────────────
     if args.from_report:

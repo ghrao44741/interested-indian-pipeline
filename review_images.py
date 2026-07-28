@@ -503,6 +503,200 @@ def write_report(results: list[dict], output_path: str, model_key: str,
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# FEEDBACK LOOP — open a local visual review session for flagged shots instead
+# of leaving the user to interpret a text-only markdown report.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+CFL_SHARED_PATH = Path(r"C:\Bakcup_Asus\shared-tools\creative-feedback-loop")
+
+
+def open_feedback_loop(results: list[dict], images_dir: Path, project_dir: Path, project_name: str):
+    """Publish every WARN/FAIL shot as a Creative Feedback Loop batch, pre-filled
+    with the AI reviewer's own verdict as each candidate's starting note, and
+    print the review URL. Does NOT block itself — its HTTP server runs on a
+    daemon thread, so the CALLER must keep this process alive (a long-lived or
+    background shell) or the server dies the instant the process exits and the
+    printed URL stops working. Returns the CreativeFeedbackLoop, or None if
+    there was nothing flagged to review."""
+    flagged = [r for r in results if r["result"].get("verdict") in ("WARN", "FAIL")]
+    if not flagged:
+        print("No WARN/FAIL shots — nothing to open a feedback session for.")
+        return None
+
+    if not CFL_SHARED_PATH.exists():
+        print(f"⚠ Creative Feedback Loop not found at {CFL_SHARED_PATH} — skipping.")
+        return None
+
+    sys.path.insert(0, str(CFL_SHARED_PATH))
+    from creative_feedback_loop import CreativeFeedbackLoop
+
+    image_paths, notes, labels = [], [], []
+    for r in flagged:
+        path = images_dir / r["filename"]
+        if not path.exists():
+            continue
+        image_paths.append(path)
+        verdict = r["result"].get("verdict", "?")
+        notes.append(f"[{verdict}] {r['result'].get('notes', '')}".strip())
+        labels.append(f"{r['shot']} · {r['filename']}")
+
+    session_dir = project_dir / "cfl_review"
+    cfl = CreativeFeedbackLoop.create(
+        session_dir,
+        title=f"{project_name} — {len(image_paths)} flagged shot(s)",
+        goal="Pin feedback on the exact problem in each shot, then press "
+             "Generate next batch once you're ready for regeneration.",
+        open_browser=True,
+    )
+    cfl.add_batch(image_paths, label="Flagged from AI review", initial_notes=notes, source_labels=labels)
+    print(f"\n{'─' * 55}")
+    print(f"Creative Feedback Loop opened — {len(image_paths)} flagged shot(s)")
+    print(f"Review page: {cfl.url}")
+    print(f"(Each candidate's note is pre-filled with the AI reviewer's own verdict.)")
+    print(f"Server running — keep this process alive (Ctrl+C to stop) while you review.")
+    print(f"{'─' * 55}\n")
+    return cfl
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# FEEDBACK LOOP — CONSUMER. Waits for "Generate next batch" / "Send winner &
+# wrap up", regenerates ONLY the shots that actually got feedback (a shot
+# marked Winner with no new note is treated as accepted-as-is and left alone),
+# and publishes the corrected image(s) as the next batch. Repeats until the
+# owner wraps up.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _describe_pin_position(x_pct: float, y_pct: float) -> str:
+    h = "left" if x_pct < 33 else ("right" if x_pct > 66 else "center")
+    v = "top" if y_pct < 33 else ("bottom" if y_pct > 66 else "middle")
+    if h == "center" and v == "middle":
+        return "the center"
+    if v == "middle":
+        return f"the {h}"
+    if h == "center":
+        return f"the {v}"
+    return f"the {v}-{h}"
+
+
+def _format_feedback(comment: dict) -> str:
+    """Turn a candidate's pins + whole-candidate note into one instruction
+    string an image model can act on. Pin coordinates become a rough spatial
+    description (there's no way to hand an AI image generator literal x/y
+    coordinates and have it understand them)."""
+    parts = []
+    for p in comment.get("pins", []):
+        pos = _describe_pin_position(p["x_pct"], p["y_pct"])
+        parts.append(f"Near {pos} of the image: {p['note']}")
+    if comment.get("note"):
+        parts.append(comment["note"])
+    return " | ".join(parts)
+
+
+def _regenerate_shot_image(shot: dict, feedback_text: str, images_dir: Path,
+                           project_dir: Path) -> Path:
+    """Regenerate one shot's image, appending the reviewer's feedback to its
+    original prompt, then re-apply the PIL text overlay. Returns the new image
+    path (same filename — overwritten in place).
+
+    Shells out to generate_images_flux.py --prompt-override rather than
+    calling the image-generation API directly, matching how every other
+    regeneration path in this pipeline already works.
+    """
+    import subprocess as _subprocess
+
+    # Force the CHILD process's own stdout to UTF-8 regardless of the parent
+    # console's codepage — both scripts print emoji/arrows that crash under
+    # cp1252 (this bit us repeatedly earlier this session under Git Bash;
+    # without this, the exact same crash happens here too since a subprocess
+    # otherwise inherits the parent's console encoding).
+    child_env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+
+    full_scene = f"{shot['prompt']} IMPORTANT FIX REQUESTED BY REVIEWER: {feedback_text}"
+
+    result = _subprocess.run(
+        [sys.executable, str(Path(__file__).parent / "generate_images_flux.py"),
+         "--project", str(project_dir), "--shot", re.search(r"\d+", shot["shot"]).group(),
+         "--overwrite", "--prompt-override", full_scene],
+        check=False, capture_output=True, text=True, encoding="utf-8", timeout=120, env=child_env,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"generate_images_flux.py failed for {shot['shot']}: {result.stderr[-500:]}")
+
+    out_path = images_dir / shot["filename"]
+
+    # Clear any stale _orig.png backup BEFORE re-running the overlay — a real
+    # bug hit earlier this session: add_text_overlays.py always prefers an
+    # existing backup over the current file, so skipping this step would
+    # silently re-burn the overlay onto the OLD pre-fix image instead of the
+    # one just generated.
+    orig_backup = images_dir / f"{Path(shot['filename']).stem}_orig.png"
+    orig_backup.unlink(missing_ok=True)
+    _subprocess.run(
+        [sys.executable, str(Path(__file__).parent / "add_text_overlays.py"),
+         "--project", str(project_dir), "--scene", Path(shot["filename"]).stem, "--overwrite"],
+        check=False, capture_output=True, timeout=60, env=child_env,
+    )
+    return out_path
+
+
+def run_feedback_loop(cfl, shots: list[dict], images_dir: Path, project_dir: Path):
+    """Block on the review session: each time the owner presses Generate next
+    batch, regenerate only the flagged candidates that actually carry feedback
+    (a pin and/or a whole-candidate note), publish those as the next batch,
+    and keep waiting. Ends when the owner presses Send winner & wrap up."""
+    shots_by_num = {}
+    for s in shots:
+        m = re.search(r"(\d+)", s["shot"])
+        if m:
+            shots_by_num[int(m.group(1))] = s
+
+    while True:
+        print(f"Waiting for feedback at {cfl.url} …  (Ctrl+C to stop)")
+        event = cfl.wait_for_feedback(poll_interval=3.0)
+
+        if event.intent == "wrap_up":
+            winner = next((c for c in event.comments if c["candidate_id"] == event.winner_candidate_id), None)
+            print(f"\nWinner selected: {winner['filename'] if winner else '(unknown)'}")
+            cfl.close(outcome="approved", winner_version_id=event.version_id,
+                      winner_candidate_id=event.winner_candidate_id)
+            print("Feedback session closed.")
+            return
+
+        to_regenerate = []
+        for c in event.comments:
+            feedback_text = _format_feedback(c)
+            if c.get("verdict") == "winner" and not feedback_text:
+                print(f"  {c.get('source_label') or c['filename']}: marked Winner, no new feedback — leaving as-is.")
+                continue
+            if not feedback_text:
+                print(f"  {c.get('source_label') or c['filename']}: no feedback given — leaving as-is.")
+                continue
+            m = re.search(r"SHOT (\d+)", c.get("source_label") or "")
+            shot_num = int(m.group(1)) if m else None
+            shot = shots_by_num.get(shot_num)
+            if shot is None:
+                print(f"  ⚠ Could not match {c.get('source_label')} back to a known shot — skipping.")
+                continue
+            to_regenerate.append((shot, feedback_text))
+
+        if not to_regenerate:
+            print("  Nothing carried feedback — nothing to regenerate. Still waiting…\n")
+            continue
+
+        new_paths, new_labels = [], []
+        for shot, feedback_text in to_regenerate:
+            print(f"  Regenerating {shot['shot']} · {shot['filename']}  — {feedback_text[:80]}...")
+            path = _regenerate_shot_image(shot, feedback_text, images_dir, project_dir)
+            new_paths.append(path)
+            new_labels.append(f"{shot['shot']} · {shot['filename']}")
+
+        version_number = len(new_paths)
+        cfl.add_batch(new_paths, label=f"Corrected {version_number} shot(s) from feedback",
+                      parent_version_id=event.version_id, source_labels=new_labels)
+        print(f"  ✓ Published {len(new_paths)} corrected image(s) as the next batch.\n")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # MAIN
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -520,6 +714,19 @@ def main():
                         help=f"Claude model to use for the bulk pass (default: {DEFAULT_MODEL})")
     parser.add_argument("--no-recheck", action="store_true",
                         help="Skip the automatic Sonnet recheck of WARN/FAIL shots (haiku-only run)")
+    parser.add_argument("--feedback-loop", action="store_true",
+                        help="If any shots end up WARN/FAIL, open a local Creative Feedback Loop "
+                             "review session (visual, pin-based) instead of just the markdown report. "
+                             "Runs ONLY the server (blocks to keep it alive) — pair with a separate "
+                             "--consume-feedback process to actually regenerate from your feedback; "
+                             "the two must be different processes (see --consume-feedback's help).")
+    parser.add_argument("--consume-feedback", action="store_true",
+                        help="Watch an EXISTING Creative Feedback Loop session (from a prior "
+                             "--feedback-loop run) and regenerate shots as feedback comes in. Talks "
+                             "to session.json directly on disk — no HTTP involved — so run it as a "
+                             "separate process from the one serving --feedback-loop's review page "
+                             "(a clean separation: image generation can fail or be killed without "
+                             "taking the review page down, and vice versa).")
     args = parser.parse_args()
 
     # ── resolve paths ──────────────────────────────────────────────────────────
@@ -568,6 +775,28 @@ def main():
         if not shots:
             print(f"❌ {target} not found in prompts file.")
             sys.exit(1)
+
+    if args.consume_feedback:
+        # No review pass needed — just watch an existing session on disk and
+        # regenerate as feedback comes in. Deliberately a SEPARATE process from
+        # --feedback-loop's server: see that flag's help for why.
+        if not CFL_SHARED_PATH.exists():
+            print(f"❌ Creative Feedback Loop not found at {CFL_SHARED_PATH}.")
+            sys.exit(1)
+        sys.path.insert(0, str(CFL_SHARED_PATH))
+        from creative_feedback_loop import SessionStore, CreativeFeedbackLoop
+        session_dir = project_dir / "cfl_review"
+        if not (session_dir / "session.json").exists():
+            print(f"❌ No feedback session found at {session_dir} — run with --feedback-loop first.")
+            sys.exit(1)
+        store = SessionStore.load(session_dir)
+        cfl = CreativeFeedbackLoop(store, url=f"(local session at {session_dir}, no server in this process)")
+        print(f"Watching {session_dir} for feedback — Ctrl+C to stop.\n")
+        try:
+            run_feedback_loop(cfl, shots, images_dir, project_dir)
+        except KeyboardInterrupt:
+            print("\nStopped watching for feedback.")
+        return
 
     # ── init Anthropic client ──────────────────────────────────────────────────
     api_key = os.environ.get("ANTHROPIC_API_KEY")
@@ -734,6 +963,23 @@ def main():
     print(f"  — SKIP : {skips}")
     print(f"\nReport: {report_path}")
     print(f"{'═' * 55}\n")
+
+    if args.feedback_loop:
+        cfl = open_feedback_loop(results, images_dir, project_dir, project_dir.name)
+        if cfl is not None:
+            # This process ONLY serves the review page — it never spawns a
+            # subprocess itself. Run
+            #   python review_images.py --project X --consume-feedback
+            # as a SEPARATE process to actually regenerate from feedback (see
+            # --consume-feedback's help for why these must be split).
+            print(f"Run this in another terminal to regenerate as feedback comes in:")
+            print(f"  python review_images.py --project {project_dir.name} --consume-feedback\n")
+            try:
+                while True:
+                    time.sleep(3600)
+            except KeyboardInterrupt:
+                pass
+            return
 
     if warns + fails > 0:
         sys.exit(1)   # non-zero exit so CI pipelines can catch issues
