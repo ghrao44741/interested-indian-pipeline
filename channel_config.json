@@ -46,7 +46,7 @@
   },
 
   "voice": {
-    "provider": "gemini_cloudtts",
+    "provider": "elevenlabs",
     "gemini_voice": "Iapetus",
     "gemini_model": "gemini-2.5-flash-preview-tts",
     "gemini_speaking_rate": 0.85,
@@ -56,12 +56,13 @@
     "gemini_cloudtts_locale": "en-IN",
     "gemini_cloudtts_style": "Narrate in a predominantly American English accent with only a faint trace of Indian origin - like an Indian-born professional who emigrated to the United States 30 years ago and now sounds mostly American, just a subtle hint of the original accent remaining. Confident, articulate, sophisticated young professional narrator, smooth natural pacing, understated warmth.",
     "_gemini_cloudtts_note": "Voice: Iapetus. Style updated 2026-07-27 to the 'Indian-American hybrid, more American than Indian' variant — an Indian-born narrator who's lived in the US 30 years, mostly American accent with just a faint Indian trace — see voice_previews/gemini31_Iapetus_enIN_indianamerican_moreus.wav, the one selected (chosen over the plain 'classy Indian English' variant and over the equivalent Charon take). This is a deliberate departure from the earlier 'must say Indian English explicitly' finding below — here the goal is for Indian-ness to be a subtle undertone, not the dominant accent, so the style text says so explicitly rather than omitting it (omitting any Indian-origin mention entirely was NOT tested here and would likely drift to fully generic American, per the earlier finding). IMPORTANT (general, still applies): the style prompt's own wording is what actually shapes the accent — locale=en-IN alone doesn't determine it; confirmed empirically in an earlier A/B that omitting any Indian-accent wording caused full drift away from Indian. Goes through Cloud Text-to-Speech (texttospeech.googleapis.com), a different API from the Gemini Developer API the 'gemini' provider uses — Cloud TTS rejects plain API keys, so this REQUIRES the gcloud CLI installed and authenticated (gcloud auth login) on whatever machine runs the pipeline. Falls back to provider 'gemini' if gcloud isn't available.",
-    "elevenlabs_default": "gYQ0co3BoppQZ8BDM3lj",
-    "elevenlabs_name": "ANX - Deep & Friendly",
+    "elevenlabs_default": "aJm4vjjSZkqTKDkM19X1",
+    "elevenlabs_name": "Cyber Creed",
     "model": "eleven_multilingual_v2",
     "stability": 0.5,
     "similarity_boost": 0.75,
-    "note": "Provider: 'gemini_cloudtts' (default, Indian-accented via Cloud TTS + en-IN locale + style prompt, needs gcloud auth), 'gemini' (Gemini Developer API, simple API key, no locale/style control), 'elevenlabs', or 'edge'. Switch provider here or pass --provider flag."
+    "elevenlabs_note": "Switched 2026-07-28 from gemini_cloudtts to elevenlabs — Cloud TTS's per-chunk synthesis caused an audible voice/tone shift at chunk boundaries on long scripts (documented model limitation, no fix available). Voice 'Cyber Creed' (aJm4vjjSZkqTKDkM19X1) chosen after sampling 20 Indian-male candidates from ElevenLabs' shared-voice-library (clear/approachable register, lighter accent — earlier candidates were rejected as too heavy). Model is eleven_multilingual_v2, NOT eleven_turbo_v2_5 — first tried turbo_v2_5 specifically for its 40k-char single-request capacity (avoids chunk seams entirely), but a direct same-voice/same-text A/B confirmed turbo_v2_5 renders this voice audibly differently from multilingual_v2, and multilingual_v2 was the one actually approved after listening. multilingual_v2 caps at 10k chars/request, so our ~12k-char script still needs 2 chunks (1 seam) — an explicit, accepted trade-off: quality/voice-match over the (smaller, 1-seam) residual drift risk. Previously tried 'ANX - Deep & Friendly' (gYQ0co3BoppQZ8BDM3lj) was rejected earlier for sounding generic/not distinctly Indian despite being tagged 'indian' accent in ElevenLabs' own metadata — don't trust the accent tag alone, always listen.",
+    "note": "Provider: 'gemini_cloudtts' (Indian-accented via Cloud TTS + en-IN locale + style prompt, needs gcloud auth, has a documented cross-chunk voice-drift issue on long scripts), 'gemini' (Gemini Developer API, simple API key, no locale/style control), 'elevenlabs' (current default — model eleven_multilingual_v2, chosen for voice quality over eleven_turbo_v2_5's single-request/zero-seam advantage; see elevenlabs_note), or 'edge'. Switch provider here or pass --provider flag."
   },
 
   "stitch": {

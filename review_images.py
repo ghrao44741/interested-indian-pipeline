@@ -157,7 +157,13 @@ RUBRIC — check each dimension:
                     an image for missing overlay text.
 4. ratio_ok       : Is the image landscape / 16:9? (mark true if unsure)
 5. no_artifacts   : Is the image free of AI generation errors (mangled text, extra limbs,
-                    distorted shapes, blurry regions)?
+                    distorted shapes, blurry regions)? This INCLUDES any large/prominent text,
+                    title, or heading rendered as part of the illustration itself (e.g. a big
+                    "The Interested Indian" title card taking up a chunk of the frame) — the
+                    generator sometimes hallucinates this even though the prompt explicitly
+                    forbids it. Mark false if you see one. Do NOT confuse this with the small
+                    "The Interested Indian" text in the bottom-right corner in amber font — that
+                    is an intentional post-production channel badge on every image, not a defect.
 6. no_typos       : Read ALL visible text in the image carefully. Is it free of spelling mistakes,
                     wrong numbers, garbled words, or incorrect proper nouns? Compare against any
                     specific number/date/proper noun in THIS SHOT's own NARRATION or INTENDED
@@ -181,7 +187,9 @@ VERDICT rules:
             (a MAP/CHART/PHOTO shot correctly having no cartoon mascot is NEVER a style failure —
             only fail PHOTO/MAP/CHART style if it fails ITS OWN type's guide above); content
             completely wrong/unrecognisable; obvious generation artifacts (extra limbs, distorted
-            shapes, blurry key areas); confirmed typo in a key number or proper noun; image is
+            shapes, blurry key areas); a large hallucinated title/heading rendered into the
+            illustration itself (not the small bottom-right channel badge — that's correct);
+            confirmed typo in a key number or proper noun; image is
             off-topic (completely different subject); watermark present.
             Do NOT fail a CARTOON shot for: expressive cartoon faces (correct style), vibrant
             colors (correct), detailed mascot character (correct).

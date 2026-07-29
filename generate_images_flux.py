@@ -111,19 +111,24 @@ COST_MAP = {
 # This is the key to style consistency — every prompt starts with the same
 # style description so Flux maintains the doodle look across all 90 images.
 STYLE_PREFIX = (
-    "Flat digital cartoon illustration, warm cream background (#FAF7F2), "
+    "Flat digital cartoon illustration for an educational, friendly, approachable "
+    "YouTube video essay, warm cream background (#FAF7F2), "
     "bold black outlines, expressive characters, vibrant colors. "
-    "Channel: The Interested Indian — friendly, approachable, educational. "
     "MASCOT (use this EXACT description every time): chubby round Indian cartoon boy, "
     "gold/amber round glasses, spiky black hair, warm tan brown skin (#D4A85C), "
     "cream kurta, off-white baggy pajama trousers with gathered ankles, brown leather sandals. "
     "Expressive face, thick eyebrows, short arms. NOT a generic Asian character, NOT pale-skinned, "
     "NOT in Western clothing. He is distinctly Indian — kurta and sandals are mandatory. "
     "No photorealism, no 3D rendering. 16:9 landscape composition. "
+    "CRITICAL — do not render ANY text, words, titles, headings, captions, channel names, or "
+    "logos anywhere in the image, even if a name or phrase is mentioned in the scene "
+    "description below. All text is added separately afterward; the illustration itself "
+    "must be completely wordless except where a scene explicitly calls for an in-world "
+    "prop with text on it (a sign, a document, a banner someone is holding). "
 )
 
 STYLE_SUFFIX = (
-    " Bold outlines, vibrant colors, 16:9."
+    " Bold outlines, vibrant colors, 16:9. No title text, no channel name rendered in the image."
 )
 
 

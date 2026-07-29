@@ -51,8 +51,7 @@ ep01_v1/*.png
 *.geojson
 
 # Manifest backups (noise — keep only current manifest.json)
-ep01/manifest_backup_*.json
-ep01_v1/manifest_backup_*.json
+*/manifest_backup_*.json
 
 # Root-level generated outputs (large binary, fully regenerable)
 ep01_final.mp4

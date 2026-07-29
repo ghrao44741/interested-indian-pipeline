@@ -70,7 +70,7 @@ if _cfg_path.exists():
         pass
 
 DEFAULT_PROVIDER   = _voice_cfg.get("provider", "gemini")
-DEFAULT_VOICE_EL   = _voice_cfg.get("default", "gYQ0co3BoppQZ8BDM3lj")
+DEFAULT_VOICE_EL   = _voice_cfg.get("elevenlabs_default", "gYQ0co3BoppQZ8BDM3lj")
 DEFAULT_MODEL_EL   = _voice_cfg.get("model", "eleven_multilingual_v2")
 DEFAULT_STABILITY  = _voice_cfg.get("stability", 0.5)
 DEFAULT_SIMILARITY = _voice_cfg.get("similarity_boost", 0.75)
@@ -101,7 +101,13 @@ def first_n_sentences(text: str, n: int) -> str:
 
 # ── ElevenLabs provider ────────────────────────────────────────────────────────
 
-EL_CHUNK_LIMIT = 9500  # ElevenLabs max is 10000; keep buffer for safety
+EL_CHUNK_LIMIT = 9500  # eleven_multilingual_v2 (the configured production model) caps at
+                        # 10000 chars/request — 9500 leaves a safety buffer. Note:
+                        # eleven_turbo_v2_5 / eleven_flash_v2_5 support up to 40000 chars
+                        # (single-request, zero chunk-seam risk) but were A/B tested and
+                        # rejected — they render this voice audibly differently from
+                        # multilingual_v2. If the production model ever changes back to
+                        # turbo/flash v2.5, raise this limit accordingly.
 
 
 def _split_into_chunks(text: str, max_chars: int = EL_CHUNK_LIMIT) -> list[str]:
@@ -175,10 +181,26 @@ def _concat_mp3_chunks(chunk_paths: list[Path], output_path: str):
     list_file.unlink(missing_ok=True)
 
 
+def _compute_chunk_boundaries(chunk_paths: list[Path]) -> list[float]:
+    """Cumulative seconds where each chunk boundary falls in the final concatenated
+    audio — computed from each chunk's own real duration before the chunk files are
+    deleted, so a reviewer can jump straight to a seam instead of estimating it from
+    character offsets (speech rate isn't constant, so char-ratio timing drifts)."""
+    from pydub import AudioSegment
+    boundaries = []
+    cursor = 0.0
+    for p in chunk_paths[:-1]:
+        cursor += len(AudioSegment.from_mp3(str(p))) / 1000.0
+        boundaries.append(round(cursor, 2))
+    return boundaries
+
+
 def elevenlabs_generate(text: str, voice_id: str, output_path: str,
                          model: str = DEFAULT_MODEL_EL,
                          stability: float = DEFAULT_STABILITY,
-                         similarity: float = DEFAULT_SIMILARITY):
+                         similarity: float = DEFAULT_SIMILARITY) -> list[float]:
+    """Returns the list of chunk-boundary timestamps (seconds) in the final audio,
+    or [] if the script fit in a single request (no seam)."""
     api_key = os.environ.get("ELEVENLABS_API_KEY", "")
     if not api_key:
         print("❌ ELEVENLABS_API_KEY not set in .env")
@@ -191,6 +213,7 @@ def elevenlabs_generate(text: str, voice_id: str, output_path: str,
         audio_bytes = _elevenlabs_call(text, voice_id, api_key, model, stability, similarity)
         Path(output_path).write_bytes(audio_bytes)
         print(f"  ✓ Chunk 1/1 done")
+        return []
     else:
         tmp_dir = Path(output_path).parent / "_el_chunks"
         tmp_dir.mkdir(exist_ok=True)
@@ -203,6 +226,8 @@ def elevenlabs_generate(text: str, voice_id: str, output_path: str,
             chunk_paths.append(p)
             print(f"  ✓ Chunk {i}/{len(chunks)} done")
 
+        boundaries = _compute_chunk_boundaries(chunk_paths)
+
         print(f"  Concatenating {len(chunks)} chunks...")
         _concat_mp3_chunks(chunk_paths, output_path)
 
@@ -211,6 +236,7 @@ def elevenlabs_generate(text: str, voice_id: str, output_path: str,
             p.unlink(missing_ok=True)
         tmp_dir.rmdir()
         print(f"  ✓ Concatenation done")
+        return boundaries
 
 
 def elevenlabs_list_voices():
@@ -474,10 +500,12 @@ def cloudtts_generate(text: str, voice: str, output_path: str,
                        model: str = DEFAULT_MODEL_CLOUDTTS,
                        locale: str = DEFAULT_LOCALE_CLOUDTTS,
                        style_prompt: str = DEFAULT_STYLE_CLOUDTTS,
-                       speaking_rate: float | None = None):
+                       speaking_rate: float | None = None) -> list[float]:
     """Generate full narration via Cloud TTS (Gemini 3.1 + locale + style prompt),
     chunking long scripts and concatenating MP3 chunks via the same helper the
-    ElevenLabs path uses.
+    ElevenLabs path uses. Returns chunk-boundary timestamps (seconds), or [] if
+    the script fit in a single request, or [] if it fell back to 'gemini' provider
+    (which does its own chunking untracked).
     """
     access_token, project = _get_gcloud_access_token()
     if not access_token:
@@ -486,7 +514,7 @@ def cloudtts_generate(text: str, voice: str, output_path: str,
         print("   falling back to the 'gemini' provider (Gemini Developer API — no")
         print("   locale/style control, but works with just GEMINI_API_KEY).")
         gemini_generate(text, voice, output_path, speaking_rate=speaking_rate)
-        return
+        return []
 
     rate_label = f"  speaking_rate={speaking_rate}" if speaking_rate is not None else ""
     chunks = _split_into_chunks(text, max_chars=CLOUDTTS_CHUNK_LIMIT)
@@ -500,7 +528,7 @@ def cloudtts_generate(text: str, voice: str, output_path: str,
                                       access_token, project, speaking_rate)
         Path(output_path).write_bytes(audio_bytes)
         print(f"  ✓ Chunk 1/1 done")
-        return
+        return []
 
     tmp_dir = Path(output_path).parent / "_cloudtts_chunks"
     tmp_dir.mkdir(exist_ok=True)
@@ -514,6 +542,8 @@ def cloudtts_generate(text: str, voice: str, output_path: str,
         chunk_paths.append(p)
         print(f"  ✓ Chunk {i}/{len(chunks)} done")
 
+    boundaries = _compute_chunk_boundaries(chunk_paths)
+
     print(f"  Concatenating {len(chunks)} chunks...")
     _concat_mp3_chunks(chunk_paths, output_path)
 
@@ -521,6 +551,7 @@ def cloudtts_generate(text: str, voice: str, output_path: str,
         p.unlink(missing_ok=True)
     tmp_dir.rmdir()
     print(f"  ✓ Concatenation done")
+    return boundaries
 
 
 # ── Edge TTS provider ──────────────────────────────────────────────────────────
@@ -561,16 +592,21 @@ def get_duration(path: str) -> float:
         return 0.0
 
 
-def _write_voice_sidecar(output_path: str, provider: str, voice: str, speaking_rate) -> None:
+def _write_voice_sidecar(output_path: str, provider: str, voice: str, speaking_rate,
+                          chunk_boundaries_sec: list[float] | None = None) -> None:
     """Record which voice config produced this audio file, alongside it as
     {output_path}.voice.json. Without this, there's no way to later answer
     "what voice made this file" other than re-listening — the exact gap that
     let common/cta/cta.mp3 go stale (wrong voice) unnoticed for a while.
+
+    chunk_boundaries_sec lets review_narration_audio.py jump straight to a known
+    chunk-concatenation seam instead of guessing where it is.
     """
     sidecar = {
         "provider": provider,
         "voice": voice,
         "speaking_rate": speaking_rate,
+        "chunk_boundaries_sec": chunk_boundaries_sec or [],
         "generated_at": datetime.now().isoformat(timespec="seconds"),
     }
     if provider == "gemini_cloudtts":
@@ -683,19 +719,21 @@ async def main():
 
     rate = args.speaking_rate if args.speaking_rate is not None else DEFAULT_SPEAKING_RATE
 
+    chunk_boundaries: list[float] = []
     if args.provider == "gemini_cloudtts":
-        cloudtts_generate(text, voice, output_path, speaking_rate=rate)
+        chunk_boundaries = cloudtts_generate(text, voice, output_path, speaking_rate=rate)
     elif args.provider == "gemini":
         gemini_generate(text, voice, output_path, speaking_rate=rate)
     elif args.provider == "elevenlabs":
-        elevenlabs_generate(text, voice, output_path)
+        chunk_boundaries = elevenlabs_generate(text, voice, output_path)
     else:
         await edge_generate(text, voice, output_path)
 
     # Write a voice-config sidecar alongside the audio — otherwise there's no
     # way to later answer "what voice made this file" other than re-listening
     # (exactly the gap that let common/cta/cta.mp3 go stale unnoticed).
-    _write_voice_sidecar(output_path, args.provider, voice, rate)
+    _write_voice_sidecar(output_path, args.provider, voice, rate,
+                          chunk_boundaries_sec=chunk_boundaries)
 
     duration = get_duration(output_path)
     if duration:
