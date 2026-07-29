@@ -1936,6 +1936,8 @@ class OrchestratorAgent:
                 speaking_rate = vcfg.get("gemini_speaking_rate")  # e.g. 0.85
             elif provider == "elevenlabs":
                 voice = vcfg.get("elevenlabs_default", vcfg.get("default", voice))
+            elif provider == "grok":
+                voice = vcfg.get("grok_voice_id", "eve")
             else:
                 voice = vcfg.get("default", voice)
 

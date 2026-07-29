@@ -2,14 +2,21 @@
 generate_source_audio.py
 The Interested Indian — Full-Script Voiceover Generator
 
-Supports four providers:
-  - gemini_cloudtts  (default — Gemini 3.1 via Cloud Text-to-Speech, en-IN locale +
-                       style prompt for an Indian-accented narration. Requires the
+Supports five providers:
+  - gemini_cloudtts  (Gemini 3.1 via Cloud Text-to-Speech, en-IN locale + style
+                       prompt for an Indian-accented narration. Requires the
                        gcloud CLI installed and authenticated: gcloud auth login.
-                       Cloud TTS rejects plain API keys, unlike the other providers.)
+                       Cloud TTS rejects plain API keys, unlike the other providers.
+                       Documented cross-chunk voice-drift issue on long scripts.)
   - gemini           (Gemini Developer API — reads GEMINI_API_KEY from .env, no
                        locale/style control, sounds more generically American)
-  - elevenlabs       (reads from channel_config.json + ELEVENLABS_API_KEY in .env)
+  - elevenlabs       (default — reads from channel_config.json + ELEVENLABS_API_KEY
+                       in .env)
+  - grok             (xAI — reads from channel_config.json + XAI_API_KEY in .env,
+                       same key already used for image generation. Supports custom
+                       voice cloning via console.x.ai's Voice Library — live
+                       passphrase verification there, not automatable from here.
+                       15,000 char/request limit, cheaper than ElevenLabs.)
   - edge             (free Edge TTS, no API key needed)
 
 The script produces one continuous voiceover MP3 in {project}/source_audio/,
@@ -74,6 +81,10 @@ DEFAULT_VOICE_EL   = _voice_cfg.get("elevenlabs_default", "gYQ0co3BoppQZ8BDM3lj"
 DEFAULT_MODEL_EL   = _voice_cfg.get("model", "eleven_multilingual_v2")
 DEFAULT_STABILITY  = _voice_cfg.get("stability", 0.5)
 DEFAULT_SIMILARITY = _voice_cfg.get("similarity_boost", 0.75)
+DEFAULT_SPEED_EL   = _voice_cfg.get("speed", 1.0)  # ElevenLabs generation-time pacing control
+                                                     # (0.7-1.2 typical range, NOT a post-hoc
+                                                     # time-stretch — baked into synthesis, so
+                                                     # pitch/timbre stay natural at any setting).
 DEFAULT_VOICE_EDGE   = "en-US-GuyNeural"
 DEFAULT_VOICE_GEMINI   = _voice_cfg.get("gemini_voice", "Charon")
 DEFAULT_MODEL_GEMINI   = "gemini-2.5-flash-preview-tts"
@@ -83,6 +94,15 @@ GEMINI_CHUNK_LIMIT   = 4500   # conservative limit per API call for long scripts
 DEFAULT_MODEL_CLOUDTTS  = _voice_cfg.get("gemini_cloudtts_model", "gemini-3.1-flash-tts-preview")
 DEFAULT_LOCALE_CLOUDTTS = _voice_cfg.get("gemini_cloudtts_locale", "en-IN")
 DEFAULT_STYLE_CLOUDTTS  = _voice_cfg.get("gemini_cloudtts_style", "")
+
+DEFAULT_VOICE_GROK    = _voice_cfg.get("grok_voice_id", "eve")   # built-in (eve/ara/leo/rex/sal)
+                                                                   # or an 8-char custom voice_id
+                                                                   # from console.x.ai voice cloning
+DEFAULT_LANGUAGE_GROK = _voice_cfg.get("grok_language", "en")     # BCP-47 code, or "auto"
+DEFAULT_SPEED_GROK    = _voice_cfg.get("grok_speed", 1.0)         # generation-time pacing, same
+                                                                   # idea as ElevenLabs' speed
+GROK_TTS_URL = "https://api.x.ai/v1/tts"
+GROK_CHUNK_LIMIT = 14500  # xAI's documented hard limit is 15,000 chars/request; buffer for safety
 
 TARGET_LUFS = _voice_cfg.get("target_lufs", -14.0)  # broadcast/streaming-standard loudness
                                                        # target — normalized once here, on the
@@ -146,13 +166,14 @@ def _split_into_chunks(text: str, max_chars: int = EL_CHUNK_LIMIT) -> list[str]:
 
 
 def _elevenlabs_call(text: str, voice_id: str, api_key: str,
-                      model: str, stability: float, similarity: float) -> bytes:
+                      model: str, stability: float, similarity: float,
+                      speed: float = 1.0) -> bytes:
     """Single ElevenLabs API call → returns raw MP3 bytes."""
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
     body = json.dumps({
         "text": text,
         "model_id": model,
-        "voice_settings": {"stability": stability, "similarity_boost": similarity},
+        "voice_settings": {"stability": stability, "similarity_boost": similarity, "speed": speed},
     }).encode()
     headers = {
         "xi-api-key": api_key,
@@ -210,7 +231,8 @@ def _compute_chunk_boundaries(chunk_paths: list[Path]) -> list[float]:
 def elevenlabs_generate(text: str, voice_id: str, output_path: str,
                          model: str = DEFAULT_MODEL_EL,
                          stability: float = DEFAULT_STABILITY,
-                         similarity: float = DEFAULT_SIMILARITY) -> list[float]:
+                         similarity: float = DEFAULT_SIMILARITY,
+                         speed: float = DEFAULT_SPEED_EL) -> list[float]:
     """Returns the list of chunk-boundary timestamps (seconds) in the final audio,
     or [] if the script fit in a single request (no seam)."""
     api_key = os.environ.get("ELEVENLABS_API_KEY", "")
@@ -219,10 +241,10 @@ def elevenlabs_generate(text: str, voice_id: str, output_path: str,
         sys.exit(1)
 
     chunks = _split_into_chunks(text)
-    print(f"  ElevenLabs: {len(chunks)} chunk(s), voice={voice_id}, model={model}")
+    print(f"  ElevenLabs: {len(chunks)} chunk(s), voice={voice_id}, model={model}, speed={speed}")
 
     if len(chunks) == 1:
-        audio_bytes = _elevenlabs_call(text, voice_id, api_key, model, stability, similarity)
+        audio_bytes = _elevenlabs_call(text, voice_id, api_key, model, stability, similarity, speed)
         Path(output_path).write_bytes(audio_bytes)
         print(f"  ✓ Chunk 1/1 done")
         return []
@@ -232,7 +254,7 @@ def elevenlabs_generate(text: str, voice_id: str, output_path: str,
         chunk_paths = []
         for i, chunk in enumerate(chunks, 1):
             print(f"  ⏳ Chunk {i}/{len(chunks)} ({len(chunk)} chars)...")
-            audio_bytes = _elevenlabs_call(chunk, voice_id, api_key, model, stability, similarity)
+            audio_bytes = _elevenlabs_call(chunk, voice_id, api_key, model, stability, similarity, speed)
             p = tmp_dir / f"chunk_{i:03d}.mp3"
             p.write_bytes(audio_bytes)
             chunk_paths.append(p)
@@ -266,6 +288,126 @@ def elevenlabs_list_voices():
     print(f"{'─' * 70}")
     for v in sorted(voices, key=lambda x: x.get("name", "")):
         print(f"  {v.get('name',''):<45} {v.get('voice_id','')}")
+
+
+# ── Grok (xAI) TTS provider ──────────────────────────────────────────────────────
+#
+# Reuses XAI_API_KEY (already in .env for image generation — no new secret needed).
+# Response shape: raw binary MP3 bytes directly (Content-Type: audio/mpeg), NOT a
+# JSON+base64 wrapper — xAI's own docs page describes the JSON shape, but a real
+# live test call proved that wrong (see _grok_call's docstring for how this was
+# caught). Don't trust that docs page if xAI changes this again — verify live.
+#
+# voice_id is a built-in voice (see grok_list_voices() for the real, current list —
+# 26 as of 2026-07-29, not just the original 5) or an 8-char custom voice_id from
+# console.x.ai's Voice Library (live passphrase verification required there — not
+# something this script can do on a user's behalf). Custom Voice cloning itself is
+# geo-restricted by xAI to the US (excluding Illinois); using the
+# TTS endpoint with a voice_id you already have is not similarly restricted.
+
+def _grok_call(text: str, voice_id: str, api_key: str, language: str, speed: float) -> bytes:
+    """Single Grok TTS API call → returns raw MP3 bytes.
+
+    NOTE: xAI's own docs page (docs.x.ai/developers/rest-api-reference/inference/
+    text-to-speech) describes a JSON response with a base64 'audio' field — a real,
+    live test call proved that wrong: the API actually returns raw binary audio
+    directly (Content-Type: audio/mpeg, body starts with an MPEG frame-sync byte
+    0xFF). Trusting the docs summary without a live test would have silently
+    produced a corrupt file (attempting to JSON-decode raw MP3 bytes crashes
+    immediately with a UnicodeDecodeError, which is how this was caught).
+    """
+    body = json.dumps({
+        "text": text,
+        "voice_id": voice_id,
+        "language": language,
+        "speed": speed,
+        "output_format": {"codec": "mp3"},
+    }).encode()
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    req = urllib.request.Request(GROK_TTS_URL, data=body, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            return r.read()
+    except urllib.error.HTTPError as e:
+        body_err = e.read().decode()[:300]
+        print(f"❌ Grok TTS API error {e.code}: {body_err}")
+        sys.exit(1)
+
+
+def grok_generate(text: str, voice_id: str, output_path: str,
+                   language: str = DEFAULT_LANGUAGE_GROK,
+                   speed: float = DEFAULT_SPEED_GROK) -> list[float]:
+    """Returns the list of chunk-boundary timestamps (seconds) in the final audio,
+    or [] if the script fit in a single request (no seam)."""
+    api_key = os.environ.get("XAI_API_KEY", "")
+    if not api_key:
+        print("❌ XAI_API_KEY not set in .env")
+        sys.exit(1)
+
+    chunks = _split_into_chunks(text, max_chars=GROK_CHUNK_LIMIT)
+    print(f"  Grok TTS: {len(chunks)} chunk(s), voice={voice_id}, language={language}, speed={speed}")
+
+    if len(chunks) == 1:
+        audio_bytes = _grok_call(text, voice_id, api_key, language, speed)
+        Path(output_path).write_bytes(audio_bytes)
+        print(f"  ✓ Chunk 1/1 done")
+        return []
+    else:
+        tmp_dir = Path(output_path).parent / "_grok_chunks"
+        tmp_dir.mkdir(exist_ok=True)
+        chunk_paths = []
+        for i, chunk in enumerate(chunks, 1):
+            print(f"  ⏳ Chunk {i}/{len(chunks)} ({len(chunk)} chars)...")
+            audio_bytes = _grok_call(chunk, voice_id, api_key, language, speed)
+            p = tmp_dir / f"chunk_{i:03d}.mp3"
+            p.write_bytes(audio_bytes)
+            chunk_paths.append(p)
+            print(f"  ✓ Chunk {i}/{len(chunks)} done")
+
+        boundaries = _compute_chunk_boundaries(chunk_paths)
+
+        print(f"  Concatenating {len(chunks)} chunks...")
+        _concat_mp3_chunks(chunk_paths, output_path)
+
+        for p in chunk_paths:
+            p.unlink(missing_ok=True)
+        tmp_dir.rmdir()
+        print(f"  ✓ Concatenation done")
+        return boundaries
+
+
+def grok_list_voices():
+    """Calls GET /v1/tts/voices for the real, current list — NOT a hardcoded
+    static list. xAI added 21 new voices beyond the original 5 in July 2026;
+    a static list would already be stale (confirmed: 'naksh', used by this
+    channel, isn't one of the original 5 and wouldn't appear in one)."""
+    api_key = os.environ.get("XAI_API_KEY", "")
+    if not api_key:
+        print("❌ XAI_API_KEY not set in .env")
+        sys.exit(1)
+    req = urllib.request.Request(
+        "https://api.x.ai/v1/tts/voices",
+        headers={"Authorization": f"Bearer {api_key}"}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            data = json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        print(f"❌ Grok TTS API error {e.code}: {e.read().decode()[:300]}")
+        sys.exit(1)
+    voices = data.get("voices", [])
+    print(f"\nGrok TTS voices ({len(voices)} total):")
+    print(f"{'─' * 70}")
+    for v in sorted(voices, key=lambda x: x.get("name", "")):
+        print(f"  {v.get('name',''):<15} {v.get('voice_id',''):<15} "
+              f"{v.get('gender',''):<8} {v.get('language','')}")
+    print("\nCustom voices: create one at console.x.ai (Voice Library) — live")
+    print("passphrase verification required, ~90-120s recording, returns an")
+    print("8-char voice_id. Then set channel_config.json voice.grok_voice_id")
+    print("to that ID, or pass --voice <id> directly.")
 
 
 # ── Gemini TTS provider ────────────────────────────────────────────────────────
@@ -683,7 +825,8 @@ def normalize_loudness(audio_path: str, target_lufs: float = TARGET_LUFS) -> dic
 
 def _write_voice_sidecar(output_path: str, provider: str, voice: str, speaking_rate,
                           chunk_boundaries_sec: list[float] | None = None,
-                          loudness: dict | None = None) -> None:
+                          loudness: dict | None = None,
+                          speed: float | None = None) -> None:
     """Record which voice config produced this audio file, alongside it as
     {output_path}.voice.json. Without this, there's no way to later answer
     "what voice made this file" other than re-listening — the exact gap that
@@ -709,6 +852,10 @@ def _write_voice_sidecar(output_path: str, provider: str, voice: str, speaking_r
         sidecar["model"] = DEFAULT_MODEL_GEMINI
     elif provider == "elevenlabs":
         sidecar["model"] = DEFAULT_MODEL_EL
+        sidecar["speed"] = speed
+    elif provider == "grok":
+        sidecar["language"] = DEFAULT_LANGUAGE_GROK
+        sidecar["speed"] = speed
 
     try:
         Path(f"{output_path}.voice.json").write_text(
@@ -726,7 +873,7 @@ async def main():
     parser.add_argument("--project",   help="Episode folder (e.g. ep01)")
     parser.add_argument("--script",    help="Path to narration .txt file")
     parser.add_argument("--provider",  default=DEFAULT_PROVIDER,
-                        choices=["gemini_cloudtts", "gemini", "elevenlabs", "edge"],
+                        choices=["gemini_cloudtts", "gemini", "elevenlabs", "grok", "edge"],
                         help=f"TTS provider (default from channel_config: {DEFAULT_PROVIDER})")
     parser.add_argument("--voice",     default=None,
                         help="Voice ID (ElevenLabs) or voice name (Edge TTS). Defaults from channel_config.json.")
@@ -741,6 +888,10 @@ async def main():
     parser.add_argument("--speaking-rate", type=float, default=None, metavar="RATE",
                         help="Gemini TTS speed: 0.25 (slowest) – 4.0 (fastest). Default=1.0. "
                              "Try 0.85 for a slightly slower Charon pace.")
+    parser.add_argument("--speed", type=float, default=None, metavar="SPEED",
+                        help=f"Generation-pacing speed for ElevenLabs (0.7-1.2, default "
+                             f"{DEFAULT_SPEED_EL}) or Grok (default {DEFAULT_SPEED_GROK}). "
+                             f"Not the same parameter as --speaking-rate (that's Gemini-only).")
     parser.add_argument("--no-normalize", action="store_true",
                         help=f"Skip loudness normalization (default: normalize full-script "
                              f"generations to {TARGET_LUFS} LUFS via ffmpeg loudnorm)")
@@ -752,6 +903,8 @@ async def main():
             await edge_list_voices(args.locale)
         elif args.provider in ("gemini", "gemini_cloudtts"):
             gemini_list_voices()   # same voice names for both Gemini-backed providers
+        elif args.provider == "grok":
+            grok_list_voices()
         else:
             elevenlabs_list_voices()
         return
@@ -782,6 +935,8 @@ async def main():
         voice = args.voice or DEFAULT_VOICE_GEMINI
     elif args.provider == "elevenlabs":
         voice = args.voice or DEFAULT_VOICE_EL
+    elif args.provider == "grok":
+        voice = args.voice or DEFAULT_VOICE_GROK
     else:
         voice = args.voice or DEFAULT_VOICE_EDGE
 
@@ -813,6 +968,12 @@ async def main():
     print(f"{'─' * 55}")
 
     rate = args.speaking_rate if args.speaking_rate is not None else DEFAULT_SPEAKING_RATE
+    if args.speed is not None:
+        speed = args.speed
+    elif args.provider == "grok":
+        speed = DEFAULT_SPEED_GROK
+    else:
+        speed = DEFAULT_SPEED_EL
 
     chunk_boundaries: list[float] = []
     if args.provider == "gemini_cloudtts":
@@ -820,7 +981,9 @@ async def main():
     elif args.provider == "gemini":
         gemini_generate(text, voice, output_path, speaking_rate=rate)
     elif args.provider == "elevenlabs":
-        chunk_boundaries = elevenlabs_generate(text, voice, output_path)
+        chunk_boundaries = elevenlabs_generate(text, voice, output_path, speed=speed)
+    elif args.provider == "grok":
+        chunk_boundaries = grok_generate(text, voice, output_path, speed=speed)
     else:
         await edge_generate(text, voice, output_path)
 
@@ -835,7 +998,7 @@ async def main():
     # way to later answer "what voice made this file" other than re-listening
     # (exactly the gap that let common/cta/cta.mp3 go stale unnoticed).
     _write_voice_sidecar(output_path, args.provider, voice, rate,
-                          chunk_boundaries_sec=chunk_boundaries, loudness=loudness)
+                          chunk_boundaries_sec=chunk_boundaries, loudness=loudness, speed=speed)
 
     duration = get_duration(output_path)
     if duration:
