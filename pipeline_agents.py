@@ -502,13 +502,22 @@ class ReviewAgent:
         project_dir = Path(ctx["project_dir"])
         issues, recs = [], []
 
-        audio_files = list((project_dir / "source_audio").glob("*.mp3"))
+        # Exclude preview_*.mp3 (short voice A/B test clips from generate_source_audio.py
+        # --preview) — sorted so the fallback below is deterministic, not whatever
+        # order the filesystem happens to return.
+        audio_files = sorted(
+            p for p in (project_dir / "source_audio").glob("*.mp3")
+            if not p.name.startswith("preview_")
+        )
         if not audio_files:
             return ReviewResult(False, 0, ["No audio files found in source_audio/"], ["Re-run voice generation"])
 
+        narration_path = project_dir / "source_audio" / "narration.mp3"
+        audio_file = narration_path if narration_path.exists() else audio_files[0]
+
         try:
             from pydub import AudioSegment
-            audio = AudioSegment.from_file(str(audio_files[0]))
+            audio = AudioSegment.from_file(str(audio_file))
             dur = len(audio) / 1000
             if dur < 480:  # 8 min minimum
                 issues.append(f"Narration too short: {dur:.0f}s (expected 8–18 min)")
@@ -520,6 +529,42 @@ class ReviewAgent:
             print("  ⚠ pydub not installed — skipping audio duration check (pip install pydub --break-system-packages)")
         except Exception as e:
             issues.append(f"Could not analyse audio: {e}")
+
+        # Narration audio review (chunk seams, transcript-vs-script diff, silence
+        # gaps) — reuses review_narration_audio.py rather than duplicating its
+        # logic. Advisory only (never fails this stage on its own): these are
+        # things a human should listen to and judge, not hard gate criteria.
+        try:
+            import review_narration_audio as rna
+            script_path = ctx.get("script_path")
+            script_path = Path(script_path) if script_path else None
+            if not script_path or not script_path.exists():
+                matches = sorted(project_dir.glob("script_*.txt"))
+                script_path = matches[-1] if matches else None
+
+            print("  Running narration audio review (Whisper transcript + seam/silence scan)...")
+            data = rna.review(audio_file, script_path, whisper_model="base")
+            report = rna.build_report(data)
+            report_path = audio_file.parent / f"{audio_file.stem}_review.md"
+            report_path.write_text(report, encoding="utf-8")
+
+            if data["known_seams"]:
+                seam_times = ", ".join(rna.format_timestamp(s["time_s"]) for s in data["known_seams"])
+                recs.append(f"Narration has {len(data['known_seams'])} chunk-concatenation seam(s) "
+                            f"at {seam_times} — listen here first for an audible tone/pace shift")
+            if data["silence_gaps"]:
+                recs.append(f"{len(data['silence_gaps'])} silence gap(s) >=1.2s found in narration — "
+                            f"see {report_path.name}")
+            if data["transcript_issues"]:
+                issues.append(f"{len(data['transcript_issues'])} transcript-vs-script mismatch(es) "
+                               f"found in narration (possible mispronunciation/skipped/garbled text) "
+                               f"— see {report_path.name}")
+                recs.append(f"Review {report_path.name} for exact timestamps and check by ear")
+        except ImportError:
+            recs.append("review_narration_audio.py dependencies (whisper/pydub) not installed — "
+                         "skipping narration audio review")
+        except Exception as e:
+            recs.append(f"Could not run narration audio review: {e}")
 
         score = 10 if not issues else 5
         return ReviewResult(passed=True, score=max(score, 7), issues=issues, recommendations=recs)
