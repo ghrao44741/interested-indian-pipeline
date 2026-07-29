@@ -228,13 +228,29 @@ def run_pexels(shot: dict, images_dir: Path, script_dir: Path) -> bool:
     return True
 
 
-def run_ai_batch(project_dir: Path, script_dir: Path, overwrite: bool):
-    """Call generate_images_flux.py for all non-MAP shots (it skips existing)."""
+def run_ai_batch(project_dir: Path, script_dir: Path, overwrite: bool) -> bool:
+    """Call generate_images_flux.py, which filters to CARTOON-type shots only
+    in a full-batch run (MAP/CHART/PHOTO are handled by their own scripts and
+    skipped here — see generate_images_flux.py's own filter for why that
+    matters). Returns True on success. Deliberately doesn't capture_output — this is a
+    long-running batch (can be 100+ shots) that prints per-shot progress live,
+    and capturing would hide that until the whole batch finished. But the
+    exit code must still be checked: this used to be a bare
+    subprocess.run(cmd, check=False) with the result silently discarded, which
+    let a total failure (e.g. generate_images_flux.py crashing on import before
+    generating anything) print nothing and get reported as a normal, silent
+    'Routing complete' — confirmed on a real run where all 102 shots in a
+    batch failed this way with zero visible error."""
     flux_script = script_dir / "generate_images_flux.py"
     cmd = [sys.executable, str(flux_script), "--project", str(project_dir)]
     if overwrite:
         cmd.append("--overwrite")
-    subprocess.run(cmd, check=False)
+    result = subprocess.run(cmd, check=False)
+    if result.returncode != 0:
+        print(f"\n❌ generate_images_flux.py exited with code {result.returncode} — "
+              f"AI image batch did NOT complete. See output above for the real error.")
+        return False
+    return True
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
@@ -374,13 +390,17 @@ def main():
                     photo_fail += 1
 
     # ── generate AI shots ─────────────────────────────────────────────────────
+    ai_batch_ok = True
     if ai_shot_files:
         print(f"\nGenerating {len(ai_shot_files)} AI image(s) via xAI Grok...\n")
-        run_ai_batch(project_dir, script_dir, args.overwrite)
+        ai_batch_ok = run_ai_batch(project_dir, script_dir, args.overwrite)
 
     # ── summary ────────────────────────────────────────────────────────────────
     print(f"\n{'═'*58}")
     print(f"Routing complete.")
+    if ai_shot_files and not ai_batch_ok:
+        print(f"  ❌ AI image batch ({len(ai_shot_files)} shots) FAILED — see error above. "
+              f"None of these images were generated or updated.")
     if map_fail:
         print(f"  ⚠ {map_fail} map(s) failed — check GeoJSON state names")
         print(f"    Tip: python generate_india_map.py --list-states")

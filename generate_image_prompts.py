@@ -313,6 +313,16 @@ def generate_prompts(project_dir: Path, batch_size: int, overwrite: bool):
         scene_text = "\n".join(format_shot_for_prompt(s) for s in batch)
         user_msg   = USER_TEMPLATE.format(scenes=scene_text)
 
+        results = []
+        # Retry the whole batch (not just the API call) if parsing came up short —
+        # a successful HTTP response that parses to fewer shots than requested
+        # (e.g. Claude emitting a stray "---" inside a CHART_ARGS JSON blob, which
+        # the parser's block-splitter misreads as a shot boundary) used to fall
+        # straight through to placeholder text with no retry, and the per-shot
+        # "✓" print below ran unconditionally regardless of whether that shot
+        # actually got a real prompt — silently misleading, confirmed on a real
+        # run where 9/10 shots in one batch got "[NEEDS MANUAL PROMPT]" but every
+        # line still printed a checkmark.
         for attempt in range(3):
             try:
                 response = client.messages.create(
@@ -322,30 +332,36 @@ def generate_prompts(project_dir: Path, batch_size: int, overwrite: bool):
                     messages=[{"role": "user", "content": user_msg}],
                 )
                 raw = response.content[0].text
-                break
             except Exception as e:
                 print(f"  ⚠ Attempt {attempt+1} failed: {e}")
                 if attempt < 2:
                     time.sleep(5)
+                    continue
                 else:
                     raise
 
-        results = parse_claude_output(raw, batch)
-
-        if len(results) != len(batch):
-            print(f"  ⚠ Expected {len(batch)} results, got {len(results)} — check output")
+            results = parse_claude_output(raw, batch)
+            if len(results) == len(batch):
+                break
+            print(f"  ⚠ Attempt {attempt+1}: expected {len(batch)} results, got {len(results)} "
+                  f"— retrying batch" if attempt < 2 else
+                  f"  ⚠ Expected {len(batch)} results, got {len(results)} after 3 attempts "
+                  f"— filling gaps with placeholders, needs manual fix")
+            if attempt < 2:
+                time.sleep(3)
 
         for i, shot in enumerate(batch):
             if i < len(results):
                 result = results[i]
+                print(f"  ✓ SHOT {shot['shot_num']:02d}  {shot['file']}")
             else:
                 # Fallback: blank entry so the file is still complete
                 result = {"shot_num": shot["shot_num"], "file": shot["file"],
                           "narration": shot["narration"], "prompt": "[NEEDS MANUAL PROMPT]",
                           "overlay": "[OVERLAY]", "cue": "[CUE]"}
+                print(f"  ✗ SHOT {shot['shot_num']:02d}  {shot['file']}  — NEEDS MANUAL PROMPT")
             line = build_output_line(shot, result)
             all_lines.append(line)
-            print(f"  ✓ SHOT {shot['shot_num']:02d}  {shot['file']}")
 
         if batch_num < total_batches:
             time.sleep(1)  # brief pause between batches

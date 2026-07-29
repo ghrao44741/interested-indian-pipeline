@@ -243,6 +243,15 @@ Post-upload (manual in YouTube Studio):
   mostly creator/influencer-content conventions (screen-recording mockups, growth-chart
   flexes) that don't fit this channel's tone, listed here for completeness but not a
   starting priority.
+  **Third real trigger case (pilot_neet_scandal production, 2026-07-29):** 3 PHOTO-type
+  shots (Sonam Wangchuk's hunger strike, a cockroach-sign protest at Jantar Mantar, a
+  police lathi-charge) had no matching real Pexels photo — these are recent, specific,
+  real 2026 news events that generic stock libraries simply don't carry. Worked around
+  this time by converting them to CARTOON illustrations, but an HTML/CSS-rendered
+  "info card" or "quote card" (activist name, dates, a stat) would handle this class of
+  problem more precisely than either forcing a photo search that can't succeed or an
+  illustration that has to guess at specifics — a second concrete use case for this
+  backlog item beyond the original text-hallucination motivation.
 
 - [ ] **#15** With/without B-roll A/B render for PHOTO-heavy episodes — render once with all
   PHOTO-type real-world shots, once with them swapped for CARTOON, compare which flows better.
