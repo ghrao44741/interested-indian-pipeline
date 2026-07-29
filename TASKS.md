@@ -230,6 +230,19 @@ Post-upload (manual in YouTube Studio):
   failure mode (AI image generation is bad at rendering clean text; code-rendered text sidesteps
   it entirely) for the specific scenes where the image *is* text/data. Deserves its own planning
   pass before implementation. From the VideoClaude/Arcads workflow-doc review (2026-07-28).
+  **Tool + concrete starting scope (from a second workflow-doc review, Sandy Lee AI
+  auto-editor, 2026-07-28): Remotion (React-based programmatic video rendering) is the
+  purpose-built tool for exactly this — not template image-filling, actual code-rendered
+  frames.** Overlay types worth building first, prioritized by fit with this channel's
+  content: `StepProgress` / `AnimatedList` (sequential-process explanations — "steps of
+  Article 356," "how the NEET-UG scandal unfolded," a lot of this channel's actual subject
+  matter), `LowerThird` (name/title callouts), `TypographyReveal` (stat/quote emphasis),
+  `FlowchartGlitch` (institutional-relationship diagrams). Full reference list from that
+  doc also included `WordPop`, `EmphasisAlert`, `BrowserMockup`, `AIChatBubble`,
+  `CardFlip3D`, `CursorSelect`, `NewsFlash`, `GoogleSearch`, `YouTubeGrowth`, `PIPLayout` —
+  mostly creator/influencer-content conventions (screen-recording mockups, growth-chart
+  flexes) that don't fit this channel's tone, listed here for completeness but not a
+  starting priority.
 
 - [ ] **#15** With/without B-roll A/B render for PHOTO-heavy episodes — render once with all
   PHOTO-type real-world shots, once with them swapped for CARTOON, compare which flows better.
