@@ -83,6 +83,18 @@ GEMINI_CHUNK_LIMIT   = 4500   # conservative limit per API call for long scripts
 DEFAULT_MODEL_CLOUDTTS  = _voice_cfg.get("gemini_cloudtts_model", "gemini-3.1-flash-tts-preview")
 DEFAULT_LOCALE_CLOUDTTS = _voice_cfg.get("gemini_cloudtts_locale", "en-IN")
 DEFAULT_STYLE_CLOUDTTS  = _voice_cfg.get("gemini_cloudtts_style", "")
+
+TARGET_LUFS = _voice_cfg.get("target_lufs", -14.0)  # broadcast/streaming-standard loudness
+                                                       # target — normalized once here, on the
+                                                       # single master narration file, so every
+                                                       # provider/voice switch (and every future
+                                                       # episode) sounds consistently loud instead
+                                                       # of whatever level the TTS API happened to
+                                                       # output. Applied BEFORE the split stage
+                                                       # cuts per-scene clips from this file, so
+                                                       # every clip inherits it for free rather
+                                                       # than each tiny clip being normalized
+                                                       # independently (unreliable on short audio).
 CLOUD_TTS_URL   = "https://texttospeech.googleapis.com/v1beta1/text:synthesize"
 CLOUDTTS_CHUNK_LIMIT = 3500   # Google's official Gemini-TTS docs state the text field
                                # (and the prompt field, separately) can be at most 4,000
@@ -592,21 +604,101 @@ def get_duration(path: str) -> float:
         return 0.0
 
 
+def normalize_loudness(audio_path: str, target_lufs: float = TARGET_LUFS) -> dict | None:
+    """Two-pass ffmpeg loudnorm to a target integrated loudness, in place.
+    Two-pass (measure, then apply using the measured values) is what ffmpeg's
+    own loudnorm docs recommend for accuracy — single-pass can be off by
+    several LU on speech material. Returns the measured stats dict on success,
+    None if normalization couldn't be applied (ffmpeg missing/failed) — in
+    which case the original file is left untouched rather than corrupted.
+    """
+    measure_cmd = [
+        "ffmpeg", "-i", audio_path,
+        "-af", f"loudnorm=I={target_lufs}:TP=-1.5:LRA=11:print_format=json",
+        "-f", "null", "-",
+    ]
+    try:
+        result = subprocess.run(measure_cmd, capture_output=True, text=True, timeout=300)
+    except FileNotFoundError:
+        print("  ⚠ ffmpeg not found — skipping loudness normalization")
+        return None
+    except subprocess.TimeoutExpired:
+        print("  ⚠ Loudness measurement timed out — skipping normalization")
+        return None
+
+    stderr = result.stderr
+    json_start = stderr.rfind("{")
+    json_end = stderr.rfind("}") + 1
+    if json_start == -1 or json_end == 0:
+        print("  ⚠ Could not measure loudness (loudnorm pass 1 produced no stats) — skipping")
+        return None
+    try:
+        measured = json.loads(stderr[json_start:json_end])
+    except json.JSONDecodeError:
+        print("  ⚠ Could not parse loudness measurement — skipping normalization")
+        return None
+
+    tmp_out = f"{audio_path}.normalized.mp3"
+    apply_filter = (
+        f"loudnorm=I={target_lufs}:TP=-1.5:LRA=11:"
+        f"measured_I={measured['input_i']}:measured_TP={measured['input_tp']}:"
+        f"measured_LRA={measured['input_lra']}:measured_thresh={measured['input_thresh']}:"
+        f"offset={measured['target_offset']}:linear=true:print_format=json"
+    )
+    apply_cmd = ["ffmpeg", "-y", "-i", audio_path, "-af", apply_filter, tmp_out]
+    try:
+        result2 = subprocess.run(apply_cmd, capture_output=True, text=True, timeout=300)
+    except subprocess.TimeoutExpired:
+        print("  ⚠ Loudness normalization apply pass timed out — keeping original audio")
+        Path(tmp_out).unlink(missing_ok=True)
+        return None
+
+    if result2.returncode != 0 or not Path(tmp_out).exists() or Path(tmp_out).stat().st_size == 0:
+        print("  ⚠ Loudness normalization failed — keeping original audio")
+        Path(tmp_out).unlink(missing_ok=True)
+        return None
+
+    # Pass 1's "output_i" is only a PREDICTION assuming linear normalization —
+    # when the input is far from the target with little true-peak headroom
+    # (common for narration that was never normalized before), ffmpeg silently
+    # falls back to dynamic (adaptive-gain) normalization instead, which can
+    # land noticeably off that prediction. Parse pass 2's own stats so what
+    # gets logged (and stored in the sidecar) is what actually happened, not
+    # what pass 1 assumed would happen — confirmed this matters on real
+    # narration audio (predicted -14.0, actual result -16.02 LUFS).
+    actual = dict(measured)
+    stderr2 = result2.stderr
+    j2_start, j2_end = stderr2.rfind("{"), stderr2.rfind("}") + 1
+    if j2_start != -1 and j2_end != 0:
+        try:
+            actual.update(json.loads(stderr2[j2_start:j2_end]))
+        except json.JSONDecodeError:
+            pass  # keep pass-1 prediction as a fallback rather than failing the whole normalize
+
+    Path(tmp_out).replace(audio_path)
+    print(f"  ✓ Loudness normalized: {actual['input_i']} -> {actual.get('output_i', '?')} LUFS "
+          f"(target {target_lufs}, type={actual.get('normalization_type', '?')})")
+    return actual
+
+
 def _write_voice_sidecar(output_path: str, provider: str, voice: str, speaking_rate,
-                          chunk_boundaries_sec: list[float] | None = None) -> None:
+                          chunk_boundaries_sec: list[float] | None = None,
+                          loudness: dict | None = None) -> None:
     """Record which voice config produced this audio file, alongside it as
     {output_path}.voice.json. Without this, there's no way to later answer
     "what voice made this file" other than re-listening — the exact gap that
     let common/cta/cta.mp3 go stale (wrong voice) unnoticed for a while.
 
     chunk_boundaries_sec lets review_narration_audio.py jump straight to a known
-    chunk-concatenation seam instead of guessing where it is.
+    chunk-concatenation seam instead of guessing where it is. loudness records
+    the measured-vs-target LUFS from normalize_loudness(), if it ran.
     """
     sidecar = {
         "provider": provider,
         "voice": voice,
         "speaking_rate": speaking_rate,
         "chunk_boundaries_sec": chunk_boundaries_sec or [],
+        "loudness": loudness,
         "generated_at": datetime.now().isoformat(timespec="seconds"),
     }
     if provider == "gemini_cloudtts":
@@ -649,6 +741,9 @@ async def main():
     parser.add_argument("--speaking-rate", type=float, default=None, metavar="RATE",
                         help="Gemini TTS speed: 0.25 (slowest) – 4.0 (fastest). Default=1.0. "
                              "Try 0.85 for a slightly slower Charon pace.")
+    parser.add_argument("--no-normalize", action="store_true",
+                        help=f"Skip loudness normalization (default: normalize full-script "
+                             f"generations to {TARGET_LUFS} LUFS via ffmpeg loudnorm)")
     args = parser.parse_args()
 
     # ── List voices ──
@@ -729,11 +824,18 @@ async def main():
     else:
         await edge_generate(text, voice, output_path)
 
+    # Normalize loudness — skipped for --preview (short A/B test clips; loudnorm's
+    # measurement pass is unreliable on very short audio, same reason chunk/scene
+    # clips aren't normalized independently — see TARGET_LUFS comment above).
+    loudness = None
+    if not args.preview and not args.no_normalize:
+        loudness = normalize_loudness(output_path)
+
     # Write a voice-config sidecar alongside the audio — otherwise there's no
     # way to later answer "what voice made this file" other than re-listening
     # (exactly the gap that let common/cta/cta.mp3 go stale unnoticed).
     _write_voice_sidecar(output_path, args.provider, voice, rate,
-                          chunk_boundaries_sec=chunk_boundaries)
+                          chunk_boundaries_sec=chunk_boundaries, loudness=loudness)
 
     duration = get_duration(output_path)
     if duration:

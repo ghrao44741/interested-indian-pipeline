@@ -1,6 +1,6 @@
 # Tasks — The Interested Indian Pipeline
 
-Last updated: 2026-07-26
+Last updated: 2026-07-28
 
 ## Immediate
 
@@ -216,6 +216,26 @@ Post-upload (manual in YouTube Studio):
   - 7-day YouTube Analytics pull → feed CTR/retention into ResearchAgent for next topic
   - Store in `ep##/analytics_7day.json`
 
+- [ ] **#13** Grade-match Pexels PHOTO shots to the flat-cartoon brand style — `search_pexels.py`
+  currently searches/picks/resizes with zero color treatment. A real photo dropped between two
+  flat-illustration scenes looks visually jarring. Needs a lightweight filter pass (desaturate,
+  color-match toward the `#FAF7F2`/navy palette) — will need visual iteration against real
+  generated frames, not a one-shot fix. From the VideoClaude/Arcads workflow-doc review
+  (2026-07-28): "grade-match every clip."
+
+- [ ] **#14** Code-rendered graphics for text-heavy elements (stat/title/quote cards, numbered
+  step lists) — a new subsystem, not a patch: needs a template design (what does a stat card
+  look like in this brand?), a new TYPE in `generate_image_prompts.py`/`route_images.py`
+  routing, and new ffmpeg compositing logic. Directly attacks the stray-title-hallucination
+  failure mode (AI image generation is bad at rendering clean text; code-rendered text sidesteps
+  it entirely) for the specific scenes where the image *is* text/data. Deserves its own planning
+  pass before implementation. From the VideoClaude/Arcads workflow-doc review (2026-07-28).
+
+- [ ] **#15** With/without B-roll A/B render for PHOTO-heavy episodes — render once with all
+  PHOTO-type real-world shots, once with them swapped for CARTOON, compare which flows better.
+  Low urgency; more a habit to try on a photo-heavy episode than a code change (maybe a
+  `--skip-photos` flag at most). From the VideoClaude/Arcads workflow-doc review (2026-07-28).
+
 ## Done
 
 - [x] Build `review_images.py` — AI image QA, 8-check rubric, Claude Haiku vision
@@ -282,3 +302,40 @@ Post-upload (manual in YouTube Studio):
   actual PNGs (not just a clean exit code) — first pass had the text scrim overlapping
   the mascot's face on a long test title; narrowed the text zone and made badge placement
   theme-aware to fix it, then re-verified on both a long and a realistic-length title.
+- [x] **#16** LUFS loudness normalization — `generate_source_audio.py`'s new
+  `normalize_loudness()` (two-pass ffmpeg `loudnorm`, target -14 LUFS, configurable via
+  `channel_config.json` `voice.target_lufs`) runs once on the master narration file right
+  after generation, before the split stage cuts per-scene clips — every clip inherits
+  consistent loudness for free rather than each tiny clip being normalized independently
+  (unreliable on short audio). Skipped for `--preview` (short A/B clips, same reason).
+  From the VideoClaude/Arcads workflow-doc review (2026-07-28). Real gap: grepped the
+  codebase first and confirmed no normalization existed anywhere — verified against the
+  real `pilot_neet_scandal` narration, which measured -26.76 LUFS input (far below any
+  reasonable target, and with no consistency guaranteed across the mid-session TTS
+  provider switch). Found and fixed a real accuracy bug during testing: ffmpeg's loudnorm
+  pass-1 JSON reports a *predicted* output loudness assuming linear normalization, but on
+  this input ffmpeg silently fell back to dynamic normalization (the linear gain needed
+  would have clipped past the true-peak ceiling) — pass 1 predicted -14.0 LUFS, the real
+  result was -16.02. Fixed by parsing pass 2's own stats for the logged/stored value
+  instead of trusting pass 1's prediction. Chunk-boundary timestamps (added for the
+  narration-review tool) are unaffected — loudnorm is a pure gain filter, sample count
+  and duration are unchanged either way.
+- [x] **#17** Approval checkpoint before image generation spends AI credits —
+  `OrchestratorAgent._stage_images()` now counts shots by TYPE from
+  `image_prompts_one_line_per_prompt.md` (CARTOON = costs xAI Grok credits; MAP/CHART/PHOTO
+  = free/local) and pauses with `[enter] Generate | edit | quit` before calling
+  `route_images.py`. From the VideoClaude/Arcads workflow-doc review (2026-07-28) —
+  directly targets this session's own pain point, where stray-title hallucinations and a
+  wrong landmark were only caught *after* a full ~100-shot paid batch, requiring a costly
+  Sonnet re-audit. Verified end-to-end against the real `pilot_neet_scandal` prompts file
+  (102 CARTOON / 7 CHART / 1 MAP / 6 PHOTO counted correctly) with input mocked to "quit" —
+  confirmed the real `route_images.py` subprocess call (the actual credit-spending step)
+  is never reached.
+
+## Backlog from VideoClaude/Arcads workflow-doc review (2026-07-28)
+
+Reviewed a talking-head video-editing workflow doc (Claude Edits VideoClaude + Arcads MCP).
+Most of it doesn't apply — assumes real camera footage and a recorded voice (filler-word
+cuts, voice isolation, PiP face-shrink), none of which exist in a TTS-narrated, AI-illustrated
+pipeline. Five ideas were judged worth taking; #1 (LUFS) and #3 (approval gate) implemented
+immediately above as **#16**/**#17**. The other three are **#13**/**#14**/**#15** in Future.
