@@ -1,6 +1,6 @@
 # Script Review — script_the_exam_scandal_a_cockroach_party_and_a_ministers_res_DRAFT.txt
 
-**Words:** 2080  **Paragraphs:** 17
+**Words:** 2087  **Paragraphs:** 17
 
 ## Deterministic Issues
 

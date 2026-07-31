@@ -726,13 +726,14 @@ async def edge_list_voices(locale: str = "en-US"):
         print(f"  {v['ShortName']:30s} {v['Gender']:8s} {personalities}")
 
 
-async def edge_generate(text: str, voice: str, output_path: str):
+async def edge_generate(text: str, voice: str, output_path: str,
+                         rate: str = "+0%", pitch: str = "+0Hz"):
     try:
         import edge_tts
     except ImportError:
         print("❌ edge-tts not installed. Run: pip install edge-tts")
         sys.exit(1)
-    communicate = edge_tts.Communicate(text, voice)
+    communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
     await communicate.save(output_path)
 
 
@@ -895,6 +896,10 @@ async def main():
     parser.add_argument("--no-normalize", action="store_true",
                         help=f"Skip loudness normalization (default: normalize full-script "
                              f"generations to {TARGET_LUFS} LUFS via ffmpeg loudnorm)")
+    parser.add_argument("--edge-rate", default="+0%", metavar="RATE",
+                        help="Edge TTS speaking-rate offset, e.g. '+12%%' or '-10%%'. Edge-only.")
+    parser.add_argument("--edge-pitch", default="+0Hz", metavar="PITCH",
+                        help="Edge TTS pitch offset, e.g. '+15Hz' or '-5Hz'. Edge-only.")
     args = parser.parse_args()
 
     # ── List voices ──
@@ -985,7 +990,7 @@ async def main():
     elif args.provider == "grok":
         chunk_boundaries = grok_generate(text, voice, output_path, speed=speed)
     else:
-        await edge_generate(text, voice, output_path)
+        await edge_generate(text, voice, output_path, rate=args.edge_rate, pitch=args.edge_pitch)
 
     # Normalize loudness — skipped for --preview (short A/B test clips; loudnorm's
     # measurement pass is unreliable on very short audio, same reason chunk/scene

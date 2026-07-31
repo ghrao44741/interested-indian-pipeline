@@ -1924,13 +1924,15 @@ class OrchestratorAgent:
         provider      = "edge"
         voice         = "en-US-GuyNeural"
         speaking_rate = None   # None → omit flag → generate_source_audio.py uses its own default
+        edge_rate     = None
+        edge_pitch    = None
         cfg_path = PIPELINE_DIR / "channel_config.json"
         if cfg_path.exists():
             import json as _json
             cfg      = _json.loads(cfg_path.read_text(encoding="utf-8"))
             vcfg     = cfg.get("voice", {})
             provider = vcfg.get("provider", provider)
-            # Resolve voice by provider so Gemini/ElevenLabs/Edge each get the right key
+            # Resolve voice by provider so Gemini/ElevenLabs/Grok/Edge each get the right key
             if provider in ("gemini", "gemini_cloudtts"):
                 voice         = vcfg.get("gemini_voice", "Charon")
                 speaking_rate = vcfg.get("gemini_speaking_rate")  # e.g. 0.85
@@ -1938,6 +1940,10 @@ class OrchestratorAgent:
                 voice = vcfg.get("elevenlabs_default", vcfg.get("default", voice))
             elif provider == "grok":
                 voice = vcfg.get("grok_voice_id", "eve")
+            elif provider == "edge":
+                voice      = vcfg.get("edge_voice", voice)
+                edge_rate  = vcfg.get("edge_rate")   # e.g. "+12%"
+                edge_pitch = vcfg.get("edge_pitch")  # e.g. "+15Hz"
             else:
                 voice = vcfg.get("default", voice)
 
@@ -1955,6 +1961,10 @@ class OrchestratorAgent:
                "--voice",    voice]
         if speaking_rate is not None:
             cmd.extend(["--speaking-rate", str(speaking_rate)])
+        if edge_rate is not None:
+            cmd.extend(["--edge-rate", edge_rate])
+        if edge_pitch is not None:
+            cmd.extend(["--edge-pitch", edge_pitch])
         self._run_cmd(cmd, label="generate_source_audio.py")
 
     def _stage_split(self):
