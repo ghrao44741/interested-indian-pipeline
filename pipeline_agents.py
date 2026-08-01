@@ -1916,11 +1916,12 @@ class OrchestratorAgent:
 
         print(f"{sep}\n")
 
-    def _stage_voice(self):
-        gen_audio = PIPELINE_DIR / "generate_source_audio.py"
-        script_path = Path(self.state["data"]["script_path"])
+    def _resolve_voice_config(self):
+        """Resolve (provider, voice, speaking_rate, edge_rate, edge_pitch) from channel_config.json.
 
-        # Read provider + voice + speaking rate from channel_config.json
+        Shared by _stage_voice (to synthesise) and _stage_split (to stamp the real
+        voice into manifest.json instead of the split script's argparse default).
+        """
         provider      = "edge"
         voice         = "en-US-GuyNeural"
         speaking_rate = None   # None → omit flag → generate_source_audio.py uses its own default
@@ -1946,13 +1947,23 @@ class OrchestratorAgent:
                 edge_pitch = vcfg.get("edge_pitch")  # e.g. "+15Hz"
             else:
                 voice = vcfg.get("default", voice)
+        return provider, voice, speaking_rate, edge_rate, edge_pitch
 
-        # Manifest voice overrides channel_config (per-episode override)
-        manifest_voice = self.state.get("data", {}).get("voice") or \
-                         (json.loads((self.project_dir / "manifest.json").read_text()).get("voice")
-                          if (self.project_dir / "manifest.json").exists() else None)
-        if manifest_voice and manifest_voice != voice:
-            voice = manifest_voice
+    def _stage_voice(self):
+        gen_audio = PIPELINE_DIR / "generate_source_audio.py"
+        script_path = Path(self.state["data"]["script_path"])
+
+        provider, voice, speaking_rate, edge_rate, edge_pitch = self._resolve_voice_config()
+
+        # Per-episode override. Only episode_state's own data.voice counts —
+        # manifest.json's voice field is a *record* of what the split ran with
+        # (rewritten on every split), not an input. Reading it back here made
+        # channel_config.json voice changes silently ineffective for any project
+        # that already had a manifest.
+        episode_voice = self.state.get("data", {}).get("voice")
+        if episode_voice and episode_voice != voice:
+            print(f"  ℹ Episode override: using '{episode_voice}' instead of configured '{voice}'")
+            voice = episode_voice
 
         cmd = [sys.executable, str(gen_audio),
                "--project",  str(self.project_dir),
@@ -1980,12 +1991,23 @@ class OrchestratorAgent:
         mp3s = sorted(audio_dir.glob("*.mp3")) if audio_dir.exists() else []
         if not mp3s:
             raise FileNotFoundError(f"No .mp3 found in {audio_dir} — run voice stage first")
-        audio_path = mp3s[0]
+        # The voice stage always writes narration.mp3 (generate_source_audio.py's
+        # --out default, which _stage_voice never overrides). Pick it explicitly:
+        # source_audio/ accumulates voice tests and preview_*.mp3 files, so the old
+        # behaviour (alphabetically first) lands on whichever test clip sorts earliest.
+        narration = audio_dir / "narration.mp3"
+        if narration.exists():
+            audio_path = narration
+        else:
+            audio_path = mp3s[0]
+            print(f"  ⚠ narration.mp3 not found — falling back to {audio_path.name}")
         title = self.state["data"].get("title", "")
+        _, voice, _, _, _ = self._resolve_voice_config()
         cmd = [python, str(split),
                "--audio",        audio_path.name,
                "--project",      str(self.project_dir),
                "--video-type",   "LongVideo",
+               "--voice",        voice,
                "--device",       "cuda",
                "--compute-type", "int8_float16",
                "--batch-size",   "8"]
