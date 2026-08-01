@@ -120,6 +120,16 @@ DEFAULT_PAD_COLOR = "0xFAF7F2"    # fallback if no brand.json is found — histo
                                   # color, carried over here by copy-paste. Add brand.json with this
                                   # project's real color; this default doesn't change until you do.
 
+# x264 quality. Nothing set a rate or CRF before, so libx264 fell back to its
+# default CRF 23 — on flat cartoon artwork that produced a 483 kbps 1080p file.
+# YouTube re-encodes whatever it is given, so a thin source compounds into
+# visible banding on large flat colour areas. Intermediates are cut tighter than
+# delivery because every clip is re-encoded at least twice downstream (concat,
+# then caption burn) and generation loss accumulates.
+CLIP_CRF        = "16"
+DELIVERY_CRF    = "18"
+X264_PRESET     = "medium"
+
 MASCOT_HEIGHT_PX  = 180           # mascot scaled to this height at 1080p
 MASCOT_PADDING_PX = 30            # padding from edge
 
@@ -293,7 +303,8 @@ def build_clip_from_video(scene_id: str, video_path: str, audio_path: str,
         "-stream_loop", "-1", "-i", video_path,
         "-i", audio_path,
         "-map", "0:v:0", "-map", "1:a:0",
-        "-c:v", "libx264", "-c:a", "aac", "-b:a", "192k",
+        "-c:v", "libx264", "-crf", CLIP_CRF, "-preset", X264_PRESET,
+        "-c:a", "aac", "-b:a", "192k",
         "-pix_fmt", "yuv420p",
         "-vf", (
             "scale=1920:1080:force_original_aspect_ratio=decrease:force_divisible_by=2,"
@@ -342,6 +353,7 @@ def build_clip_from_image(scene_id: str, image_path: str, audio_path: str,
         "-loop", "1", "-i", image_path,
         "-i", audio_path,
         "-c:v", "libx264", "-tune", "stillimage",
+        "-crf", CLIP_CRF, "-preset", X264_PRESET,
         "-c:a", "aac", "-b:a", "192k",
         "-pix_fmt", "yuv420p",
         "-vf", vf_chain,
@@ -385,7 +397,7 @@ def apply_mascot_overlay(clip_path: str, mascot_png: str, position: str,
             f"[0:v][m]overlay={xy}:enable='{enable_expr}'[v]"
         ),
         "-map", "[v]", "-map", "0:a",
-        "-c:v", "libx264", "-c:a", "copy",
+        "-c:v", "libx264", "-crf", CLIP_CRF, "-preset", X264_PRESET, "-c:a", "copy",
         "-pix_fmt", "yuv420p",
         output_path,
     ]
@@ -408,7 +420,8 @@ def concatenate_clips(clip_paths: list, output_path: str, tmp_dir: str):
     cmd = [
         "ffmpeg", "-y",
         "-f", "concat", "-safe", "0", "-i", list_path,
-        "-c:v", "libx264", "-c:a", "aac", "-b:a", "192k",
+        "-c:v", "libx264", "-crf", DELIVERY_CRF, "-preset", X264_PRESET,
+        "-c:a", "aac", "-b:a", "192k",
         "-pix_fmt", "yuv420p", "-movflags", "+faststart",
         output_path,
     ]
@@ -419,14 +432,29 @@ def concatenate_clips(clip_paths: list, output_path: str, tmp_dir: str):
 
 
 def mix_background_music(video_path: str, bgm_path: str,
-                          output_path: str, volume: float):
+                          output_path: str, volume: float,
+                          target_lufs: float = -14.0, true_peak: float = -1.0):
+    """Mix BGM under the narration, then normalise the finished mix.
+
+    Two things were wrong here. ffmpeg's amix defaults to normalize=1, which
+    scales EVERY input by 1/n — a flat -6dB on the narration regardless of how
+    quiet the BGM already is. That silently threw away the -14 LUFS
+    normalisation generate_source_audio.py had already applied, and the
+    delivered video measured -21.2 LUFS (about 7dB under YouTube's target).
+
+    normalize=0 keeps the narration at its own level and adds the BGM (already
+    attenuated to ~0.04) on top. The loudnorm pass then guarantees the *shipped*
+    file hits the target with true-peak limiting, rather than trusting that
+    upstream normalisation survived the mix — which is exactly what it did not.
+    """
     cmd = [
         "ffmpeg", "-y",
         "-i", video_path,
         "-stream_loop", "-1", "-i", bgm_path,
         "-filter_complex", (
             f"[1:a]volume={volume}[bgm];"
-            f"[0:a][bgm]amix=inputs=2:duration=first:dropout_transition=2[aout]"
+            f"[0:a][bgm]amix=inputs=2:duration=first:dropout_transition=2:normalize=0[mixed];"
+            f"[mixed]loudnorm=I={target_lufs}:TP={true_peak}:LRA=11[aout]"
         ),
         "-map", "0:v:0", "-map", "[aout]",
         "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
@@ -469,7 +497,7 @@ def burn_ass_captions(video_path: str, ass_path: str, output_path: str):
         "ffmpeg", "-y",
         "-i", video_path,
         "-vf", f"subtitles='{ass_ff}'",
-        "-c:v", "libx264", "-c:a", "copy",
+        "-c:v", "libx264", "-crf", DELIVERY_CRF, "-preset", X264_PRESET, "-c:a", "copy",
         "-pix_fmt", "yuv420p",
         output_path,
     ]

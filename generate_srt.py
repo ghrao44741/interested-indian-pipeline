@@ -19,12 +19,13 @@ import textwrap
 from mutagen.mp3 import MP3
 
 
-# Max characters per caption line. Measured empirically against the actual
-# ffmpeg/libass render at FontSize=28 Bold in a 1920x1080 frame — libass wraps
-# text on its own at roughly this width regardless of what we set here, so
-# staying under that keeps our line breaks authoritative (no surprise re-wrap
-# that pushes a 2-line caption into 4-5 lines and off the top of frame).
-MAX_LINE_CHARS = 34
+# Max characters per caption line, paired with ASS_FONT_SIZE below — the two
+# must move together, since this is really "how many characters fit on one line
+# at that size". Measured against the actual ffmpeg/libass render in a 1920x1080
+# frame; staying under the width libass would wrap at keeps our line breaks
+# authoritative (no surprise re-wrap pushing a 2-line caption off frame).
+# At 52px Bold, ~32 chars spans roughly 1000px of the 1920 frame.
+MAX_LINE_CHARS = 32
 # Minimum seconds a caption chunk must occupy; shorter chunks are merged upward
 MIN_CHUNK_SECS = 1.2
 
@@ -49,6 +50,32 @@ def seconds_to_ass_time(s: float) -> str:
         sec += 1
         cs = 0
     return f"{h:d}:{m:02d}:{sec:02d}.{cs:02d}"
+
+
+def _rebalance(text: str, max_chars: int) -> str:
+    """Re-wrap merged text so its lines are of similar length.
+
+    Merging previously just glued two greedily-wrapped lines back together with
+    a newline, which kept the greedy split: "A re-exam was scheduled for 21st" /
+    "June." — an orphaned word under a full-width line, rendering as a ragged
+    two-line caption box. Re-wrapping at the narrowest width that still yields
+    the same number of lines evens them out.
+    """
+    words = text.split()
+    if not words:
+        return text
+    lines_needed = len(textwrap.wrap(text, width=max_chars))
+    if lines_needed <= 1:
+        return text
+    # Narrow the width until it would need an extra line; the last width that
+    # still fits is the most balanced one.
+    best = textwrap.wrap(text, width=max_chars)
+    for width in range(max_chars, max(len(max(words, key=len)), 1) - 1, -1):
+        candidate = textwrap.wrap(text, width=width)
+        if len(candidate) > lines_needed:
+            break
+        best = candidate
+    return "\n".join(best)
 
 
 def split_caption_entries(text: str, start: float, end: float,
@@ -80,13 +107,13 @@ def split_caption_entries(text: str, start: float, end: float,
 
     # Merge short trailing chunks into the previous one (may create 3-line entry)
     while len(chunks) > 1 and raw_dur[-1] < MIN_CHUNK_SECS:
-        chunks[-2] = chunks[-2] + "\n" + chunks[-1]
+        chunks[-2] = _rebalance(chunks[-2] + " " + chunks[-1], max_chars)
         raw_dur[-2] += raw_dur[-1]
         chunks.pop(); raw_dur.pop()
 
     # Merge short leading chunks into the next one
     while len(chunks) > 1 and raw_dur[0] < MIN_CHUNK_SECS:
-        chunks[1] = chunks[0] + "\n" + chunks[1]
+        chunks[1] = _rebalance(chunks[0] + " " + chunks[1], max_chars)
         raw_dur[1] += raw_dur[0]
         chunks.pop(0); raw_dur.pop(0)
 
@@ -195,6 +222,12 @@ def generate_srt(project_dir: str) -> str:
 # resolution explicitly, so what we set here is exactly what renders.
 ASS_MARGIN_V = 145
 
+# Caption font size at 1920x1080. Was 28, which renders about 500px wide and is
+# unreadable on a phone — flagged in review and confirmed against a real frame
+# grab. 52 is in the normal range for burned captions at 1080p and stays legible
+# at quarter-screen. Changing this REQUIRES re-tuning MAX_LINE_CHARS above.
+ASS_FONT_SIZE = 52
+
 
 def generate_ass(project_dir: str) -> str:
     entries, cursor, episode, n_scenes = _build_entries(project_dir)
@@ -212,7 +245,7 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,28,&H00FFFFFF,&H000000FF,&H00000000,&H90000000,-1,0,0,0,100,100,0,0,3,1,0,2,10,10,{ASS_MARGIN_V},1
+Style: Default,Arial,{ASS_FONT_SIZE},&H00FFFFFF,&H000000FF,&H00000000,&H90000000,-1,0,0,0,100,100,0,0,3,1,0,2,10,10,{ASS_MARGIN_V},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

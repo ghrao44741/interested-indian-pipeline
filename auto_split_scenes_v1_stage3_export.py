@@ -68,11 +68,45 @@ import torch
 
 # Common Whisper mis-transcriptions for brand/product names.
 # Add more pairs here as you discover new misheard terms.
+# Known mis-transcriptions, applied to every scene's text before it reaches the
+# manifest — and therefore before it reaches the burned-in captions. Whisper is
+# transcribing TTS audio of a script we already have, so any divergence here is
+# an ASR error, never the speaker misspeaking.
+#
+# Ordering matters: longer/more specific patterns must come before the shorter
+# ones they contain, since these are applied in sequence.
 BRAND_CORRECTIONS = {
+    # ── sibling channels (kept: the split script is shared) ──
     r"\ba\s+yonium\s+glow\b": "Aeonium Glow",
     r"\bay\s*onium\s+glow\b": "Aeonium Glow",
     r"\beonium\s+glow\b": "Aeonium Glow",
     r"\bthat'?s\s+y\b": "That's Why",  # guard against "that's y" mis-hearing "That's Why"
+
+    # ── The Interested Indian: exam/institution names ──
+    r"\bnith\s*yugi\b": "Neet U.G.",
+    r"\bneat\s+u\.?\s*g\.?\b": "Neet U.G.",
+    r"\bneet[\s-]*ug\b": "Neet U.G.",
+    r"\bneed\s+u\.?\s*g\.?\b": "Neet U.G.",
+    r"\bneat\s+mess\b": "Neet mess",
+    r"\bm\.?\s*b\.?\s*s\b(?!\.?\s*b)": "M.B.B.S.",   # "MBS seats" -> M.B.B.S.
+    r"\bisro\b": "ISRO",
+    r"\bisrao\b": "ISRO",
+    r"\bc\.?\s*b\.?\s*i\b": "CBI",
+
+    # ── Indian place and person names ──
+    r"\bbangalore\s*u\b": "Bengaluru",
+    r"\bjantar\s+r?mantar\b": "Jantar Mantar",
+    r"\bvangachuk\b": "Wangchuk",
+    r"\bwangachuk\b": "Wangchuk",
+    r"\bjushi\b": "Joshi",
+
+    # ── common word-level mishearings ──
+    r"\bmem\s*page\b": "meme page",
+    r"\bmem\s+account\b": "meme account",
+    r"\blag\s+(followers|members)\b": r"lakh \1",
+    r"\bblackards?\b": "placards",
+    r"\bbatten(s)?\b": r"baton\1",
+    r"\bsound\s+bite\b": "soundbite",
 }
 
 def apply_brand_corrections(text: str) -> str:
