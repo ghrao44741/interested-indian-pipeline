@@ -4,113 +4,115 @@
 [00:14] has never run a candidate and is named entirely after a household pest spent 50 days telling him to.
 [00:22] I've read that sentence back to myself three times and it still doesn't sound real.
 [00:27] Here's how a government loses a fight to cockroaches.
-[00:31] On 3rd May 2026, 22.7 lakh students, roughly the population of a mid-sized European country,
-[00:39] sat down for NEET-UG, India's single entrance exam for every medical and dental seat in the country.
+[00:31] On 3rd May 2026, more than 22 lakh students, roughly the population of a mid-sized European country,
+[00:39] sat down for Neet U.G., India's single entrance exam for every medical and dental seat in the country.
 [00:46] You pass it, you become a doctor. You miss it, you wait a full year and try again.
 [00:52] No second sitting, no partial credit, no alternate path if your family doesn't have the money for a second attempt at a coaching institute.
-[01:02] That's the whole system, riding on one 3-hour test, once a year, for every single one of those 22.7 lakh teenagers.
-[01:11] And the math on the other side of that test is brutal.
-[01:15] India has roughly 1.3 lakh MBBS seats nationwide, government and private combined.
-[01:22] do the division and you get an acceptance rate under 6%,
-[01:26] meaning more than 19 out of every 20 students who sat that exam were always going to walk away disappointed before anyone leaked anything.
-[01:36] I did that division twice because I assumed I'd made an error.
-[01:41] I hadn't. Which is less competitive exam and more organic chemistry's answer to the Hunger Games?
-[01:48] When a system is already that unforgiving, it doesn't take much to tip it from extremely hard into people will pay anything to cheat it.
+[01:02] That's the whole system, riding on one 3-hour test, once a year, for every single one of those 22 lakh teenagers.
+[01:10] And the math on the other side of that test is brutal.
+[01:14] India has roughly 1.3 lakh MBBS seats nationwide, government and private combined.
+[01:21] do the division and you get an acceptance rate under 6% meaning more than 19 out of
+[01:27] every 20 students who sat that exam were always going to walk away disappointed before anyone leaked anything.
+[01:35] I did that division twice because I assumed I'd made an error.
+[01:40] I hadn't. Which is less competitive exam and more organic chemistry's answer to the hunger games.
+[01:47] When a system is already that unforgiving, it doesn't take much to tip it from extremely hard into people will pay anything to cheat it.
 [01:57] Nine days later, the guessing game caught up with the exam itself.
-[02:02] Investigators in Rajasthan had found guest papers,
-[02:05] pre-circulated question banks being sold for up to 5 lakh rupees each and somewhere between 60 and 70 percent of the actual paper matched them.
-[02:15] Not vaguely similar. matched. So the National Testing Agency did the only thing left to do, cancelled the whole exam, opened a CBI probe, eventually detained 13 people,
-[02:28] and told 22.7 lakh 18-year-olds who would spend two years of their lives preparing to sit tight, they'd get back to them.
-[02:37] Imagine training for months, running your race, finishing strong and then being told someone else on the track may have worn rocket shoes,
-[02:45] so could everyone please just line up and run it again next month.
-[02:50] A re-exam was scheduled for 21st June. The kind of person who pays 5 lakh rupees for a leaked paper is someone who understands exactly what neat UG is worth to a family.
-[03:03] Whole towns in India, Kota in Rajasthan is the famous one exist almost entirely as coaching industry economies where parents relocate their teenagers for a year
-[03:14] or two and pay a serious chunk of household savings on the promise of a medical seat at the end of it.
-[03:21] When the price is that large and that binary, someone is always going to try selling a shortcut and someone desperate enough is always going to buy it.
-[03:31] The leak wasn't a random glitch in the system. It was the system's own economics working exactly as you'd expect.
-[03:39] Here's the part that makes this properly absurd, though the National Testing Agency exists specifically to prevent this.
-[03:47] It was created in November 2017, pulled out from under India's Central School Board.
-[03:53] With one pitch, take exam administration away from an overloaded education bureaucracy and hand it to a dedicated,
-[04:01] modern, professional agency that could run tests at international standard.
-[04:06] That was the actual sales pitch, word for word,
-[04:09] back when it launched like hiring a professional organizer to sort out your messy closet and
-[04:15] nine years later your clothes are on fire and the organizer is the one holding the matches.
-[04:21] The specialist agency built to fix exam integrity is the one whose integrity is now the actual news story.
-[04:29] I keep waiting for the twist where this turns out to be a different agency.
-[04:34] It never comes. If this sounds familiar, that's because it already happened.
-[04:40] In 2024, the exact same exam leaked,
-[04:44] and the fallout was bad enough that the government formed a high-level committee led by a former ISRO chairman with one job – fix the National Testing Agency for good.
-[04:54] That committee didn't hold back. It filed a 101 recommendations, online testing, better candidate authentication using government schools as secure exam centres.
-[05:06] A 101 is an oddly specific number for a to-do list and by this May,
-[05:11] the man who chaired it told the Supreme Court that most of them were done or actively underway and in Indian bureaucracy,
-[05:18] actively underway carries roughly the same weight as I'll text you back does in a relationship that's already over.
-[05:26] And then, two years after that report landed, the same exam leaked again anyway through more or less the same hole.
-[05:34] In 2024, it was pen and paper question sets moving through an offline network of coaching agents before exam day.
-[05:43] In 2026, it was guest papers built of leaked question banks, sold for cash, matched against the real thing at 60-70% overlap.
-[05:54] Different vocabulary, same underlying failure, a paper-based, once-a-year,
-[05:59] winner-takes-almost-nothing exam that has to stay secret for months while it moves through printing presses,
-[06:05] transport routes, and exam centers in every state, handled by thousands of people along the way.
-[06:11] You only need one weak link in that chain, and apparently, every couple of years, there is one.
-[06:19] Which raises an obvious problem with the whole reform effort,
-[06:22] a 101-point plan clearly wasn't enough if the thing it was built to stop just happened again anyway.
-[06:30] I don't have a good answer for that one, and I've been sitting with it for a while.
-[06:35] While all of this was working its way through the courts, the Chief Justice of India said something he probably wishes he could take back.
-[06:43] He'd spent months fielding urgent petition after urgent petition over the neat mess, and during one hearing, talking about young, unemployed activists,
-[06:53] he compared them to cockroaches, people who, in his words, don't get jobs, so some of them become RTI activists and start attacking everyone.
-[07:03] You can hear the frustration in that line. A judge tired of being everyone's last resort.
-[07:10] But frustration doesn't always translate well into a sound bite, and this one didn't.
-[07:15] It was meant as a dismissal. It landed as a gift. Within 78 hours, a college student named Abhijeet Deepke had turned that one sentence into a satirical social media page called the Cockroach Janata Party,
-[07:30] Cockroach, People's Party, and it had 30 lakh followers.
-[07:34] Not a real political party. No candidates, no manifesto beyond the exam system is broken and somebody in a suit should say so.
-[07:43] Just a joke account that decided to become the loudest voice in the room.
-[07:48] You've probably seen a group chat rename itself something ridiculous after one bad meeting and then watched that ridiculous name somehow become the entire group's personality.
-[07:59] That's this, at national scale, except the group chat, in this case, has 30 lakh members and a logo.
-[08:06] I would like it on record that I did not see this coming." The joke did not stay a joke for long.
-[08:14] Protesters started carrying actual cockroach signs to Jantar Mantar, Delhi's designated protest lawn, and the movement spread outward to Pune, Bengaluru and Lucknow.
-[08:25] A well-known activist, Sonam Wangachuk, joined in with a 26-day hunger strike.
-[08:30] Vangachuk wasn't some random celebrity endorsement.
-[08:33] He'd already built a real reputation from education and climate protests in Ladakh, the kind of credibility that doesn't come from a verified badge.
-[08:43] His involvement is what turned an internet joke into something newsrooms could no longer file under student memes and move on from.
-[08:52] And that's really the story of this whole movement.
-[08:55] It started as a punchline, built its audience like a mempage, and only afterward picked up the institutional weight a hunger strike,
-[09:03] national headlines, a resignation that traditional protest movements usually need years to earn.
-[09:10] For a while, the government's response was to call the whole thing anti-national.
-[09:15] Yes, firing one minister doesn't install biometric scanners or rewrite how the National Testing Agency hires people, fix the system.
-[09:24] Not just the man standing near it, is not an unreasonable position on its own.
-[09:29] But you can be technically right and still lose the room completely.
-[09:34] I've been technically right about plenty of arguments I still lost, so I sympathise a little.
-[09:40] Then, on 20th July and 21st, police used lathi charges,
-[09:45] the baton crackdowns you've almost certainly seen in a dozen other Indian protest videos.
-[09:51] The government said protesters had blocked roads and ignored repeated orders to disperse.
-[09:56] Protesters said they were standing with placards and got charged anyway.
-[10:02] Both things can be true in different corners of the same crowd.
-[10:06] What isn't in dispute is what the footage that actually went viral showed.
-[10:11] Mostly college students, holding insect-themed placards, getting hit with batons.
-[10:16] Which, whether or not someone 20 minutes earlier had blocked a road, is not the optics you want if you're trying to argue the crackdown was proportionate.
-[10:25] Two months of the minister is staying followed by roughly 48 hours, in late July, where he wasn't.
-[10:33] On 25th July, Dharmendra Pradhan resigned as Union Education Minister, writing that he didn't want the country's students left trapped in a web of confusion.
-[10:44] The President accepted it the same day, and Cabinet Minister Prahlad Joshi picked up the education portfolio on top of the one he already had one person to cabinet level jobs,
-[10:55] not because he is uniquely qualified for both but because the desk needed a name on it by evening.
-[11:01] Indian cabinets do this constantly, and the spare ministry to whoever has room that week, like a portfolio is a task you assign rather than a job someone trains for.
-[11:12] The cockroach Janta Party announced it was ending its Jantar Mantar protest in good faith that same week.
-[11:19] Sit with that for a second, a meme account had outlasted a sitting cabinet minister.
-[11:25] I don't know what I expected from 2026, but it wasn't that.
-[11:30] And then, because this is how Indian bureaucracy always closes a loop, the government announced its response.
-[11:37] A new expert committee, pulling from technology, education and administration, to recommend long-term reforms.
-[11:44] NEET-UG is reportedly moving to computer-based testing next year.
-[11:49] Biometric checks, tighter paper security, more digital surveillance all promised, again,
-[11:55] on top of the 101 promises already sitting in a file somewhere from the last time.
-[12:01] If you've lost count of how many committees I've mentioned in the last two minutes, congratulations, you're feeling roughly 1% of the exhaustion the actual students feel.
-[12:11] And while the government was scheduling this one, the cockroaches, somewhere, were presumably already scheduling the next protest.
-[12:19] For the 22.7 lakh students who actually sat that May exam, none of this committee talk changes what the last few months cost them.
-[12:28] A re-exam 8 weeks later than planned. A summer spent not knowing whether the score they'd earned would even count.
-[12:37] Coaching Institute deadlines and hostel leases that don't pause for a CBI probe.
-[12:42] Whatever the next reform report recommends, it arrives too late for the specific batch of 18-year-olds who lived through this particular version of the story, which is,
-[12:52] if you think about it, the quite cost hiding underneath every one of these Indian governance stories, the fix always arrives, eventually, for whoever comes after.
-[13:02] I keep thinking about that one detail more than any other in this story.
-[13:07] Which brings us back to where we started. There is already a 101 point reform plan sitting on a desk, mostly implemented,
-[13:16] from the last time this exact same thing happened and it wasn't enough to stop it from happening again two years later.
-[13:24] The real problem clearly isn't that India can't write a good committee report – it's written two of them now,
-[13:30] from two different chairmen, with broadly the same recommendations both times.
-[13:35] The real question isn't whether India can write a reform report.
-[13:39] It's whether next year's batch of 22.7 lakh students gets a fair exam, or just a better logo for whichever protest comes after.
+[02:01] According to investigators in Rajasthan, guest papers, pre-circulated question banks, were being sold for up to 5 lakh rupees each,
+[02:10] and somewhere between 60 and 70 percent of the actual paper allegedly matched them.
+[02:16] not vaguely similar. Matched. So the National Testing Agency did the only thing left to do, cancelled the whole exam, opened a CBI probe, and eventually detained 13 people.
+[02:29] Those 13 have since been charged. Worth saying plainly, charges are not convictions, and none of this has been tested in court yet.
+[02:39] Meanwhile, more than 22 lakh 18-year-olds who would spend two years of their lives preparing were told to sit tight and that someone would get back to them.
+[02:50] Imagine training for months, running your race, finishing strong and then being told someone else on the track may have worn rocket shoes,
+[02:58] so could everyone please just line up and run it again next month.
+[03:03] A re-exam was scheduled for 21st June. The kind of person who pays five lakh rupees for a leaked paper is someone who understands exactly what Neet U.G. is worth to a family.
+[03:16] Whole towns in India, Kota in Rajasthan is the famous one exist almost entirely as coaching industry economies where parents relocate their teenagers for a year
+[03:27] or two and pay a serious chunk of household savings on the promise of a medical seat at the end of it.
+[03:34] When the price is that large and that binary, someone is always going to try selling a shortcut and someone desperate enough is always going to buy it.
+[03:44] The leak wasn't a random glitch in the system. It was the system's own economics working exactly as you'd expect.
+[03:52] Here's the part that makes this properly absurd, though the National Testing Agency exists specifically to prevent this.
+[04:00] It was created in November 2017, pulled out from under India's Central School Board, with one pitch,
+[04:07] take exam administration away from an overloaded education bureaucracy and hand it to a dedicated,
+[04:14] modern, professional agency that could run tests at international standard.
+[04:19] That was the actual sales pitch, word for word,
+[04:22] back when it launched like hiring a professional organizer to sort out your messy closet and
+[04:28] 9 years later your clothes are on fire and the organizer is the one holding the matches.
+[04:34] The specialist agency built to fix exam integrity is the one whose integrity is now the actual news story.
+[04:42] I keep waiting for the twist where this turns out to be a different agency.
+[04:47] It never comes. If this sounds familiar, that's because it already happened.
+[04:53] In 2024, the exact same exam leaked,
+[04:57] and the fallout was bad enough that the government formed a high-level committee led by a former ISRO chairman with one job – fix the National Testing Agency for good.
+[05:07] That committee didn't hold back. It filed 101 recommendations, online testing,
+[05:13] better candidate authentication using government schools as secure exam centres.
+[05:20] 101 is an oddly specific number for a to-do list and by this May,
+[05:24] the man who chaired it told the Supreme Court that most of them were done or actively underway and in Indian bureaucracy,
+[05:31] actively underway carries roughly the same weight as I'll text you back does in a relationship that's already over.
+[05:39] And then, two years after that report landed, the same exam leaked again anyway through more or less the same hole.
+[05:47] In 2024, it was pen and paper question sets moving through an offline network of coaching agents before exam day.
+[05:56] In 2026, it was guest papers built of leaked question banks, sold for cash, matched against the real thing at 60-70% overlap.
+[06:07] Different vocabulary, same underlying failure, a paper-based, once-a-year,
+[06:12] winner-takes-almost-nothing exam that has to stay secret for months while it moves through printing presses,
+[06:18] transport routes, and exam centers in every state, handled by thousands of people along the way.
+[06:24] You only need one weak link in that chain, and apparently, every couple of years, there is one.
+[06:31] Which raises an obvious problem with the whole reform effort,
+[06:35] a 101-point plan clearly wasn't enough if the thing it was built to stop just happened again anyway.
+[06:42] I don't have a good answer for that one, and I've been sitting with it for a while.
+[06:48] While all of this was working its way through the courts, the Chief Justice of India said something he probably wishes he could take back.
+[06:56] He'd spent months fielding urgent petition after urgent petition over the NEET mess, and during one hearing, talking about young, unemployed activists,
+[07:05] he compared them to cockroaches, people who, in his words, don't get jobs, so some of them become RTI activists and start attacking everyone.
+[07:16] You can hear the frustration in that line. A judge tired of being everyone's last resort.
+[07:22] But frustration doesn't always translate well into a soundbite, and this one didn't.
+[07:28] It was meant as a dismissal. It landed as a gift. Within 78 hours, a college student named Abhijeet Deepke had turned that one sentence into a satirical social media page called the Cockroach Janata Party,
+[07:42] Cockroach, People's Party, and it had 30 lakh followers.
+[07:47] Not a real political party. No candidates, no manifesto beyond the exam system is broken and somebody in a suit should say so.
+[07:56] Just a joke account that decided to become the loudest voice in the room.
+[08:01] You've probably seen a group chat rename itself something ridiculous after one bad meeting and then watched that ridiculous name somehow become the entire group's personality.
+[08:12] That's this, at national scale, except the group chat, in this case, has 30 lakh members and a logo.
+[08:19] I would like it on record that I did not see this coming." The joke did not stay a joke for long.
+[08:27] Protesters started carrying actual cockroach signs to Jantar Mantar, Delhi's designated protest lawn, and the movement spread outward to Pune, Bengaluru and Lucknow.
+[08:37] A well-known activist, Sonam Wangchuk, joined in with a 26-day hunger strike.
+[08:43] Wangchuk wasn't some random celebrity endorsement.
+[08:46] He'd already built a real reputation from education and climate protests in Ladakh, the kind of credibility that doesn't come from a verified badge.
+[08:56] His involvement is what turned an internet joke into something newsrooms could no longer file under student memes and move on from.
+[09:05] And that's really the story of this whole movement.
+[09:08] It started as a punchline, built its audience like a meme page, and only afterward picked up the institutional weight a hunger strike,
+[09:16] national headlines, a resignation that traditional protest movements usually need years to earn.
+[09:23] For a while, the government's response was to call the whole thing anti-national.
+[09:28] Yes, firing one minister doesn't install biometric scanners or rewrite how the National Testing Agency hires people, fix the system.
+[09:36] Not just the man standing near it, is not an unreasonable position on its own.
+[09:42] But you can be technically right and still lose the room completely.
+[09:46] I've been technically right about plenty of arguments I still lost, so I sympathise a little.
+[09:53] Then, on 20th July and 21st, police used lathi charges,
+[09:58] the baton crackdowns you've almost certainly seen in a dozen other Indian protest videos.
+[10:04] The government said protesters had blocked roads and ignored repeated orders to disperse.
+[10:09] Protesters said they were standing with placards and got charged anyway.
+[10:15] Both things can be true in different corners of the same crowd.
+[10:19] What isn't in dispute is what the footage that actually went viral showed.
+[10:24] Mostly college students, holding insect-themed placards, getting hit with batons.
+[10:29] Which, whether or not someone 20 minutes earlier had blocked a road, is not the optics you want if you're trying to argue the crackdown was proportionate.
+[10:38] Two months off, the minister is staying followed by roughly 48 hours, in late July, where he wasn't.
+[10:46] On 25th July, Dharmendra Pradhan resigned as Union Education Minister, writing that he didn't want the country's students left trapped in a web of confusion.
+[10:56] The President accepted it the same day, and Cabinet Minister Prahlad Joshi picked up the education portfolio on top of the one he already had one person to cabinet-level jobs,
+[11:08] not because he is uniquely qualified for both but because the desk needed a name on it by evening.
+[11:14] Indian cabinets do this constantly, and the spare ministry to whoever has room that week, like a portfolio is a task you assign rather than a job someone trains for.
+[11:25] The cockroach Janata Party announced it was ending its Janata Mantra protest in good faith that same week.
+[11:32] Sit with that for a second, a meme account had outlasted a sitting cabinet minister.
+[11:38] I don't know what I expected from 2026, but it wasn't that.
+[11:43] And then, because this is how Indian bureaucracy always closes a loop, the government announced its response.
+[11:50] A new expert committee, pulling from technology, education and administration, to recommend long-term reforms.
+[11:57] Neet U.G. is reportedly moving to computer-based testing next year.
+[12:02] Biometric checks, tighter paper security, more digital surveillance all promised, again,
+[12:08] on top of the 101 promises already sitting in a file somewhere from the last time.
+[12:14] If you've lost count of how many committees I've mentioned in the last two minutes, congratulations, you're feeling roughly 1% of the exhaustion the actual students feel.
+[12:24] And while the government was scheduling this one, the cockroaches, somewhere, were presumably already scheduling the next protest.
+[12:32] For the more than 22 lakh students who actually sat that May exam, none of this committee talk changes what the last few months cost them.
+[12:41] A re-exam 8 weeks later than planned. A summer spent not knowing whether the score they'd earned would even count.
+[12:49] Coaching Institute deadlines and hostel leases that don't pause for a CBI probe.
+[12:55] Whatever the next reform report recommends, it arrives too late for the specific batch of 18-year-olds who lived through this particular version of the story, which is,
+[13:05] if you think about it, the quite cost hiding underneath every one of these Indian governance stories, the fix always arrives, eventually, for whoever comes after.
+[13:15] I keep thinking about that one detail more than any other in this story.
+[13:20] Which brings us back to where we started. There is already a 101-point reform plan sitting on a desk, mostly implemented,
+[13:29] from the last time this exact same thing happened and it wasn't enough to stop it from happening again two years later.
+[13:37] The real problem clearly isn't that India can't write a good committee report,
+[13:41] it's written two of them now, from two different chairmen, with broadly the same recommendations both times.
+[13:47] The real question isn't whether India can write a reform report.
+[13:52] It's whether next year's batch of more than 22 lakh students gets a fair exam or just a better logo for whichever protest comes after.

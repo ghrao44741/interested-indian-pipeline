@@ -726,6 +726,57 @@ async def edge_list_voices(locale: str = "en-US"):
         print(f"  {v['ShortName']:30s} {v['Gender']:8s} {personalities}")
 
 
+# ── Indian-term pronunciation (applied to TTS input only) ─────────────────────
+#
+# The channel is moving to a neutral international-English voice, chosen for
+# natural intonation and question prosody over accent authenticity — Indian
+# identity is carried by the subject, character and vocabulary instead. What a
+# neutral voice does NOT get right on its own is Indian names and terms, so
+# respell them phonetically here.
+#
+# IMPORTANT: this rewrites only the string handed to the synthesiser. The script
+# file keeps its real spelling, and captions are unaffected — they are built from
+# WhisperX's transcript of the audio, and auto_split_scenes' BRAND_CORRECTIONS
+# maps any phonetic artefacts back to the correct spelling. So "Neet U.G." can be
+# spoken correctly while the caption still reads "NEET-UG".
+#
+# Case-insensitive. Ordered: longer, more specific entries first.
+PRONUNCIATION_DICT = {
+    r"\bNEET[-\s]?UG\b":      "Neet U.G.",
+    r"\bNEET\b":              "Neet",
+    r"\bNTA\b":               "N-T-A",
+    r"\bCBI\b":               "C-B-I",
+    r"\bRTI\b":               "R-T-I",
+    r"\bISRO\b":              "ISRO",
+    r"\bMBBS\b":              "M.B.B.S.",
+    r"\bLok Sabha\b":         "Loke Sabha",
+    r"\bRajya Sabha\b":       "Rahj-ya Sabha",
+    r"\bJantar Mantar\b":     "Juntar Muntar",
+    r"\bSonam Wangchuk\b":    "Sonam Wong-chook",
+    r"\bWangchuk\b":          "Wong-chook",
+    r"\bBengaluru\b":         "Bengaluroo",
+    r"\bLucknow\b":           "Luck-now",
+    r"\bRajasthan\b":         "Rah-jasthan",
+    r"\bBihar\b":             "Bih-har",
+    r"\bKota\b":              "Koh-ta",
+    r"\bLadakh\b":            "La-dakh",
+    r"\bcrore\b":             "crore",
+    r"\blakh\b":              "lakh",
+}
+
+
+def apply_pronunciation(text: str) -> str:
+    """Respell Indian names/terms for the synthesiser. Never touches captions."""
+    changed = 0
+    for pattern, replacement in PRONUNCIATION_DICT.items():
+        text, n = re.subn(pattern, replacement, text, flags=re.IGNORECASE)
+        changed += n
+    if changed:
+        print(f"  Pronunciation: {changed} Indian term(s) respelled for TTS "
+              f"(captions keep original spelling)")
+    return text
+
+
 async def edge_generate(text: str, voice: str, output_path: str,
                          rate: str = "+0%", pitch: str = "+0Hz"):
     try:
@@ -979,6 +1030,10 @@ async def main():
         speed = DEFAULT_SPEED_GROK
     else:
         speed = DEFAULT_SPEED_EL
+
+    # Respell Indian names/terms phonetically for the synthesiser only. Applied
+    # here, once, so every provider benefits — see apply_pronunciation().
+    text = apply_pronunciation(text)
 
     chunk_boundaries: list[float] = []
     if args.provider == "gemini_cloudtts":

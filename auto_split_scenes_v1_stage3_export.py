@@ -101,6 +101,7 @@ BRAND_CORRECTIONS = {
     r"\bjushi\b": "Joshi",
 
     # ── common word-level mishearings ──
+    r"\bguest\s+papers?\b": "guess papers",   # hand-fixed twice before; make it stick
     r"\bmem\s*page\b": "meme page",
     r"\bmem\s+account\b": "meme account",
     r"\blag\s+(followers|members)\b": r"lakh \1",

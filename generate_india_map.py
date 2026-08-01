@@ -231,22 +231,24 @@ def render_map(
                 color="#6B5040", zorder=3,
             )
 
-    # Callout box
+    # Title first, then the callout *below* it. Both used to sit at the top
+    # (title centred at y=0.97, callout left at y=0.96), so any title wide
+    # enough to reach the left third rendered straight through the callout box.
+    if title:
+        ax.text(
+            0.50, 0.98, title, transform=ax.transAxes,
+            ha="center", va="top", fontsize=15, fontweight="bold",
+            color=TITLE_COLOR, zorder=4,
+        )
+
+    # Callout box — offset down when there is a title to clear it.
     if callout:
         ax.text(
-            0.02, 0.96, callout, transform=ax.transAxes,
-            ha="left", va="top", fontsize=9, fontweight="bold", color="white",
+            0.02, 0.88 if title else 0.96, callout, transform=ax.transAxes,
+            ha="left", va="top", fontsize=11, fontweight="bold", color="white",
             bbox=dict(boxstyle="round,pad=0.4", facecolor=highlight_color,
                       edgecolor="white", linewidth=1),
             zorder=4,
-        )
-
-    # Title
-    if title:
-        ax.text(
-            0.50, 0.97, title, transform=ax.transAxes,
-            ha="center", va="top", fontsize=11, fontweight="bold",
-            color=TITLE_COLOR, zorder=4,
         )
 
     # Legend

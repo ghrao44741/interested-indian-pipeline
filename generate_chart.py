@@ -70,11 +70,17 @@ BAR_PALETTE = [
 
 # ── Renderers ──────────────────────────────────────────────────────────────────
 
+# Canvas is figsize 12.8x7.2 at dpi 100 = 1280x720, matching every other image
+# the pipeline produces. Kept as constants so layout maths (e.g. fitting a stat
+# to its column in render_stat) reads from one place.
+CANVAS_W, CANVAS_H = 1280, 720
+
+
 def _setup_fig():
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    fig, ax = plt.subplots(figsize=(12.8, 7.2), dpi=100)
+    fig, ax = plt.subplots(figsize=(CANVAS_W / 100, CANVAS_H / 100), dpi=100)
     fig.patch.set_facecolor(BG_COLOR)
     ax.set_facecolor(BG_COLOR)
     return fig, ax, plt
@@ -137,6 +143,15 @@ def render_stat(data: list[dict], title: str, out_path: Path):
     ax.set_axis_off()
 
     n = len(data)
+
+    # Size the big number to the column it has to fit in. A fixed 72/96pt
+    # assumed short values like "91"; real stats are strings such as
+    # "22 lakh+" or "under 6%", and three of those at 72pt ran straight
+    # through each other into an unreadable overlap.
+    longest = max((str(item["stat"]) for item in data), key=len)
+    col_width_px = (CANVAS_W / n) * 0.88          # leave a gutter between columns
+    stat_fontsize = _fit_fontsize(fig, longest, col_width_px, 96 if n == 1 else 72)
+
     for i, item in enumerate(data):
         x = (i + 0.5) / n
         color = item.get("color", BAR_PALETTE[i % len(BAR_PALETTE)])
@@ -145,7 +160,7 @@ def render_stat(data: list[dict], title: str, out_path: Path):
         ax.text(x, 0.62, item["stat"],
                 transform=ax.transAxes,
                 ha="center", va="center",
-                fontsize=96 if n == 1 else 72,
+                fontsize=stat_fontsize,
                 fontweight="black",
                 color=color)
 
@@ -289,13 +304,38 @@ def render_pie(data: list[dict], title: str, out_path: Path):
     _save(fig, plt, out_path)
 
 
+def _fit_fontsize(fig, text: str, max_px: float, start: int, weight: str = "black",
+                  min_size: int = 22) -> int:
+    """Largest font size at which `text` still fits within max_px, by measuring.
+
+    Glyph widths cannot be guessed from the point size — an earlier attempt to
+    approximate them left three stat values at full size, running through each
+    other into an unreadable overlap. This renders the string offscreen and
+    measures its real extent.
+    """
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    size = start
+    while size > min_size:
+        probe = fig.text(0, -1, text, fontsize=size, fontweight=weight)
+        width = probe.get_window_extent(renderer=renderer).width
+        probe.remove()
+        if width <= max_px:
+            break
+        size -= 2
+    return size
+
+
 def _save(fig, plt, out_path: Path):
-    import matplotlib
     out_path.parent.mkdir(parents=True, exist_ok=True)
     plt.tight_layout(pad=1.2)
-    plt.savefig(str(out_path), dpi=100, bbox_inches="tight", facecolor=BG_COLOR)
+    # No bbox_inches="tight": it crops to the drawn content, so charts came out
+    # at whatever size the content happened to occupy (e.g. 1243x706) rather
+    # than the 1280x720 every other image in the pipeline uses — while still
+    # printing "1280×720". Honour the figure size instead.
+    plt.savefig(str(out_path), dpi=100, facecolor=BG_COLOR)
     plt.close()
-    print(f"  ✓ Chart saved → {out_path}  (1280×720)")
+    print(f"  ✓ Chart saved → {out_path}  ({CANVAS_W}×{CANVAS_H})")
 
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
