@@ -10,7 +10,8 @@
       "visuals": [
         {
           "id": "VIS-001-A",
-          "anchor": "In July 2026, India's education minister resigned."
+          "anchor": "In July 2026, India's education minister resigned.",
+          "state": "planned"
         }
       ]
     },
@@ -22,7 +23,8 @@
       "visuals": [
         {
           "id": "VIS-002-A",
-          "anchor": "Not over money, not over an affair, not over a leaked recording."
+          "anchor": "Not over money, not over an affair, not over a leaked recording.",
+          "state": "planned"
         }
       ]
     },
@@ -34,11 +36,13 @@
       "visuals": [
         {
           "id": "VIS-003-A",
-          "anchor": "He resigned because a political party that does not legally exist,"
+          "anchor": "He resigned because a political party that does not legally exist,",
+          "state": "planned"
         },
         {
           "id": "VIS-003-B",
-          "anchor": "has never run a candidate and is named entirely after a household pest spent 50 days telling him to."
+          "anchor": "has never run a candidate and is named entirely after a household pest spent 50 days telling him to.",
+          "state": "planned"
         }
       ]
     },
@@ -50,7 +54,8 @@
       "visuals": [
         {
           "id": "VIS-004-A",
-          "anchor": "I've read that sentence back to myself three times and it still doesn't sound real."
+          "anchor": "I've read that sentence back to myself three times and it still doesn't sound real.",
+          "state": "planned"
         }
       ]
     },
@@ -62,7 +67,8 @@
       "visuals": [
         {
           "id": "VIS-005-A",
-          "anchor": "Here's how a government loses a fight to cockroaches."
+          "anchor": "Here's how a government loses a fight to cockroaches.",
+          "state": "planned"
         }
       ]
     },
@@ -74,11 +80,13 @@
       "visuals": [
         {
           "id": "VIS-006-A",
-          "anchor": "On 3rd May 2026, more than 22 lakh students, roughly the population of a mid-sized European country,"
+          "anchor": "On 3rd May 2026, more than 22 lakh students, roughly the population of a mid-sized European country,",
+          "state": "planned"
         },
         {
           "id": "VIS-006-B",
-          "anchor": "sat down for Neet U.G., India's single entrance exam for every medical and dental seat in the country."
+          "anchor": "sat down for Neet U.G., India's single entrance exam for every medical and dental seat in the country.",
+          "state": "planned"
         }
       ]
     },
@@ -90,7 +98,8 @@
       "visuals": [
         {
           "id": "VIS-007-A",
-          "anchor": "You pass it, you become a doctor."
+          "anchor": "You pass it, you become a doctor.",
+          "state": "planned"
         }
       ]
     },
@@ -102,7 +111,8 @@
       "visuals": [
         {
           "id": "VIS-008-A",
-          "anchor": "You miss it, you wait a full year and try again."
+          "anchor": "You miss it, you wait a full year and try again.",
+          "state": "planned"
         }
       ]
     },
@@ -114,7 +124,8 @@
       "visuals": [
         {
           "id": "VIS-009-A",
-          "anchor": "No second sitting, no partial credit, no alternate path if your family doesn't have the money for a second attempt at a coaching institute."
+          "anchor": "No second sitting, no partial credit, no alternate path if your family doesn't have the money for a second attempt at a coaching institute.",
+          "state": "planned"
         }
       ]
     },
@@ -126,7 +137,8 @@
       "visuals": [
         {
           "id": "VIS-010-A",
-          "anchor": "That's the whole system, riding on one 3-hour test, once a year, for every single one of those 22 lakh teenagers."
+          "anchor": "That's the whole system, riding on one 3-hour test, once a year, for every single one of those 22 lakh teenagers.",
+          "state": "planned"
         }
       ]
     },
@@ -138,7 +150,8 @@
       "visuals": [
         {
           "id": "VIS-011-A",
-          "anchor": "And the math on the other side of that test is brutal."
+          "anchor": "And the math on the other side of that test is brutal.",
+          "state": "planned"
         }
       ]
     },
@@ -150,7 +163,8 @@
       "visuals": [
         {
           "id": "VIS-012-A",
-          "anchor": "India has roughly 1.3 lakh MBBS seats nationwide, government and private combined."
+          "anchor": "India has roughly 1.3 lakh MBBS seats nationwide, government and private combined.",
+          "state": "planned"
         }
       ]
     },
@@ -162,11 +176,13 @@
       "visuals": [
         {
           "id": "VIS-013-A",
-          "anchor": "do the division and you get an acceptance rate under 6% meaning more than 19 out of"
+          "anchor": "do the division and you get an acceptance rate under 6% meaning more than 19 out of",
+          "state": "planned"
         },
         {
           "id": "VIS-013-B",
-          "anchor": "every 20 students who sat that exam were always going to walk away disappointed before anyone leaked anything."
+          "anchor": "every 20 students who sat that exam were always going to walk away disappointed before anyone leaked anything.",
+          "state": "planned"
         }
       ]
     },
@@ -178,7 +194,8 @@
       "visuals": [
         {
           "id": "VIS-014-A",
-          "anchor": "I did that division twice because I assumed I'd made an error."
+          "anchor": "I did that division twice because I assumed I'd made an error.",
+          "state": "planned"
         }
       ]
     },
@@ -190,7 +207,8 @@
       "visuals": [
         {
           "id": "VIS-015-A",
-          "anchor": "I hadn't."
+          "anchor": "I hadn't.",
+          "state": "planned"
         }
       ]
     },
@@ -202,7 +220,8 @@
       "visuals": [
         {
           "id": "VIS-016-A",
-          "anchor": "Which is less competitive exam and more organic chemistry's answer to the hunger games."
+          "anchor": "Which is less competitive exam and more organic chemistry's answer to the hunger games.",
+          "state": "planned"
         }
       ]
     },
@@ -214,7 +233,8 @@
       "visuals": [
         {
           "id": "VIS-017-A",
-          "anchor": "When a system is already that unforgiving, it doesn't take much to tip it from extremely hard into people will pay anything to cheat it."
+          "anchor": "When a system is already that unforgiving, it doesn't take much to tip it from extremely hard into people will pay anything to cheat it.",
+          "state": "planned"
         }
       ]
     },
@@ -226,7 +246,8 @@
       "visuals": [
         {
           "id": "VIS-018-A",
-          "anchor": "Nine days later, the guessing game caught up with the exam itself."
+          "anchor": "Nine days later, the guessing game caught up with the exam itself.",
+          "state": "planned"
         }
       ]
     },
@@ -238,11 +259,13 @@
       "visuals": [
         {
           "id": "VIS-019-A",
-          "anchor": "According to investigators in Rajasthan, guess papers, pre-circulated question banks, were being sold for up to 5 lakh rupees each,"
+          "anchor": "According to investigators in Rajasthan, guess papers, pre-circulated question banks, were being sold for up to 5 lakh rupees each,",
+          "state": "planned"
         },
         {
           "id": "VIS-019-B",
-          "anchor": "and somewhere between 60 and 70 percent of the actual paper allegedly matched them."
+          "anchor": "and somewhere between 60 and 70 percent of the actual paper allegedly matched them.",
+          "state": "planned"
         }
       ]
     },
@@ -254,7 +277,8 @@
       "visuals": [
         {
           "id": "VIS-020-A",
-          "anchor": "not vaguely similar."
+          "anchor": "not vaguely similar.",
+          "state": "planned"
         }
       ]
     },
@@ -266,7 +290,8 @@
       "visuals": [
         {
           "id": "VIS-021-A",
-          "anchor": "Matched."
+          "anchor": "Matched.",
+          "state": "planned"
         }
       ]
     },
@@ -278,7 +303,8 @@
       "visuals": [
         {
           "id": "VIS-022-A",
-          "anchor": "So the National Testing Agency did the only thing left to do, cancelled the whole exam, opened a CBI probe, and eventually detained 13 people."
+          "anchor": "So the National Testing Agency did the only thing left to do, cancelled the whole exam, opened a CBI probe, and eventually detained 13 people.",
+          "state": "planned"
         }
       ]
     },
@@ -290,7 +316,8 @@
       "visuals": [
         {
           "id": "VIS-023-A",
-          "anchor": "Those 13 have since been charged."
+          "anchor": "Those 13 have since been charged.",
+          "state": "planned"
         }
       ]
     },
@@ -302,7 +329,8 @@
       "visuals": [
         {
           "id": "VIS-024-A",
-          "anchor": "Worth saying plainly, charges are not convictions, and none of this has been tested in court yet."
+          "anchor": "Worth saying plainly, charges are not convictions, and none of this has been tested in court yet.",
+          "state": "planned"
         }
       ]
     },
@@ -314,7 +342,8 @@
       "visuals": [
         {
           "id": "VIS-025-A",
-          "anchor": "Meanwhile, more than 22 lakh 18-year-olds who would spend two years of their lives preparing were told to sit tight and that someone would get back to them."
+          "anchor": "Meanwhile, more than 22 lakh 18-year-olds who would spend two years of their lives preparing were told to sit tight and that someone would get back to them.",
+          "state": "planned"
         }
       ]
     },
@@ -326,11 +355,13 @@
       "visuals": [
         {
           "id": "VIS-026-A",
-          "anchor": "Imagine training for months, running your race, finishing strong and then being told someone else on the track may have worn rocket shoes,"
+          "anchor": "Imagine training for months, running your race, finishing strong and then being told someone else on the track may have worn rocket shoes,",
+          "state": "planned"
         },
         {
           "id": "VIS-026-B",
-          "anchor": "so could everyone please just line up and run it again next month."
+          "anchor": "so could everyone please just line up and run it again next month.",
+          "state": "planned"
         }
       ]
     },
@@ -342,7 +373,8 @@
       "visuals": [
         {
           "id": "VIS-027-A",
-          "anchor": "A re-exam was scheduled for 21st June."
+          "anchor": "A re-exam was scheduled for 21st June.",
+          "state": "planned"
         }
       ]
     },
@@ -354,7 +386,8 @@
       "visuals": [
         {
           "id": "VIS-028-A",
-          "anchor": "The kind of person who pays five lakh rupees for a leaked paper is someone who understands exactly what Neet U.G. is worth to a family."
+          "anchor": "The kind of person who pays five lakh rupees for a leaked paper is someone who understands exactly what Neet U.G. is worth to a family.",
+          "state": "planned"
         }
       ]
     },
@@ -373,15 +406,18 @@
       "visuals": [
         {
           "id": "VIS-030-A",
-          "anchor": "Whole towns in India,"
+          "anchor": "Whole towns in India,",
+          "state": "planned"
         },
         {
           "id": "VIS-030-B",
-          "anchor": "Kota in Rajasthan is the famous one exist almost entirely as coaching industry economies where parents relocate their teenagers for a year"
+          "anchor": "Kota in Rajasthan is the famous one exist almost entirely as coaching industry economies where parents relocate their teenagers for a year",
+          "state": "planned"
         },
         {
           "id": "VIS-030-C",
-          "anchor": "or two and pay a serious chunk of household savings on the promise of a medical seat at the end of it."
+          "anchor": "or two and pay a serious chunk of household savings on the promise of a medical seat at the end of it.",
+          "state": "planned"
         }
       ]
     },
@@ -393,7 +429,8 @@
       "visuals": [
         {
           "id": "VIS-031-A",
-          "anchor": "When the price is that large and that binary, someone is always going to try selling a shortcut and someone desperate enough is always going to buy it."
+          "anchor": "When the price is that large and that binary, someone is always going to try selling a shortcut and someone desperate enough is always going to buy it.",
+          "state": "planned"
         }
       ]
     },
@@ -405,7 +442,8 @@
       "visuals": [
         {
           "id": "VIS-032-A",
-          "anchor": "The leak wasn't a random glitch in the system."
+          "anchor": "The leak wasn't a random glitch in the system.",
+          "state": "planned"
         }
       ]
     },
@@ -417,7 +455,8 @@
       "visuals": [
         {
           "id": "VIS-033-A",
-          "anchor": "It was the system's own economics working exactly as you'd expect."
+          "anchor": "It was the system's own economics working exactly as you'd expect.",
+          "state": "planned"
         }
       ]
     },
@@ -429,7 +468,8 @@
       "visuals": [
         {
           "id": "VIS-034-A",
-          "anchor": "Here's the part that makes this properly absurd, though the National Testing Agency exists specifically to prevent this."
+          "anchor": "Here's the part that makes this properly absurd, though the National Testing Agency exists specifically to prevent this.",
+          "state": "planned"
         }
       ]
     },
@@ -441,27 +481,33 @@
       "visuals": [
         {
           "id": "VIS-035-A",
-          "anchor": "It was created in November 2017, pulled out from under India's Central School Board, with one pitch,"
+          "anchor": "It was created in November 2017, pulled out from under India's Central School Board, with one pitch,",
+          "state": "planned"
         },
         {
           "id": "VIS-035-B",
-          "anchor": "take exam administration away from an overloaded education bureaucracy and hand it to a dedicated,"
+          "anchor": "take exam administration away from an overloaded education bureaucracy and hand it to a dedicated,",
+          "state": "planned"
         },
         {
           "id": "VIS-035-C",
-          "anchor": "modern, professional agency that could run tests at international standard."
+          "anchor": "modern, professional agency that could run tests at international standard.",
+          "state": "planned"
         },
         {
           "id": "VIS-035-D",
-          "anchor": "That was the actual sales pitch, word for word,"
+          "anchor": "That was the actual sales pitch, word for word,",
+          "state": "planned"
         },
         {
           "id": "VIS-035-E",
-          "anchor": "back when it launched like hiring a professional organizer to sort out your messy closet and"
+          "anchor": "back when it launched like hiring a professional organizer to sort out your messy closet and",
+          "state": "planned"
         },
         {
           "id": "VIS-035-F",
-          "anchor": "9 years later your clothes are on fire and the organizer is the one holding the matches."
+          "anchor": "9 years later your clothes are on fire and the organizer is the one holding the matches.",
+          "state": "planned"
         }
       ]
     },
@@ -473,7 +519,8 @@
       "visuals": [
         {
           "id": "VIS-036-A",
-          "anchor": "The specialist agency built to fix exam integrity is the one whose integrity is now the actual news story."
+          "anchor": "The specialist agency built to fix exam integrity is the one whose integrity is now the actual news story.",
+          "state": "planned"
         }
       ]
     },
@@ -485,7 +532,8 @@
       "visuals": [
         {
           "id": "VIS-037-A",
-          "anchor": "I keep waiting for the twist where this turns out to be a different agency."
+          "anchor": "I keep waiting for the twist where this turns out to be a different agency.",
+          "state": "planned"
         }
       ]
     },
@@ -497,7 +545,8 @@
       "visuals": [
         {
           "id": "VIS-038-A",
-          "anchor": "It never comes."
+          "anchor": "It never comes.",
+          "state": "planned"
         }
       ]
     },
@@ -509,7 +558,8 @@
       "visuals": [
         {
           "id": "VIS-039-A",
-          "anchor": "If this sounds familiar, that's because it already happened."
+          "anchor": "If this sounds familiar, that's because it already happened.",
+          "state": "planned"
         }
       ]
     },
@@ -521,11 +571,13 @@
       "visuals": [
         {
           "id": "VIS-040-A",
-          "anchor": "In 2024, the exact same exam leaked,"
+          "anchor": "In 2024, the exact same exam leaked,",
+          "state": "planned"
         },
         {
           "id": "VIS-040-B",
-          "anchor": "and the fallout was bad enough that the government formed a high-level committee led by a former ISRO chairman with one job – fix the National Testing Agency for good."
+          "anchor": "and the fallout was bad enough that the government formed a high-level committee led by a former ISRO chairman with one job – fix the National Testing Agency for good.",
+          "state": "planned"
         }
       ]
     },
@@ -537,7 +589,8 @@
       "visuals": [
         {
           "id": "VIS-041-A",
-          "anchor": "That committee didn't hold back."
+          "anchor": "That committee didn't hold back.",
+          "state": "planned"
         }
       ]
     },
@@ -549,11 +602,13 @@
       "visuals": [
         {
           "id": "VIS-042-A",
-          "anchor": "It filed 101 recommendations, online testing,"
+          "anchor": "It filed 101 recommendations, online testing,",
+          "state": "planned"
         },
         {
           "id": "VIS-042-B",
-          "anchor": "better candidate authentication using government schools as secure exam centres."
+          "anchor": "better candidate authentication using government schools as secure exam centres.",
+          "state": "planned"
         }
       ]
     },
@@ -565,15 +620,18 @@
       "visuals": [
         {
           "id": "VIS-043-A",
-          "anchor": "101 is an oddly specific number for a to-do list and by this May,"
+          "anchor": "101 is an oddly specific number for a to-do list and by this May,",
+          "state": "planned"
         },
         {
           "id": "VIS-043-B",
-          "anchor": "the man who chaired it told the Supreme Court that most of them were done or actively underway and in Indian bureaucracy,"
+          "anchor": "the man who chaired it told the Supreme Court that most of them were done or actively underway and in Indian bureaucracy,",
+          "state": "planned"
         },
         {
           "id": "VIS-043-C",
-          "anchor": "actively underway carries roughly the same weight as I'll text you back does in a relationship that's already over."
+          "anchor": "actively underway carries roughly the same weight as I'll text you back does in a relationship that's already over.",
+          "state": "planned"
         }
       ]
     },
@@ -585,7 +643,8 @@
       "visuals": [
         {
           "id": "VIS-044-A",
-          "anchor": "And then, two years after that report landed, the same exam leaked again anyway through more or less the same hole."
+          "anchor": "And then, two years after that report landed, the same exam leaked again anyway through more or less the same hole.",
+          "state": "planned"
         }
       ]
     },
@@ -597,7 +656,8 @@
       "visuals": [
         {
           "id": "VIS-045-A",
-          "anchor": "In 2024, it was pen and paper question sets moving through an offline network of coaching agents before exam day."
+          "anchor": "In 2024, it was pen and paper question sets moving through an offline network of coaching agents before exam day.",
+          "state": "planned"
         }
       ]
     },
@@ -609,7 +669,8 @@
       "visuals": [
         {
           "id": "VIS-046-A",
-          "anchor": "In 2026, it was guess papers built of leaked question banks, sold for cash, matched against the real thing at 60-70% overlap."
+          "anchor": "In 2026, it was guess papers built of leaked question banks, sold for cash, matched against the real thing at 60-70% overlap.",
+          "state": "planned"
         }
       ]
     },
@@ -621,15 +682,18 @@
       "visuals": [
         {
           "id": "VIS-047-A",
-          "anchor": "Different vocabulary, same underlying failure, a paper-based, once-a-year,"
+          "anchor": "Different vocabulary, same underlying failure, a paper-based, once-a-year,",
+          "state": "planned"
         },
         {
           "id": "VIS-047-B",
-          "anchor": "winner-takes-almost-nothing exam that has to stay secret for months while it moves through printing presses,"
+          "anchor": "winner-takes-almost-nothing exam that has to stay secret for months while it moves through printing presses,",
+          "state": "planned"
         },
         {
           "id": "VIS-047-C",
-          "anchor": "transport routes, and exam centers in every state, handled by thousands of people along the way."
+          "anchor": "transport routes, and exam centers in every state, handled by thousands of people along the way.",
+          "state": "planned"
         }
       ]
     },
@@ -641,7 +705,8 @@
       "visuals": [
         {
           "id": "VIS-048-A",
-          "anchor": "You only need one weak link in that chain, and apparently, every couple of years, there is one."
+          "anchor": "You only need one weak link in that chain, and apparently, every couple of years, there is one.",
+          "state": "planned"
         }
       ]
     },
@@ -653,7 +718,8 @@
       "visuals": [
         {
           "id": "VIS-049-A",
-          "anchor": "a 101-point plan clearly wasn't enough if the thing it was built to stop just happened again anyway."
+          "anchor": "a 101-point plan clearly wasn't enough if the thing it was built to stop just happened again anyway.",
+          "state": "planned"
         }
       ]
     },
@@ -665,7 +731,8 @@
       "visuals": [
         {
           "id": "VIS-050-A",
-          "anchor": "I don't have a good answer for that one, and I've been sitting with it for a while."
+          "anchor": "I don't have a good answer for that one, and I've been sitting with it for a while.",
+          "state": "planned"
         }
       ]
     },
@@ -677,7 +744,8 @@
       "visuals": [
         {
           "id": "VIS-051-A",
-          "anchor": "While all of this was working its way through the courts, the Chief Justice of India said something he probably wishes he could take back."
+          "anchor": "While all of this was working its way through the courts, the Chief Justice of India said something he probably wishes he could take back.",
+          "state": "planned"
         }
       ]
     },
@@ -689,15 +757,18 @@
       "visuals": [
         {
           "id": "VIS-052-A",
-          "anchor": "He'd spent months fielding urgent petition after urgent petition over the NEET mess, and during one hearing, talking about young, unemployed activists,"
+          "anchor": "He'd spent months fielding urgent petition after urgent petition over the NEET mess, and during one hearing, talking about young, unemployed activists,",
+          "state": "planned"
         },
         {
           "id": "VIS-052-B",
-          "anchor": "he compared them to cockroaches, people who, in his words, don't get jobs, so some of them become RTI activists and start attacking everyone."
+          "anchor": "he compared them to cockroaches, people who, in his words, don't get jobs, so some of them become RTI activists and start attacking everyone.",
+          "state": "planned"
         },
         {
           "id": "VIS-052-C",
-          "anchor": "You can hear the frustration in that line."
+          "anchor": "You can hear the frustration in that line.",
+          "state": "planned"
         }
       ]
     },
@@ -709,7 +780,8 @@
       "visuals": [
         {
           "id": "VIS-053-A",
-          "anchor": "A judge tired of being everyone's last resort."
+          "anchor": "A judge tired of being everyone's last resort.",
+          "state": "planned"
         }
       ]
     },
@@ -721,7 +793,8 @@
       "visuals": [
         {
           "id": "VIS-054-A",
-          "anchor": "But frustration doesn't always translate well into a soundbite, and this one didn't."
+          "anchor": "But frustration doesn't always translate well into a soundbite, and this one didn't.",
+          "state": "planned"
         }
       ]
     },
@@ -733,7 +806,8 @@
       "visuals": [
         {
           "id": "VIS-055-A",
-          "anchor": "It was meant as a dismissal."
+          "anchor": "It was meant as a dismissal.",
+          "state": "planned"
         }
       ]
     },
@@ -745,7 +819,8 @@
       "visuals": [
         {
           "id": "VIS-056-A",
-          "anchor": "It landed as a gift."
+          "anchor": "It landed as a gift.",
+          "state": "planned"
         }
       ]
     },
@@ -757,11 +832,13 @@
       "visuals": [
         {
           "id": "VIS-057-A",
-          "anchor": "Within 78 hours, a college student named Abhijeet Deepke had turned that one sentence into a satirical social media page called the Cockroach Janata Party,"
+          "anchor": "Within 78 hours, a college student named Abhijeet Deepke had turned that one sentence into a satirical social media page called the Cockroach Janata Party,",
+          "state": "planned"
         },
         {
           "id": "VIS-057-B",
-          "anchor": "Cockroach, People's Party, and it had 30 lakh followers."
+          "anchor": "Cockroach, People's Party, and it had 30 lakh followers.",
+          "state": "planned"
         }
       ]
     },
@@ -773,7 +850,8 @@
       "visuals": [
         {
           "id": "VIS-058-A",
-          "anchor": "Not a real political party."
+          "anchor": "Not a real political party.",
+          "state": "planned"
         }
       ]
     },
@@ -785,11 +863,13 @@
       "visuals": [
         {
           "id": "VIS-059-A",
-          "anchor": "No candidates, no manifesto beyond the exam system is broken and somebody in a suit should say so."
+          "anchor": "No candidates, no manifesto beyond the exam system is broken and somebody in a suit should say so.",
+          "state": "planned"
         },
         {
           "id": "VIS-059-B",
-          "anchor": "Just a joke account that decided to become the loudest voice in the room."
+          "anchor": "Just a joke account that decided to become the loudest voice in the room.",
+          "state": "planned"
         }
       ]
     },
@@ -801,7 +881,8 @@
       "visuals": [
         {
           "id": "VIS-060-A",
-          "anchor": "You've probably seen a group chat rename itself something ridiculous after one bad meeting and then watched that ridiculous name somehow become the entire group's personality."
+          "anchor": "You've probably seen a group chat rename itself something ridiculous after one bad meeting and then watched that ridiculous name somehow become the entire group's personality.",
+          "state": "planned"
         }
       ]
     },
@@ -813,7 +894,8 @@
       "visuals": [
         {
           "id": "VIS-061-A",
-          "anchor": "That's this, at national scale, except the group chat, in this case, has 30 lakh members and a logo."
+          "anchor": "That's this, at national scale, except the group chat, in this case, has 30 lakh members and a logo.",
+          "state": "planned"
         }
       ]
     },
@@ -825,7 +907,8 @@
       "visuals": [
         {
           "id": "VIS-062-A",
-          "anchor": "I would like it on record that I did not see this coming.\" The joke did not stay a joke for long."
+          "anchor": "I would like it on record that I did not see this coming.\" The joke did not stay a joke for long.",
+          "state": "planned"
         }
       ]
     },
@@ -844,7 +927,8 @@
       "visuals": [
         {
           "id": "VIS-064-A",
-          "anchor": "Protesters started carrying actual cockroach signs to Jantar Mantar, Delhi's designated protest lawn, and the movement spread outward to Pune, Bengaluru and Lucknow."
+          "anchor": "Protesters started carrying actual cockroach signs to Jantar Mantar, Delhi's designated protest lawn, and the movement spread outward to Pune, Bengaluru and Lucknow.",
+          "state": "planned"
         }
       ]
     },
@@ -856,7 +940,8 @@
       "visuals": [
         {
           "id": "VIS-065-A",
-          "anchor": "A well-known activist, Sonam Wangchuk, joined in with a 26-day hunger strike."
+          "anchor": "A well-known activist, Sonam Wangchuk, joined in with a 26-day hunger strike.",
+          "state": "planned"
         }
       ]
     },
@@ -868,11 +953,13 @@
       "visuals": [
         {
           "id": "VIS-066-A",
-          "anchor": "Wangchuk wasn't some random celebrity endorsement."
+          "anchor": "Wangchuk wasn't some random celebrity endorsement.",
+          "state": "planned"
         },
         {
           "id": "VIS-066-B",
-          "anchor": "He'd already built a real reputation from education and climate protests in Ladakh, the kind of credibility that doesn't come from a verified badge."
+          "anchor": "He'd already built a real reputation from education and climate protests in Ladakh, the kind of credibility that doesn't come from a verified badge.",
+          "state": "planned"
         }
       ]
     },
@@ -884,7 +971,8 @@
       "visuals": [
         {
           "id": "VIS-067-A",
-          "anchor": "His involvement is what turned an internet joke into something newsrooms could no longer file under student memes and move on from."
+          "anchor": "His involvement is what turned an internet joke into something newsrooms could no longer file under student memes and move on from.",
+          "state": "planned"
         }
       ]
     },
@@ -896,15 +984,18 @@
       "visuals": [
         {
           "id": "VIS-068-A",
-          "anchor": "And that's really the story of this whole movement."
+          "anchor": "And that's really the story of this whole movement.",
+          "state": "planned"
         },
         {
           "id": "VIS-068-B",
-          "anchor": "It started as a punchline, built its audience like a meme page, and only afterward picked up the institutional weight a hunger strike,"
+          "anchor": "It started as a punchline, built its audience like a meme page, and only afterward picked up the institutional weight a hunger strike,",
+          "state": "planned"
         },
         {
           "id": "VIS-068-C",
-          "anchor": "national headlines, a resignation that traditional protest movements usually need years to earn."
+          "anchor": "national headlines, a resignation that traditional protest movements usually need years to earn.",
+          "state": "planned"
         }
       ]
     },
@@ -916,15 +1007,18 @@
       "visuals": [
         {
           "id": "VIS-069-A",
-          "anchor": "For a while, the government's response was to call the whole thing anti-national."
+          "anchor": "For a while, the government's response was to call the whole thing anti-national.",
+          "state": "planned"
         },
         {
           "id": "VIS-069-B",
-          "anchor": "Yes, firing one minister doesn't install biometric scanners or rewrite how the National Testing Agency hires people, fix the system."
+          "anchor": "Yes, firing one minister doesn't install biometric scanners or rewrite how the National Testing Agency hires people, fix the system.",
+          "state": "planned"
         },
         {
           "id": "VIS-069-C",
-          "anchor": "Not just the man standing near it, is not an unreasonable position on its own."
+          "anchor": "Not just the man standing near it, is not an unreasonable position on its own.",
+          "state": "planned"
         }
       ]
     },
@@ -936,7 +1030,8 @@
       "visuals": [
         {
           "id": "VIS-070-A",
-          "anchor": "But you can be technically right and still lose the room completely."
+          "anchor": "But you can be technically right and still lose the room completely.",
+          "state": "planned"
         }
       ]
     },
@@ -948,7 +1043,8 @@
       "visuals": [
         {
           "id": "VIS-071-A",
-          "anchor": "I've been technically right about plenty of arguments I still lost, so I sympathise a little."
+          "anchor": "I've been technically right about plenty of arguments I still lost, so I sympathise a little.",
+          "state": "planned"
         }
       ]
     },
@@ -960,11 +1056,13 @@
       "visuals": [
         {
           "id": "VIS-072-A",
-          "anchor": "Then, on 20th July and 21st, police used lathi charges,"
+          "anchor": "Then, on 20th July and 21st, police used lathi charges,",
+          "state": "planned"
         },
         {
           "id": "VIS-072-B",
-          "anchor": "the baton crackdowns you've almost certainly seen in a dozen other Indian protest videos."
+          "anchor": "the baton crackdowns you've almost certainly seen in a dozen other Indian protest videos.",
+          "state": "planned"
         }
       ]
     },
@@ -976,11 +1074,13 @@
       "visuals": [
         {
           "id": "VIS-073-A",
-          "anchor": "The government said protesters had blocked roads and ignored repeated orders to disperse."
+          "anchor": "The government said protesters had blocked roads and ignored repeated orders to disperse.",
+          "state": "planned"
         },
         {
           "id": "VIS-073-B",
-          "anchor": "Protesters said they were standing with placards and got charged anyway."
+          "anchor": "Protesters said they were standing with placards and got charged anyway.",
+          "state": "planned"
         }
       ]
     },
@@ -992,7 +1092,8 @@
       "visuals": [
         {
           "id": "VIS-074-A",
-          "anchor": "Both things can be true in different corners of the same crowd."
+          "anchor": "Both things can be true in different corners of the same crowd.",
+          "state": "planned"
         }
       ]
     },
@@ -1004,15 +1105,18 @@
       "visuals": [
         {
           "id": "VIS-075-A",
-          "anchor": "What isn't in dispute is what the footage that actually went viral showed."
+          "anchor": "What isn't in dispute is what the footage that actually went viral showed.",
+          "state": "planned"
         },
         {
           "id": "VIS-075-B",
-          "anchor": "Mostly college students, holding insect-themed placards, getting hit with batons."
+          "anchor": "Mostly college students, holding insect-themed placards, getting hit with batons.",
+          "state": "planned"
         },
         {
           "id": "VIS-075-C",
-          "anchor": "Which, whether or not someone 20 minutes earlier had blocked a road, is not the optics you want if you're trying to argue the crackdown was proportionate."
+          "anchor": "Which, whether or not someone 20 minutes earlier had blocked a road, is not the optics you want if you're trying to argue the crackdown was proportionate.",
+          "state": "planned"
         }
       ]
     },
@@ -1024,7 +1128,8 @@
       "visuals": [
         {
           "id": "VIS-076-A",
-          "anchor": "Two months off, the minister is staying followed by roughly 48 hours, in late July, where he wasn't."
+          "anchor": "Two months off, the minister is staying followed by roughly 48 hours, in late July, where he wasn't.",
+          "state": "planned"
         }
       ]
     },
@@ -1036,19 +1141,23 @@
       "visuals": [
         {
           "id": "VIS-077-A",
-          "anchor": "On 25th July, Dharmendra Pradhan resigned as Union Education Minister, writing that he didn't want the country's students left trapped in a web of confusion."
+          "anchor": "On 25th July, Dharmendra Pradhan resigned as Union Education Minister, writing that he didn't want the country's students left trapped in a web of confusion.",
+          "state": "planned"
         },
         {
           "id": "VIS-077-B",
-          "anchor": "The President accepted it the same day,"
+          "anchor": "The President accepted it the same day,",
+          "state": "planned"
         },
         {
           "id": "VIS-077-C",
-          "anchor": "and Cabinet Minister Prahlad Joshi picked up the education portfolio on top of the one he already had one person to cabinet-level jobs,"
+          "anchor": "and Cabinet Minister Prahlad Joshi picked up the education portfolio on top of the one he already had one person to cabinet-level jobs,",
+          "state": "planned"
         },
         {
           "id": "VIS-077-D",
-          "anchor": "not because he is uniquely qualified for both but because the desk needed a name on it by evening."
+          "anchor": "not because he is uniquely qualified for both but because the desk needed a name on it by evening.",
+          "state": "planned"
         }
       ]
     },
@@ -1060,7 +1169,8 @@
       "visuals": [
         {
           "id": "VIS-078-A",
-          "anchor": "Indian cabinets do this constantly, and the spare ministry to whoever has room that week, like a portfolio is a task you assign rather than a job someone trains for."
+          "anchor": "Indian cabinets do this constantly, and the spare ministry to whoever has room that week, like a portfolio is a task you assign rather than a job someone trains for.",
+          "state": "planned"
         }
       ]
     },
@@ -1072,7 +1182,8 @@
       "visuals": [
         {
           "id": "VIS-079-A",
-          "anchor": "The cockroach Janata Party announced it was ending its Janata Mantra protest in good faith that same week."
+          "anchor": "The cockroach Janata Party announced it was ending its Janata Mantra protest in good faith that same week.",
+          "state": "planned"
         }
       ]
     },
@@ -1084,7 +1195,8 @@
       "visuals": [
         {
           "id": "VIS-080-A",
-          "anchor": "Sit with that for a second, a meme account had outlasted a sitting cabinet minister."
+          "anchor": "Sit with that for a second, a meme account had outlasted a sitting cabinet minister.",
+          "state": "planned"
         }
       ]
     },
@@ -1096,7 +1208,8 @@
       "visuals": [
         {
           "id": "VIS-081-A",
-          "anchor": "I don't know what I expected from 2026, but it wasn't that."
+          "anchor": "I don't know what I expected from 2026, but it wasn't that.",
+          "state": "planned"
         }
       ]
     },
@@ -1108,11 +1221,13 @@
       "visuals": [
         {
           "id": "VIS-082-A",
-          "anchor": "And then, because this is how Indian bureaucracy always closes a loop, the government announced its response."
+          "anchor": "And then, because this is how Indian bureaucracy always closes a loop, the government announced its response.",
+          "state": "planned"
         },
         {
           "id": "VIS-082-B",
-          "anchor": "A new expert committee, pulling from technology, education and administration, to recommend long-term reforms."
+          "anchor": "A new expert committee, pulling from technology, education and administration, to recommend long-term reforms.",
+          "state": "planned"
         }
       ]
     },
@@ -1124,7 +1239,8 @@
       "visuals": [
         {
           "id": "VIS-083-A",
-          "anchor": "Neet U.G. is reportedly moving to computer-based testing next year."
+          "anchor": "Neet U.G. is reportedly moving to computer-based testing next year.",
+          "state": "planned"
         }
       ]
     },
@@ -1136,11 +1252,13 @@
       "visuals": [
         {
           "id": "VIS-084-A",
-          "anchor": "Biometric checks, tighter paper security, more digital surveillance all promised, again,"
+          "anchor": "Biometric checks, tighter paper security, more digital surveillance all promised, again,",
+          "state": "planned"
         },
         {
           "id": "VIS-084-B",
-          "anchor": "on top of the 101 promises already sitting in a file somewhere from the last time."
+          "anchor": "on top of the 101 promises already sitting in a file somewhere from the last time.",
+          "state": "planned"
         }
       ]
     },
@@ -1152,7 +1270,8 @@
       "visuals": [
         {
           "id": "VIS-085-A",
-          "anchor": "If you've lost count of how many committees I've mentioned in the last two minutes, congratulations, you're feeling roughly 1% of the exhaustion the actual students feel."
+          "anchor": "If you've lost count of how many committees I've mentioned in the last two minutes, congratulations, you're feeling roughly 1% of the exhaustion the actual students feel.",
+          "state": "planned"
         }
       ]
     },
@@ -1164,7 +1283,8 @@
       "visuals": [
         {
           "id": "VIS-086-A",
-          "anchor": "And while the government was scheduling this one, the cockroaches, somewhere, were presumably already scheduling the next protest."
+          "anchor": "And while the government was scheduling this one, the cockroaches, somewhere, were presumably already scheduling the next protest.",
+          "state": "planned"
         }
       ]
     },
@@ -1176,7 +1296,8 @@
       "visuals": [
         {
           "id": "VIS-087-A",
-          "anchor": "For the more than 22 lakh students who actually sat that May exam, none of this committee talk changes what the last few months cost them."
+          "anchor": "For the more than 22 lakh students who actually sat that May exam, none of this committee talk changes what the last few months cost them.",
+          "state": "planned"
         }
       ]
     },
@@ -1188,7 +1309,8 @@
       "visuals": [
         {
           "id": "VIS-088-A",
-          "anchor": "A re-exam 8 weeks later than planned."
+          "anchor": "A re-exam 8 weeks later than planned.",
+          "state": "planned"
         }
       ]
     },
@@ -1200,7 +1322,8 @@
       "visuals": [
         {
           "id": "VIS-089-A",
-          "anchor": "A summer spent not knowing whether the score they'd earned would even count."
+          "anchor": "A summer spent not knowing whether the score they'd earned would even count.",
+          "state": "planned"
         }
       ]
     },
@@ -1212,7 +1335,8 @@
       "visuals": [
         {
           "id": "VIS-090-A",
-          "anchor": "Coaching Institute deadlines and hostel leases that don't pause for a CBI probe."
+          "anchor": "Coaching Institute deadlines and hostel leases that don't pause for a CBI probe.",
+          "state": "planned"
         }
       ]
     },
@@ -1224,11 +1348,13 @@
       "visuals": [
         {
           "id": "VIS-091-A",
-          "anchor": "Whatever the next reform report recommends, it arrives too late for the specific batch of 18-year-olds who lived through this particular version of the story, which is,"
+          "anchor": "Whatever the next reform report recommends, it arrives too late for the specific batch of 18-year-olds who lived through this particular version of the story, which is,",
+          "state": "planned"
         },
         {
           "id": "VIS-091-B",
-          "anchor": "if you think about it, the quite cost hiding underneath every one of these Indian governance stories, the fix always arrives, eventually, for whoever comes after."
+          "anchor": "if you think about it, the quite cost hiding underneath every one of these Indian governance stories, the fix always arrives, eventually, for whoever comes after.",
+          "state": "planned"
         }
       ]
     },
@@ -1240,7 +1366,8 @@
       "visuals": [
         {
           "id": "VIS-092-A",
-          "anchor": "I keep thinking about that one detail more than any other in this story."
+          "anchor": "I keep thinking about that one detail more than any other in this story.",
+          "state": "planned"
         }
       ]
     },
@@ -1252,7 +1379,8 @@
       "visuals": [
         {
           "id": "VIS-093-A",
-          "anchor": "Which brings us back to where we started."
+          "anchor": "Which brings us back to where we started.",
+          "state": "planned"
         }
       ]
     },
@@ -1264,11 +1392,13 @@
       "visuals": [
         {
           "id": "VIS-094-A",
-          "anchor": "There is already a 101-point reform plan sitting on a desk, mostly implemented,"
+          "anchor": "There is already a 101-point reform plan sitting on a desk, mostly implemented,",
+          "state": "planned"
         },
         {
           "id": "VIS-094-B",
-          "anchor": "from the last time this exact same thing happened and it wasn't enough to stop it from happening again two years later."
+          "anchor": "from the last time this exact same thing happened and it wasn't enough to stop it from happening again two years later.",
+          "state": "planned"
         }
       ]
     },
@@ -1280,7 +1410,8 @@
       "visuals": [
         {
           "id": "VIS-095-A",
-          "anchor": "The real problem clearly isn't that India can't write a good committee report,"
+          "anchor": "The real problem clearly isn't that India can't write a good committee report,",
+          "state": "planned"
         }
       ]
     },
@@ -1292,7 +1423,8 @@
       "visuals": [
         {
           "id": "VIS-096-A",
-          "anchor": "it's written two of them now, from two different chairmen, with broadly the same recommendations both times."
+          "anchor": "it's written two of them now, from two different chairmen, with broadly the same recommendations both times.",
+          "state": "planned"
         }
       ]
     },
@@ -1304,7 +1436,8 @@
       "visuals": [
         {
           "id": "VIS-097-A",
-          "anchor": "The real question isn't whether India can write a reform report."
+          "anchor": "The real question isn't whether India can write a reform report.",
+          "state": "planned"
         }
       ]
     },
@@ -1316,7 +1449,8 @@
       "visuals": [
         {
           "id": "VIS-098-A",
-          "anchor": "It's whether next year's batch of more than 22 lakh students gets a fair exam or just a better logo for whichever protest comes after."
+          "anchor": "It's whether next year's batch of more than 22 lakh students gets a fair exam or just a better logo for whichever protest comes after.",
+          "state": "planned"
         }
       ]
     }

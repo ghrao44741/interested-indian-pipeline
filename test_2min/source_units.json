@@ -1,0 +1,301 @@
+{
+  "version": 2,
+  "next_seq": 21,
+  "units": [
+    {
+      "id": "SRC-001",
+      "paragraph": 0,
+      "text": "In July 2026, a Cabinet minister who had survived every single reshuffle for twelve years resigned.",
+      "fingerprint": "2296816c2ac5",
+      "visuals": [
+        {
+          "id": "VIS-001-A",
+          "anchor": "In July 2026, a cabinet minister who had survived every single reshuffle for 12 years resigned.",
+          "state": "planned"
+        }
+      ]
+    },
+    {
+      "id": "SRC-002",
+      "paragraph": 0,
+      "text": "The party that took him down is called, and I promise I am not making this up, the Cockroach Janta Party.",
+      "fingerprint": "ff24eeec20a1",
+      "visuals": [
+        {
+          "id": "VIS-002-A",
+          "anchor": "The party that took him down is called, and I promise I am not making this up, the Cockroach Janata Party.",
+          "state": "planned"
+        }
+      ]
+    },
+    {
+      "id": "SRC-003",
+      "paragraph": 1,
+      "text": "Here's how you get there.",
+      "fingerprint": "8ab37cfee438",
+      "visuals": [
+        {
+          "id": "VIS-003-A",
+          "anchor": "Here's how you get there.",
+          "state": "planned"
+        }
+      ]
+    },
+    {
+      "id": "SRC-004",
+      "paragraph": 1,
+      "text": "In May, India's biggest medical entrance exam, NEET-UG, got cancelled nationwide because a tutor cross-checked a leaked PDF against his students' actual paper and found the questions matched almost word for word.",
+      "fingerprint": "1afdce892506",
+      "visuals": [
+        {
+          "id": "VIS-004-A",
+          "anchor": "In May, India's biggest medical entrance exam, NEET-UG,",
+          "state": "planned"
+        },
+        {
+          "id": "VIS-004-B",
+          "anchor": "got cancelled nationwide because a tutor cross-checked a leaked PDF against",
+          "state": "planned"
+        },
+        {
+          "id": "VIS-004-C",
+          "anchor": "his student's actual paper and found the questions matched almost word-for-word.",
+          "state": "planned"
+        }
+      ]
+    },
+    {
+      "id": "SRC-005",
+      "paragraph": 1,
+      "text": "Twenty-two lakh candidates — roughly the population of a mid-sized country — had to sit the same exam twice because somebody couldn't keep a file secret.",
+      "fingerprint": "12dbb471602d",
+      "visuals": [
+        {
+          "id": "VIS-005-A",
+          "anchor": "22 lakh candidates, roughly the population of a mid-sized country,",
+          "state": "planned"
+        },
+        {
+          "id": "VIS-005-B",
+          "anchor": "had to sit the same exam twice because somebody couldn't keep a file secret.",
+          "state": "planned"
+        }
+      ]
+    },
+    {
+      "id": "SRC-006",
+      "paragraph": 1,
+      "text": "If you've ever forwarded a \"leaked\" exam paper in a WhatsApp group as a joke, this is the ministry-level version of that.",
+      "fingerprint": "4b43a2f8cb1a",
+      "visuals": [
+        {
+          "id": "VIS-006-A",
+          "anchor": "If you've ever forwarded a leaked exam paper in a WhatsApp group as a joke, this is the ministry level version of that.",
+          "state": "planned"
+        }
+      ]
+    },
+    {
+      "id": "SRC-007",
+      "paragraph": 2,
+      "text": "Then a Supreme Court judge, in an unrelated hearing, made a remark that got read online as comparing jobless young people to cockroaches.",
+      "fingerprint": "62707c7b83e1",
+      "visuals": [
+        {
+          "id": "VIS-007-A",
+          "anchor": "Then, a Supreme Court judge, in an unrelated hearing, made a remark that got read online as comparing jobless yin people to cockroaches.",
+          "state": "planned"
+        }
+      ]
+    },
+    {
+      "id": "SRC-008",
+      "paragraph": 2,
+      "text": "The court said it was taken out of context.",
+      "fingerprint": "962973160ef5",
+      "visuals": [
+        {
+          "id": "VIS-008-A",
+          "anchor": "The court said it was taken out of context.",
+          "state": "planned"
+        }
+      ]
+    },
+    {
+      "id": "SRC-009",
+      "paragraph": 2,
+      "text": "Nobody online particularly cared — by the next morning, a student had already announced the \"Cockroach Janta Party\" as satire.",
+      "fingerprint": "3e582f9c858d",
+      "visuals": [
+        {
+          "id": "VIS-009-A",
+          "anchor": "Nobody online particularly cared.",
+          "state": "planned"
+        },
+        {
+          "id": "VIS-009-B",
+          "anchor": "By the next morning, a student had already announced the Cockroach Janata Party as satire.",
+          "state": "planned"
+        }
+      ]
+    },
+    {
+      "id": "SRC-010",
+      "paragraph": 2,
+      "text": "So now a minister who had outlasted a decade of coalition politics was being chased by a party named after an insect.",
+      "fingerprint": "d6706e88e9b8",
+      "visuals": [
+        {
+          "id": "VIS-010-A",
+          "anchor": "So now a minister who had outlasted a decade of coalition politics was being chased by a party named after an insect.",
+          "state": "planned"
+        }
+      ]
+    },
+    {
+      "id": "SRC-011",
+      "paragraph": 2,
+      "text": "That's where we were.",
+      "fingerprint": "3fefd5a18831",
+      "visuals": [
+        {
+          "id": "VIS-011-A",
+          "anchor": "That's where we were.",
+          "state": "planned"
+        }
+      ]
+    },
+    {
+      "id": "SRC-012",
+      "paragraph": 3,
+      "text": "The government's line, for most of that time, was fix the machine, not the guy who broke it.",
+      "fingerprint": "f8e68ae10a8e",
+      "visuals": [
+        {
+          "id": "VIS-012-A",
+          "anchor": "The government's line for most of that time was fix the machine, not the guy who broke it.",
+          "state": "planned"
+        }
+      ]
+    },
+    {
+      "id": "SRC-013",
+      "paragraph": 3,
+      "text": "Then a planned march toward Parliament turned into tear gas and baton charges.",
+      "fingerprint": "1dc761eac736",
+      "visuals": [
+        {
+          "id": "VIS-013-A",
+          "anchor": "Then a planned march toward parliament turned into tear gas and batting charges.",
+          "state": "planned"
+        }
+      ]
+    },
+    {
+      "id": "SRC-014",
+      "paragraph": 3,
+      "text": "I know exactly what you're thinking — either the students went too far, or the police did.",
+      "fingerprint": "96d2bd588c47",
+      "visuals": [
+        {
+          "id": "VIS-014-A",
+          "anchor": "I know exactly what you're thinking.",
+          "state": "planned"
+        },
+        {
+          "id": "VIS-014-B",
+          "anchor": "Either the students went too far or the police did.",
+          "state": "planned"
+        }
+      ]
+    },
+    {
+      "id": "SRC-015",
+      "paragraph": 3,
+      "text": "Both camps have footage.",
+      "fingerprint": "86f98f73c83e",
+      "visuals": [
+        {
+          "id": "VIS-015-A",
+          "anchor": "Both camps have footage.",
+          "state": "planned"
+        }
+      ]
+    },
+    {
+      "id": "SRC-016",
+      "paragraph": 3,
+      "text": "Both camps have hashtags.",
+      "fingerprint": "dabf8eb79d39",
+      "visuals": [
+        {
+          "id": "VIS-016-A",
+          "anchor": "Both camps have hashtags.",
+          "state": "planned"
+        }
+      ]
+    },
+    {
+      "id": "SRC-017",
+      "paragraph": 3,
+      "text": "What nobody disputes is what happened next: two months of \"I'm staying,\" and then, in about forty-eight hours, he wasn't.",
+      "fingerprint": "c016cfce2991",
+      "visuals": [
+        {
+          "id": "VIS-017-A",
+          "anchor": "What nobody disputes is what happened next.",
+          "state": "planned"
+        },
+        {
+          "id": "VIS-017-B",
+          "anchor": "Two months of Einstein and then in about 48 hours, he wasn't.",
+          "state": "planned"
+        }
+      ]
+    },
+    {
+      "id": "SRC-018",
+      "paragraph": 4,
+      "text": "And then the government did the most government thing possible: it announced a brand-new committee to fix the exam system, chaired by the man who built Aadhaar.",
+      "fingerprint": "729ba604b24f",
+      "visuals": [
+        {
+          "id": "VIS-018-A",
+          "anchor": "and then the government did the most government thing possible.",
+          "state": "planned"
+        },
+        {
+          "id": "VIS-018-B",
+          "anchor": "It announced a brand new committee to fix the exam system, chaired by the man who built Aadhaar,",
+          "state": "planned"
+        }
+      ]
+    },
+    {
+      "id": "SRC-019",
+      "paragraph": 4,
+      "text": "Which would land better if there weren't already a committee for exactly this, from the 2024 leak, still working through its own hundred-plus recommendations.",
+      "fingerprint": "f4f42f0b5df1",
+      "visuals": [
+        {
+          "id": "VIS-019-A",
+          "anchor": "which would land better if there weren't already a committee for exactly this from the 2024 leak, still working through its own 100 plus recommendations.",
+          "state": "planned"
+        }
+      ]
+    },
+    {
+      "id": "SRC-020",
+      "paragraph": 4,
+      "text": "In Indian bureaucracy, the fix for an unfinished report is always a newer report.",
+      "fingerprint": "a970b0a74067",
+      "visuals": [
+        {
+          "id": "VIS-020-A",
+          "anchor": "In Indian bureaucracy, the fix for an unfinished report is always a newer report.",
+          "state": "planned"
+        }
+      ]
+    }
+  ]
+}

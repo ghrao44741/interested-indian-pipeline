@@ -32,7 +32,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-001-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-001"
     },
     {
       "id": "SCENE-002",
@@ -57,7 +59,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-002-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-002"
     },
     {
       "id": "SCENE-003",
@@ -82,7 +86,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-003-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-003"
     },
     {
       "id": "SCENE-004",
@@ -107,7 +113,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-003-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-003"
     },
     {
       "id": "SCENE-005",
@@ -132,7 +140,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-004-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-004"
     },
     {
       "id": "SCENE-006",
@@ -157,7 +167,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-005-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-005"
     },
     {
       "id": "SCENE-007",
@@ -182,7 +194,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-006-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-006"
     },
     {
       "id": "SCENE-008",
@@ -207,7 +221,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-006-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-006"
     },
     {
       "id": "SCENE-009",
@@ -232,7 +248,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-007-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-007"
     },
     {
       "id": "SCENE-010",
@@ -257,7 +275,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-008-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-008"
     },
     {
       "id": "SCENE-011",
@@ -282,7 +302,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-009-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-009"
     },
     {
       "id": "SCENE-012",
@@ -307,7 +329,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-010-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-010"
     },
     {
       "id": "SCENE-013",
@@ -332,7 +356,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-011-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-011"
     },
     {
       "id": "SCENE-014",
@@ -357,7 +383,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-012-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-012"
     },
     {
       "id": "SCENE-015",
@@ -382,7 +410,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-013-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-013"
     },
     {
       "id": "SCENE-016",
@@ -407,7 +437,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-013-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-013"
     },
     {
       "id": "SCENE-017",
@@ -432,7 +464,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-014-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-014"
     },
     {
       "id": "SCENE-018",
@@ -457,7 +491,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-015-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-015"
     },
     {
       "id": "SCENE-019",
@@ -482,7 +518,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-016-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-016"
     },
     {
       "id": "SCENE-020",
@@ -507,7 +545,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-017-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-017"
     },
     {
       "id": "SCENE-021",
@@ -532,7 +572,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-018-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-018"
     },
     {
       "id": "SCENE-022",
@@ -557,7 +599,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-019-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-019"
     },
     {
       "id": "SCENE-023",
@@ -582,7 +626,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-019-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-019"
     },
     {
       "id": "SCENE-024",
@@ -607,7 +653,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-020-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-020"
     },
     {
       "id": "SCENE-025",
@@ -632,7 +680,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-021-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-021"
     },
     {
       "id": "SCENE-026",
@@ -657,7 +707,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-022-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-022"
     },
     {
       "id": "SCENE-027",
@@ -682,7 +734,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-023-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-023"
     },
     {
       "id": "SCENE-028",
@@ -707,7 +761,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-024-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-024"
     },
     {
       "id": "SCENE-029",
@@ -732,7 +788,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-025-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-025"
     },
     {
       "id": "SCENE-030",
@@ -757,7 +815,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-026-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-026"
     },
     {
       "id": "SCENE-031",
@@ -782,7 +842,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-026-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-026"
     },
     {
       "id": "SCENE-032",
@@ -807,7 +869,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-027-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-027"
     },
     {
       "id": "SCENE-033",
@@ -833,7 +897,10 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-028-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-028",
+      "visual_owner_note": "visual attributed to SRC-028; shot also draws on SRC-029"
     },
     {
       "id": "SCENE-034",
@@ -858,7 +925,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-030-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-030"
     },
     {
       "id": "SCENE-035",
@@ -883,7 +952,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-030-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-030"
     },
     {
       "id": "SCENE-036",
@@ -908,7 +979,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-030-C",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-030"
     },
     {
       "id": "SCENE-037",
@@ -933,7 +1006,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-031-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-031"
     },
     {
       "id": "SCENE-038",
@@ -958,7 +1033,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-032-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-032"
     },
     {
       "id": "SCENE-039",
@@ -983,7 +1060,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-033-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-033"
     },
     {
       "id": "SCENE-040",
@@ -1008,7 +1087,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-034-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-034"
     },
     {
       "id": "SCENE-041",
@@ -1033,7 +1114,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-035-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-035"
     },
     {
       "id": "SCENE-042",
@@ -1058,7 +1141,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-035-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-035"
     },
     {
       "id": "SCENE-043",
@@ -1083,7 +1168,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-035-C",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-035"
     },
     {
       "id": "SCENE-044",
@@ -1108,7 +1195,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-035-D",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-035"
     },
     {
       "id": "SCENE-045",
@@ -1133,7 +1222,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-035-E",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-035"
     },
     {
       "id": "SCENE-046",
@@ -1158,7 +1249,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-035-F",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-035"
     },
     {
       "id": "SCENE-047",
@@ -1183,7 +1276,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-036-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-036"
     },
     {
       "id": "SCENE-048",
@@ -1208,7 +1303,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-037-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-037"
     },
     {
       "id": "SCENE-049",
@@ -1233,7 +1330,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-038-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-038"
     },
     {
       "id": "SCENE-050",
@@ -1258,7 +1357,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-039-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-039"
     },
     {
       "id": "SCENE-051",
@@ -1283,13 +1384,15 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-040-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-040"
     },
     {
       "id": "SCENE-052",
       "image": "images/SCENE-052.png",
       "audio": "audio/SCENE-052.mp3",
-      "script": "and the fallout was bad enough that the government formed a high-level committee led by a former ISRO chairman with one job \u2013 fix the National Testing Agency for good.",
+      "script": "and the fallout was bad enough that the government formed a high-level committee led by a former ISRO chairman with one job – fix the National Testing Agency for good.",
       "scene_type": "standalone",
       "visual_group_id": null,
       "duration": 9.426,
@@ -1308,7 +1411,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-040-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-040"
     },
     {
       "id": "SCENE-053",
@@ -1333,7 +1438,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-041-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-041"
     },
     {
       "id": "SCENE-054",
@@ -1358,7 +1465,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-042-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-042"
     },
     {
       "id": "SCENE-055",
@@ -1383,7 +1492,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-042-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-042"
     },
     {
       "id": "SCENE-056",
@@ -1408,7 +1519,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-043-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-043"
     },
     {
       "id": "SCENE-057",
@@ -1433,7 +1546,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-043-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-043"
     },
     {
       "id": "SCENE-058",
@@ -1458,7 +1573,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-043-C",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-043"
     },
     {
       "id": "SCENE-059",
@@ -1483,7 +1600,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-044-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-044"
     },
     {
       "id": "SCENE-060",
@@ -1508,7 +1627,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-045-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-045"
     },
     {
       "id": "SCENE-061",
@@ -1533,7 +1654,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-046-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-046"
     },
     {
       "id": "SCENE-062",
@@ -1558,7 +1681,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-047-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-047"
     },
     {
       "id": "SCENE-063",
@@ -1583,7 +1708,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-047-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-047"
     },
     {
       "id": "SCENE-064",
@@ -1608,7 +1735,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-047-C",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-047"
     },
     {
       "id": "SCENE-065",
@@ -1633,7 +1762,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-048-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-048"
     },
     {
       "id": "SCENE-066",
@@ -1682,7 +1813,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-049-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-049"
     },
     {
       "id": "SCENE-068",
@@ -1707,7 +1840,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-050-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-050"
     },
     {
       "id": "SCENE-069",
@@ -1732,7 +1867,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-051-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-051"
     },
     {
       "id": "SCENE-070",
@@ -1757,7 +1894,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-052-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-052"
     },
     {
       "id": "SCENE-071",
@@ -1782,7 +1921,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-052-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-052"
     },
     {
       "id": "SCENE-072",
@@ -1807,7 +1948,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-052-C",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-052"
     },
     {
       "id": "SCENE-073",
@@ -1832,7 +1975,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-053-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-053"
     },
     {
       "id": "SCENE-074",
@@ -1857,7 +2002,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-054-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-054"
     },
     {
       "id": "SCENE-075",
@@ -1882,7 +2029,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-055-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-055"
     },
     {
       "id": "SCENE-076",
@@ -1907,7 +2056,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-056-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-056"
     },
     {
       "id": "SCENE-077",
@@ -1932,7 +2083,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-057-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-057"
     },
     {
       "id": "SCENE-078",
@@ -1957,7 +2110,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-057-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-057"
     },
     {
       "id": "SCENE-079",
@@ -1982,7 +2137,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-058-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-058"
     },
     {
       "id": "SCENE-080",
@@ -2007,7 +2164,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-059-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-059"
     },
     {
       "id": "SCENE-081",
@@ -2032,7 +2191,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-059-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-059"
     },
     {
       "id": "SCENE-082",
@@ -2057,7 +2218,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-060-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-060"
     },
     {
       "id": "SCENE-083",
@@ -2082,7 +2245,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-061-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-061"
     },
     {
       "id": "SCENE-084",
@@ -2108,7 +2273,10 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-062-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-062",
+      "visual_owner_note": "visual attributed to SRC-062; shot also draws on SRC-063"
     },
     {
       "id": "SCENE-085",
@@ -2133,7 +2301,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-064-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-064"
     },
     {
       "id": "SCENE-086",
@@ -2158,7 +2328,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-065-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-065"
     },
     {
       "id": "SCENE-087",
@@ -2183,7 +2355,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-066-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-066"
     },
     {
       "id": "SCENE-088",
@@ -2208,7 +2382,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-066-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-066"
     },
     {
       "id": "SCENE-089",
@@ -2233,7 +2409,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-067-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-067"
     },
     {
       "id": "SCENE-090",
@@ -2258,7 +2436,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-068-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-068"
     },
     {
       "id": "SCENE-091",
@@ -2283,7 +2463,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-068-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-068"
     },
     {
       "id": "SCENE-092",
@@ -2308,7 +2490,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-068-C",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-068"
     },
     {
       "id": "SCENE-093",
@@ -2333,7 +2517,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-069-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-069"
     },
     {
       "id": "SCENE-094",
@@ -2358,7 +2544,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-069-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-069"
     },
     {
       "id": "SCENE-095",
@@ -2383,7 +2571,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-069-C",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-069"
     },
     {
       "id": "SCENE-096",
@@ -2408,7 +2598,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-070-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-070"
     },
     {
       "id": "SCENE-097",
@@ -2433,7 +2625,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-071-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-071"
     },
     {
       "id": "SCENE-098",
@@ -2458,7 +2652,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-072-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-072"
     },
     {
       "id": "SCENE-099",
@@ -2483,7 +2679,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-072-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-072"
     },
     {
       "id": "SCENE-100",
@@ -2508,7 +2706,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-073-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-073"
     },
     {
       "id": "SCENE-101",
@@ -2533,7 +2733,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-073-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-073"
     },
     {
       "id": "SCENE-102",
@@ -2558,7 +2760,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-074-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-074"
     },
     {
       "id": "SCENE-103",
@@ -2583,7 +2787,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-075-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-075"
     },
     {
       "id": "SCENE-104",
@@ -2608,7 +2814,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-075-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-075"
     },
     {
       "id": "SCENE-105",
@@ -2633,7 +2841,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-075-C",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-075"
     },
     {
       "id": "SCENE-106",
@@ -2658,7 +2868,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-076-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-076"
     },
     {
       "id": "SCENE-107",
@@ -2683,7 +2895,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-077-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-077"
     },
     {
       "id": "SCENE-108",
@@ -2708,7 +2922,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-077-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-077"
     },
     {
       "id": "SCENE-109",
@@ -2733,7 +2949,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-077-C",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-077"
     },
     {
       "id": "SCENE-110",
@@ -2758,7 +2976,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-077-D",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-077"
     },
     {
       "id": "SCENE-111",
@@ -2783,7 +3003,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-078-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-078"
     },
     {
       "id": "SCENE-112",
@@ -2808,7 +3030,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-079-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-079"
     },
     {
       "id": "SCENE-113",
@@ -2833,7 +3057,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-080-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-080"
     },
     {
       "id": "SCENE-114",
@@ -2858,7 +3084,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-081-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-081"
     },
     {
       "id": "SCENE-115",
@@ -2883,7 +3111,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-082-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-082"
     },
     {
       "id": "SCENE-116",
@@ -2908,7 +3138,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-082-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-082"
     },
     {
       "id": "SCENE-117",
@@ -2933,7 +3165,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-083-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-083"
     },
     {
       "id": "SCENE-118",
@@ -2958,7 +3192,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-084-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-084"
     },
     {
       "id": "SCENE-119",
@@ -2983,7 +3219,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-084-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-084"
     },
     {
       "id": "SCENE-120",
@@ -3008,7 +3246,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-085-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-085"
     },
     {
       "id": "SCENE-121",
@@ -3033,7 +3273,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-086-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-086"
     },
     {
       "id": "SCENE-122",
@@ -3058,7 +3300,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-087-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-087"
     },
     {
       "id": "SCENE-123",
@@ -3083,7 +3327,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-088-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-088"
     },
     {
       "id": "SCENE-124",
@@ -3108,7 +3354,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-089-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-089"
     },
     {
       "id": "SCENE-125",
@@ -3133,7 +3381,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-090-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-090"
     },
     {
       "id": "SCENE-126",
@@ -3158,7 +3408,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-091-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-091"
     },
     {
       "id": "SCENE-127",
@@ -3183,7 +3435,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-091-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-091"
     },
     {
       "id": "SCENE-128",
@@ -3208,7 +3462,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-092-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-092"
     },
     {
       "id": "SCENE-129",
@@ -3233,7 +3489,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-093-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-093"
     },
     {
       "id": "SCENE-130",
@@ -3258,7 +3516,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-094-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-094"
     },
     {
       "id": "SCENE-131",
@@ -3283,7 +3543,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-094-B",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-094"
     },
     {
       "id": "SCENE-132",
@@ -3308,7 +3570,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-095-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-095"
     },
     {
       "id": "SCENE-133",
@@ -3333,7 +3597,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-096-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-096"
     },
     {
       "id": "SCENE-134",
@@ -3358,7 +3624,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-097-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-097"
     },
     {
       "id": "SCENE-135",
@@ -3383,7 +3651,9 @@
       "source_match": "ok",
       "visual_asset_id": "VIS-098-A",
       "visual_match": "new",
-      "visual_confidence": 1.0
+      "visual_confidence": 1.0,
+      "visual_state": "planned",
+      "visual_owner_source_id": "SRC-098"
     }
   ]
 }

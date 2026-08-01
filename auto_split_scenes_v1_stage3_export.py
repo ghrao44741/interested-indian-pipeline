@@ -668,14 +668,15 @@ def main():
         # Persistent visual identity, anchored to the text each visual was
         # approved against — so a re-split re-attaches artwork by overlap rather
         # than by recomputed S01/S02 position.
+        migrated = source_ids.migrate_visual_slots(units)
         assignments, tie_issues = source_ids.assign_visual_assets(units, manifest_scenes)
         for scene, info in zip(manifest_scenes, assignments):
             scene.update(info)
-        source_ids._write_atomic(
-            source_ids.sidecar_path(Path(args.project)),
-            {"version": source_ids.SIDECAR_VERSION,
-             "next_seq": max((source_ids._seq_of(u["id"]) for u in units), default=0) + 1,
-             "units": units})
+        # save_units() preserves the monotonic id high-water mark; recomputing it
+        # from the current units would recycle a deleted id onto a new sentence.
+        source_ids.save_units(Path(args.project), units)
+        if migrated:
+            print(f"  migrated {migrated} pre-lifecycle visual slot(s) as 'planned'")
 
         identity, identity_reasons = source_ids.identity_state(manifest_scenes)
 
