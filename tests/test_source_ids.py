@@ -7,6 +7,7 @@ and anything uncertain must refuse to bind rather than guess.
 Run:  python tests/test_source_ids.py
 """
 
+import json
 import sys
 import tempfile
 from pathlib import Path
@@ -302,6 +303,82 @@ mv, _ = assign_visual_assets(units, merged)
 check("all contributing source_ids retained", len(merged[0]["source_ids"]) > 1)
 check("visual owner recorded explicitly", mv[0]["visual_owner_source_id"] == merged[0]["source_ids"][0])
 check("multi-source attribution is noted", "also draws on" in mv[0].get("visual_owner_note", ""))
+
+print("\nTRANSACTIONAL MIGRATION: ambiguity must not modify identity")
+td = Path(tempfile.mkdtemp())
+sync_units(td, "The council met on Tuesday.\n")
+before_bytes = si.sidecar_path(td).read_bytes()
+# Two candidates both plausibly the edit of the single existing unit.
+blocked_exc = None
+try:
+    sync_units(td, "The council met on Tuesdays.\nThe council met on Thursday.\n")
+except si.MigrationBlocked as e:
+    blocked_exc = e
+check("ambiguous migration raises MigrationBlocked", blocked_exc is not None)
+check("ambiguity detail is reported",
+      bool(blocked_exc and blocked_exc.ambiguities), str(blocked_exc))
+check("prior sidecar is byte-for-byte unchanged",
+      si.sidecar_path(td).read_bytes() == before_bytes)
+
+if blocked_exc:
+    reasons = [f"unresolved source migration: {a}" for a in blocked_exc.ambiguities]
+    manifest = {"identity_state": si.IDENTITY_BLOCKED, "identity_reasons": reasons,
+                "scenes": []}
+    mpath = td / "manifest.json"
+    mpath.write_text(json.dumps(manifest), encoding="utf-8")
+    check("ambiguity surfaces in manifest identity_reasons",
+          any("unresolved source migration" in r for r in manifest["identity_reasons"]))
+    try:
+        si.require_clean_identity(mpath, "paid generation")
+        check("blocked migration cannot pass the paid-generation gate", False, "gate allowed it")
+    except si.IdentityError:
+        check("blocked migration cannot pass the paid-generation gate", True)
+
+print("\nRETIRED UNITS: history is kept, ids stay retired, content can return")
+td = Path(tempfile.mkdtemp())
+sync_units(td, f"{A} {B} {C}\n")
+sc = si.load_sidecar(td)
+# approve a visual on the unit that is about to be deleted
+target = next(u for u in sc["units"] if u["text"] == B)
+target["visuals"] = [{"id": "VIS-002-A", "anchor": B, "state": si.SLOT_APPROVED}]
+si.save_units(td, sc["units"])
+
+units, rep = sync_units(td, f"{A} {C}\n")           # delete B
+retired = si.load_sidecar(td).get("retired_units", [])
+check("deleted unit is retired, not discarded",
+      any(u["id"] == "SRC-002" for u in retired), str([u.get("id") for u in retired]))
+retired_b = next(u for u in retired if u["id"] == "SRC-002")
+check("retired unit keeps text and fingerprint",
+      retired_b["text"] == B and retired_b["fingerprint"] == fingerprint(B))
+check("retired unit keeps its approved visual and lifecycle state",
+      retired_b["visuals"][0]["id"] == "VIS-002-A"
+      and retired_b["visuals"][0]["state"] == si.SLOT_APPROVED, str(retired_b["visuals"]))
+check("retirement is stamped", "retired_at" in retired_b)
+
+units, _ = sync_units(td, f"{A} {C} Brand new unrelated line.\n")
+new_id = next(u["id"] for u in units if "unrelated" in u["text"])
+check("retired id is not recycled for unrelated content", new_id != "SRC-002", new_id)
+
+units, rep = sync_units(td, f"{A} {B} {C} Brand new unrelated line.\n")   # B returns
+restored = next(u for u in units if u["text"] == B)
+check("returning sentence reclaims its original id", restored["id"] == "SRC-002", restored["id"])
+check("restoration is reported", "SRC-002" in rep.get("restored", []), str(rep.get("restored")))
+check("restored unit regains its approved visual history",
+      restored["visuals"] and restored["visuals"][0]["state"] == si.SLOT_APPROVED,
+      str(restored.get("visuals")))
+check("restored id leaves the retired collection",
+      not any(u["id"] == "SRC-002" for u in si.load_sidecar(td).get("retired_units", [])))
+
+print("\nunknown metadata survives both write paths")
+td = Path(tempfile.mkdtemp())
+sync_units(td, SCRIPT)
+raw = si.load_sidecar(td)
+raw["future_key"] = {"kept": True}
+si._write_atomic(si.sidecar_path(td), raw)
+si.save_units(td, si.load_sidecar(td)["units"])
+check("save_units preserves unknown keys", si.load_sidecar(td).get("future_key") == {"kept": True})
+sync_units(td, f"{A} {B} {C} One more line.\n")
+check("sync_units preserves unknown keys", si.load_sidecar(td).get("future_key") == {"kept": True})
 
 print("\nidentity state blocks downstream work")
 state, reasons = identity_state(split_a)

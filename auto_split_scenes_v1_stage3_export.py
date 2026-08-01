@@ -659,26 +659,46 @@ def main():
     elif not script_path:
         script_path = source_ids.pick_production_script(args.project, strict=False)
 
+    migration_blocked = None
     if script_path and Path(script_path).exists():
-        units, change = source_ids.sync_units(
-            Path(args.project), Path(script_path).read_text(encoding="utf-8"))
+        try:
+            units, change = source_ids.sync_units(
+                Path(args.project), Path(script_path).read_text(encoding="utf-8"))
+        except source_ids.MigrationBlocked as blocked:
+            # Sidecar untouched. Still emit a manifest so the operator can see the
+            # split, but mark it blocked so nothing routes or generates from it.
+            migration_blocked = blocked
+            units = source_ids.load_sidecar(Path(args.project))["units"]
+            change = {"added": [], "changed": [], "removed": [], "unchanged": 0}
+            print(f"\n  ⛔ MIGRATION BLOCKED — sidecar left unchanged, resolution required:")
+            for a in blocked.ambiguities[:6]:
+                print(f"     - {a}")
+
         for scene, info in zip(manifest_scenes, source_ids.align_scenes(manifest_scenes, units)):
             scene.update(info)
 
         # Persistent visual identity, anchored to the text each visual was
         # approved against — so a re-split re-attaches artwork by overlap rather
         # than by recomputed S01/S02 position.
-        migrated = source_ids.migrate_visual_slots(units)
-        assignments, tie_issues = source_ids.assign_visual_assets(units, manifest_scenes)
-        for scene, info in zip(manifest_scenes, assignments):
-            scene.update(info)
-        # save_units() preserves the monotonic id high-water mark; recomputing it
-        # from the current units would recycle a deleted id onto a new sentence.
-        source_ids.save_units(Path(args.project), units)
-        if migrated:
-            print(f"  migrated {migrated} pre-lifecycle visual slot(s) as 'planned'")
+        if migration_blocked is None:
+            migrated = source_ids.migrate_visual_slots(units)
+            assignments, tie_issues = source_ids.assign_visual_assets(units, manifest_scenes)
+            for scene, info in zip(manifest_scenes, assignments):
+                scene.update(info)
+            # save_units() preserves the monotonic id high-water mark; recomputing
+            # it from the current units would recycle a deleted id.
+            source_ids.save_units(Path(args.project), units)
+            if migrated:
+                print(f"  migrated {migrated} pre-lifecycle visual slot(s) as 'planned'")
+        else:
+            # Nothing is allocated or persisted against an unresolved migration.
+            tie_issues = []
 
         identity, identity_reasons = source_ids.identity_state(manifest_scenes)
+        if migration_blocked is not None:
+            identity = source_ids.IDENTITY_BLOCKED
+            identity_reasons = ([f"unresolved source migration: {a}"
+                                 for a in migration_blocked.ambiguities] + identity_reasons)
 
         print(f"\n✓ Source identity: {len(units)} unit(s) from {Path(script_path).name}")
         if change["changed"] or change["added"] or change["removed"]:

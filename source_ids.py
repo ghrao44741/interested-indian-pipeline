@@ -94,6 +94,22 @@ class IdentityError(RuntimeError):
     """Raised when identity cannot be established safely."""
 
 
+class MigrationBlocked(IdentityError):
+    """A script edit cannot be migrated without a human decision.
+
+    Raised *before* anything is written. The previous sidecar is left byte-for-
+    byte intact, because guessing here would discard a retired unit's approved
+    visual history to satisfy a match nobody confirmed.
+    """
+
+    def __init__(self, ambiguities: list[str], proposal: list[dict] | None = None):
+        self.ambiguities = ambiguities
+        self.proposal = proposal or []
+        super().__init__(
+            f"{len(ambiguities)} ambiguous source migration(s) require resolution: "
+            + "; ".join(ambiguities[:3]) + (" …" if len(ambiguities) > 3 else ""))
+
+
 # Abbreviations that end in a period but do not end a sentence. Without these,
 # "1.3 lakh M.B.B.S. seats" and "Neet U.G. is moving to..." each split into
 # several bogus units. The segment is [A-Z][a-z]? so mixed-case abbreviations
@@ -282,7 +298,8 @@ def save_units(project_dir: Path, units: list[dict]) -> dict:
     return payload
 
 
-def _match_units(candidates: list[dict], old_units: list[dict]) -> tuple[dict, list[str]]:
+def _match_units(candidates: list[dict], old_units: list[dict],
+                 retired_units: list[dict] | None = None) -> tuple[dict, dict, list[str]]:
     """Map candidate index -> old unit index, staged and one-to-one.
 
     Exact fingerprints match globally first, so reordering a script preserves
@@ -296,8 +313,10 @@ def _match_units(candidates: list[dict], old_units: list[dict]) -> tuple[dict, l
     reported as ambiguous rather than assigned.
     """
     matched: dict[int, int] = {}
+    restored: dict[int, dict] = {}
     taken: set[int] = set()
     ambiguous: list[str] = []
+    retired_units = retired_units or []
 
     # Stage 1 — exact fingerprint, position-independent, ordered queues for dupes.
     by_fp: dict[str, list[int]] = {}
@@ -310,51 +329,115 @@ def _match_units(candidates: list[dict], old_units: list[dict]) -> tuple[dict, l
             matched[ci] = oi
             taken.add(oi)
 
-    # Stage 2 — fuzzy, on the remainder only, one-to-one, ambiguity reported.
-    remaining_old = [i for i in range(len(old_units)) if i not in taken]
+    # Stage 1b — a sentence that comes back reclaims its retired id, along with
+    # whatever visual history it had approved. Restoring beats issuing a new id
+    # and re-approving the same artwork.
+    retired_by_fp: dict[str, list[dict]] = {}
+    for u in retired_units:
+        retired_by_fp.setdefault(u["fingerprint"], []).append(u)
     for ci, cand in enumerate(candidates):
-        if ci in matched or not remaining_old:
+        if ci in matched:
             continue
-        target = normalise(cand["text"])
-        scored = sorted(
-            ((_ratio(target, normalise(old_units[i]["text"])), i) for i in remaining_old),
-            key=lambda t: t[0], reverse=True)
-        if not scored or scored[0][0] < UNIT_MATCH_MIN:
+        queue = retired_by_fp.get(cand["fingerprint"])
+        if queue:
+            restored[ci] = queue.pop(0)
+
+    # Stage 2 — fuzzy on the remainder, globally greedy and one-to-one.
+    #
+    # Contention is checked in BOTH directions. One candidate matching two old
+    # units equally well is ambiguous, and so is two candidates competing for the
+    # same old unit — otherwise whichever sentence happened to come first would
+    # claim the id and the other would silently get a new one.
+    remaining_old = [i for i in range(len(old_units)) if i not in taken]
+    open_cands = [ci for ci in range(len(candidates))
+                  if ci not in matched and ci not in restored]
+
+    pairs = []
+    for ci in open_cands:
+        target = normalise(candidates[ci]["text"])
+        for oi in remaining_old:
+            score = _ratio(target, normalise(old_units[oi]["text"]))
+            if score >= UNIT_MATCH_MIN:
+                pairs.append((score, ci, oi))
+    pairs.sort(key=lambda p: (-p[0], p[1], p[2]))     # deterministic ordering
+
+    settled_c: set[int] = set()
+    settled_o: set[int] = set()
+    for score, ci, oi in pairs:
+        if ci in settled_c or oi in settled_o:
             continue
-        if len(scored) > 1 and (scored[0][0] - scored[1][0]) < UNIT_TIE_EPSILON:
-            ambiguous.append(
-                f"'{cand['text'][:40]}' matches {old_units[scored[0][1]]['id']} and "
-                f"{old_units[scored[1][1]]['id']} equally — not assigned")
+        rivals = [(s, c, o) for (s, c, o) in pairs
+                  if (c, o) != (ci, oi) and (c == ci or o == oi)
+                  and c not in settled_c and o not in settled_o
+                  and abs(s - score) < UNIT_TIE_EPSILON]
+        if rivals:
+            rs, rc, ro = rivals[0]
+            if rc == ci:
+                ambiguous.append(
+                    f"'{candidates[ci]['text'][:40]}' matches {old_units[oi]['id']} and "
+                    f"{old_units[ro]['id']} equally — not assigned")
+            else:
+                ambiguous.append(
+                    f"{old_units[oi]['id']} is claimed equally by "
+                    f"'{candidates[ci]['text'][:34]}' and '{candidates[rc]['text'][:34]}' "
+                    f"— not assigned")
+            settled_c.update({ci, rc})
+            settled_o.update({oi, ro})
             continue
-        oi = scored[0][1]
         matched[ci] = oi
+        settled_c.add(ci)
+        settled_o.add(oi)
         taken.add(oi)
-        remaining_old.remove(oi)
 
-    return matched, ambiguous
+    return matched, restored, ambiguous
 
 
-def sync_units(project_dir: Path, script_text: str) -> tuple[list[dict], dict]:
+def _ambiguity_key(message: str) -> str:
+    """Stable key for an ambiguity, so a resolution can be matched to it."""
+    return hashlib.sha1(message.encode("utf-8")).hexdigest()[:10]
+
+
+def sync_units(project_dir: Path, script_text: str,
+               resolutions: dict | None = None) -> tuple[list[dict], dict]:
     """Create or update the sidecar, preserving ids across script edits.
 
-    Two passes, in this order, because doing it in one caused real collisions:
-    every candidate is matched against existing units first, and only then are
-    fresh ids allocated — from a monotonic counter above the highest id ever
-    issued. Previously new sentences kept their *positional* id, so inserting a
-    sentence at the top produced two units both called SRC-001.
+    Transactional: either the whole migration is unambiguous and gets written,
+    or nothing is written at all. An unresolved ambiguity raises MigrationBlocked
+    with the previous sidecar untouched, because the alternative — allocating a
+    new id — silently retires the old unit and its approved visual history to
+    satisfy a match nobody confirmed.
+
+    `resolutions` maps an ambiguity key (see MigrationBlocked.ambiguities via
+    _ambiguity_key) to the operator's decision, allowing the same call to commit
+    once a human has chosen.
+
+    Matching is staged: exact fingerprints globally, then retired units (so a
+    returning sentence reclaims its id), then fuzzy on the remainder. New ids are
+    allocated last, from a monotonic counter above every id ever issued.
     """
     sidecar = load_sidecar(project_dir)
     old_units = sidecar["units"]
-    next_seq = max(sidecar.get("next_seq", 1), _highest_seq(old_units) + 1)
+    retired = list(sidecar.get("retired_units", []))
+    next_seq = max(sidecar.get("next_seq", 1),
+                   _highest_seq(old_units) + 1, _highest_seq(retired) + 1)
 
     candidates = _sentences_of(script_text)
-    report = {"added": [], "changed": [], "removed": [], "unchanged": 0}
+    report = {"added": [], "changed": [], "removed": [], "restored": [], "unchanged": 0}
 
-    matched_old, ambiguous = _match_units(candidates, old_units)
-    used = set(matched_old.values())
+    matched_old, restored_map, ambiguous = _match_units(candidates, old_units, retired)
     report["ambiguous"] = ambiguous
 
-    # Assign ids: preserved for matches, freshly allocated otherwise.
+    # Nothing is written while a migration is unresolved. Allocating a new id
+    # here would also retire the old unit — discarding its visual history to
+    # satisfy a match nobody confirmed. Caller resolves, then re-runs.
+    unresolved = [a for a in ambiguous
+                  if not (resolutions or {}).get(_ambiguity_key(a))]
+    if unresolved:
+        raise MigrationBlocked(unresolved, proposal=candidates)
+
+    used = set(matched_old.values())
+    restored_ids = {u["id"] for u in restored_map.values()}
+
     units = []
     for ci, cand in enumerate(candidates):
         if ci in matched_old:
@@ -364,15 +447,36 @@ def sync_units(project_dir: Path, script_text: str) -> tuple[list[dict], dict]:
                 report["changed"].append(unit["id"])
             else:
                 report["unchanged"] += 1
+        elif ci in restored_map:
+            old = restored_map[ci]
+            unit = {"id": old["id"], **cand, "visuals": old.get("visuals", [])}
+            report["restored"].append(unit["id"])
         else:
             unit = {"id": f"SRC-{next_seq:03d}", **cand, "visuals": []}
             next_seq += 1
             report["added"].append(unit["id"])
         units.append(unit)
 
-    report["removed"] = [u["id"] for i, u in enumerate(old_units) if i not in used]
+    # Removed units are retired, not deleted: their ids stay permanently
+    # unavailable and their approved visual history survives, so a sentence that
+    # comes back can reclaim both.
+    from datetime import datetime
+    stamp = datetime.now().isoformat(timespec="seconds")
+    still_retired = [u for u in retired if u["id"] not in restored_ids]
+    for i, u in enumerate(old_units):
+        if i not in used:
+            report["removed"].append(u["id"])
+            still_retired.append({**u, "retired_at": stamp,
+                                  "retired_from_fingerprint": u["fingerprint"]})
 
-    payload = {"version": SIDECAR_VERSION, "next_seq": next_seq, "units": units}
+    # Built from the existing sidecar so unknown/future keys survive a sync —
+    # save_units() already preserved them, but sync rebuilt the payload and
+    # silently dropped them.
+    payload = dict(sidecar)
+    payload["version"] = SIDECAR_VERSION
+    payload["units"] = units
+    payload["retired_units"] = still_retired
+    payload["next_seq"] = max(next_seq, _highest_seq(still_retired) + 1)
     _write_atomic(sidecar_path(project_dir), payload)   # validates uniqueness
     return units, report
 
