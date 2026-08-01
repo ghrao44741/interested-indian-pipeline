@@ -334,6 +334,121 @@ if blocked_exc:
     except si.IdentityError:
         check("blocked migration cannot pass the paid-generation gate", True)
 
+print("\nRESOLUTIONS ACTUALLY APPLY THE DECISION")
+BASE1 = "The council met on Tuesday.\n"
+EDIT2 = "The council met on Tuesdays.\nThe council met on Thursday.\n"
+
+
+def blocked_for(base=BASE1, edit=EDIT2):
+    td = Path(tempfile.mkdtemp())
+    sync_units(td, base)
+    try:
+        sync_units(td, edit)
+    except si.MigrationBlocked as e:
+        return td, e
+    return td, None
+
+
+td, exc = blocked_for()
+check("ambiguity record is structured, not a string", isinstance(exc.ambiguities[0], dict))
+amb = exc.ambiguities[0]
+for field in ("key", "kind", "candidates", "old_source_ids", "scores", "allowed_actions", "message"):
+    check(f"record exposes {field}", field in amb, str(sorted(amb)))
+check("candidates carry index and text",
+      all({"index", "text"} <= set(c) for c in amb["candidates"]), str(amb["candidates"]))
+
+# reuse -> the named candidate gets the named id
+td, exc = blocked_for()
+key = exc.ambiguities[0]["key"]
+units, rep = sync_units(td, EDIT2,
+                        resolutions={key: {"action": "reuse", "candidate_index": 0,
+                                           "source_id": "SRC-001"}})
+check("reuse assigns the requested id to the requested candidate",
+      units[0]["id"] == "SRC-001", str([(u["id"], u["text"]) for u in units]))
+check("the unselected candidate gets a new monotonic id",
+      units[1]["id"] != "SRC-001" and si._seq_of(units[1]["id"]) > 1, units[1]["id"])
+check("reuse leaves nothing retired", not si.load_sidecar(td).get("retired_units"))
+
+# reuse of the *second* candidate must differ from the first
+td, exc = blocked_for()
+key = exc.ambiguities[0]["key"]
+units, _ = sync_units(td, EDIT2,
+                      resolutions={key: {"action": "reuse", "candidate_index": 1,
+                                         "source_id": "SRC-001"}})
+check("reuse honours candidate_index (second candidate keeps the id)",
+      units[1]["id"] == "SRC-001" and units[0]["id"] != "SRC-001",
+      str([(u["id"], u["text"]) for u in units]))
+
+# new -> both candidates are new, old unit retires
+td, exc = blocked_for()
+key = exc.ambiguities[0]["key"]
+units, rep = sync_units(td, EDIT2, resolutions={key: {"action": "new"}})
+check("'new' allocates fresh ids for every candidate",
+      all(u["id"] != "SRC-001" for u in units), str([u["id"] for u in units]))
+check("'new' retires the old unit", "SRC-001" in rep["removed"], str(rep["removed"]))
+check("reuse and new produce different outcomes", True)
+
+print("\ninvalid resolutions are rejected, not absorbed")
+for label, res in [
+    ("unknown key", {"deadbeef00": {"action": "new"}}),
+    ("malformed action", "REUSE_PLEASE"),
+    ("bad action value", {"__KEY__": {"action": "merge"}}),
+    ("invalid candidate index", {"__KEY__": {"action": "reuse", "candidate_index": 9,
+                                            "source_id": "SRC-001"}}),
+    ("unavailable source id", {"__KEY__": {"action": "reuse", "candidate_index": 0,
+                                           "source_id": "SRC-999"}}),
+    ("non-object decision", {"__KEY__": True}),
+]:
+    td, exc = blocked_for()
+    k = exc.ambiguities[0]["key"]
+    payload = res if isinstance(res, dict) else {k: res}
+    payload = {(k if kk == "__KEY__" else kk): vv for kk, vv in payload.items()}
+    before = si.sidecar_path(td).read_bytes()
+    try:
+        sync_units(td, EDIT2, resolutions=payload)
+        check(f"{label} is rejected", False, "accepted silently")
+    except si.ResolutionError:
+        check(f"{label} is rejected", True)
+    except si.MigrationBlocked:
+        check(f"{label} is rejected", False, "treated as merely unresolved")
+    check(f"{label}: sidecar unchanged", si.sidecar_path(td).read_bytes() == before)
+
+td, exc = blocked_for()
+try:
+    sync_units(td, EDIT2, resolutions={})
+    check("an incomplete resolution set stays blocked", False, "committed anyway")
+except si.MigrationBlocked:
+    check("an incomplete resolution set stays blocked", True)
+
+print("\nSIDECAR INVARIANTS ACROSS ACTIVE AND RETIRED")
+tmp = Path(tempfile.mkdtemp()) / "s.json"
+for label, payload in [
+    ("duplicate active ids", {"units": [{"id": "SRC-001"}, {"id": "SRC-001"}], "next_seq": 2}),
+    ("duplicate retired ids", {"units": [], "next_seq": 2,
+                               "retired_units": [{"id": "SRC-001"}, {"id": "SRC-001"}]}),
+    ("id both active and retired", {"units": [{"id": "SRC-001"}], "next_seq": 2,
+                                    "retired_units": [{"id": "SRC-001"}]}),
+    ("next_seq at or below highest id", {"units": [{"id": "SRC-009"}], "next_seq": 2}),
+]:
+    try:
+        si._write_atomic(tmp, payload)
+        check(f"rejects {label}", False, "write accepted")
+    except IdentityError:
+        check(f"rejects {label}", True)
+check("no sidecar written by any rejected payload", not tmp.exists())
+
+td = Path(tempfile.mkdtemp())
+sync_units(td, SCRIPT)
+good = si.sidecar_path(td).read_bytes()
+bad = si.load_sidecar(td)
+bad["retired_units"] = [{"id": bad["units"][0]["id"]}]
+try:
+    si._write_atomic(si.sidecar_path(td), bad)
+except IdentityError:
+    pass
+check("previous sidecar survives a rejected write",
+      si.sidecar_path(td).read_bytes() == good)
+
 print("\nRETIRED UNITS: history is kept, ids stay retired, content can return")
 td = Path(tempfile.mkdtemp())
 sync_units(td, f"{A} {B} {C}\n")

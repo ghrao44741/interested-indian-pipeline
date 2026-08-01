@@ -672,7 +672,10 @@ def main():
             change = {"added": [], "changed": [], "removed": [], "unchanged": 0}
             print(f"\n  ⛔ MIGRATION BLOCKED — sidecar left unchanged, resolution required:")
             for a in blocked.ambiguities[:6]:
-                print(f"     - {a}")
+                print(f"     - [{a['key']}] {a['message']}")
+                print(f"       resolve with: {{\"action\": \"reuse\", \"candidate_index\": "
+                      f"{a['candidates'][0]['index']}, \"source_id\": "
+                      f"\"{a['old_source_ids'][0]}\"}}  or  {{\"action\": \"new\"}}")
 
         for scene, info in zip(manifest_scenes, source_ids.align_scenes(manifest_scenes, units)):
             scene.update(info)
@@ -697,7 +700,7 @@ def main():
         identity, identity_reasons = source_ids.identity_state(manifest_scenes)
         if migration_blocked is not None:
             identity = source_ids.IDENTITY_BLOCKED
-            identity_reasons = ([f"unresolved source migration: {a}"
+            identity_reasons = ([f"unresolved source migration [{a['key']}]: {a['message']}"
                                  for a in migration_blocked.ambiguities] + identity_reasons)
 
         print(f"\n✓ Source identity: {len(units)} unit(s) from {Path(script_path).name}")

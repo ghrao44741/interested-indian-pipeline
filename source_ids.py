@@ -94,20 +94,36 @@ class IdentityError(RuntimeError):
     """Raised when identity cannot be established safely."""
 
 
+class ResolutionError(IdentityError):
+    """A supplied migration resolution is invalid and cannot be applied."""
+
+
 class MigrationBlocked(IdentityError):
     """A script edit cannot be migrated without a human decision.
 
     Raised *before* anything is written. The previous sidecar is left byte-for-
     byte intact, because guessing here would discard a retired unit's approved
     visual history to satisfy a match nobody confirmed.
+
+    `ambiguities` holds structured records, not prose, so a CLI or UI can present
+    and apply a decision without parsing human-readable text. Each record:
+
+        key               stable id to resolve against
+        kind              which side is contested
+        candidates        [{index, text}] competing new sentences
+        old_source_ids    competing existing ids
+        scores            {"<candidate_index>:<source_id>": similarity}
+        allowed_actions   ["reuse", "new"]
+        message           human-readable, for logs only
     """
 
-    def __init__(self, ambiguities: list[str], proposal: list[dict] | None = None):
+    def __init__(self, ambiguities: list[dict], proposal: list[dict] | None = None):
         self.ambiguities = ambiguities
         self.proposal = proposal or []
+        summary = "; ".join(a["message"] for a in ambiguities[:3])
         super().__init__(
             f"{len(ambiguities)} ambiguous source migration(s) require resolution: "
-            + "; ".join(ambiguities[:3]) + (" …" if len(ambiguities) > 3 else ""))
+            + summary + (" …" if len(ambiguities) > 3 else ""))
 
 
 # Abbreviations that end in a period but do not end a sentence. Without these,
@@ -258,10 +274,30 @@ def _write_atomic(path: Path, payload: dict) -> None:
     keys off. Write to a temp file in the same directory and os.replace() it, so
     a crash mid-write leaves the previous sidecar intact.
     """
-    ids = [u["id"] for u in payload["units"]]
-    dupes = sorted({i for i in ids if ids.count(i) > 1})
+    # Identity must be unique across the whole sidecar, not just the active
+    # units: an id present in both collections is simultaneously live and
+    # retired, and a next_seq below an existing id will reissue it.
+    active = [u["id"] for u in payload.get("units", [])]
+    retired = [u["id"] for u in payload.get("retired_units", [])]
+
+    dupes = sorted({i for i in active if active.count(i) > 1})
     if dupes:
-        raise IdentityError(f"refusing to write sidecar with duplicate ids: {dupes}")
+        raise IdentityError(f"refusing to write sidecar with duplicate active ids: {dupes}")
+
+    rdupes = sorted({i for i in retired if retired.count(i) > 1})
+    if rdupes:
+        raise IdentityError(f"refusing to write sidecar with duplicate retired ids: {rdupes}")
+
+    overlap = sorted(set(active) & set(retired))
+    if overlap:
+        raise IdentityError(
+            f"refusing to write sidecar with ids both active and retired: {overlap}")
+
+    highest = max((_seq_of(i) for i in active + retired), default=0)
+    if payload.get("next_seq", 1) <= highest:
+        raise IdentityError(
+            f"refusing to write sidecar with next_seq={payload.get('next_seq')} at or below "
+            f"the highest existing id ({highest}) — it would reissue a live or retired id")
 
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -372,15 +408,34 @@ def _match_units(candidates: list[dict], old_units: list[dict],
                   and abs(s - score) < UNIT_TIE_EPSILON]
         if rivals:
             rs, rc, ro = rivals[0]
+            cand_idxs = sorted({ci, rc})
+            old_idxs = sorted({oi, ro})
             if rc == ci:
-                ambiguous.append(
-                    f"'{candidates[ci]['text'][:40]}' matches {old_units[oi]['id']} and "
-                    f"{old_units[ro]['id']} equally — not assigned")
+                kind = "candidate_matches_several_units"
+                message = (f"'{candidates[ci]['text'][:40]}' matches "
+                           f"{old_units[oi]['id']} and {old_units[ro]['id']} equally")
             else:
-                ambiguous.append(
-                    f"{old_units[oi]['id']} is claimed equally by "
-                    f"'{candidates[ci]['text'][:34]}' and '{candidates[rc]['text'][:34]}' "
-                    f"— not assigned")
+                kind = "unit_claimed_by_several_candidates"
+                message = (f"{old_units[oi]['id']} is claimed equally by "
+                           f"'{candidates[ci]['text'][:34]}' and "
+                           f"'{candidates[rc]['text'][:34]}'")
+            record = {
+                "kind": kind,
+                "message": message,
+                "candidates": [{"index": c, "text": candidates[c]["text"]}
+                               for c in cand_idxs],
+                "old_source_ids": [old_units[o]["id"] for o in old_idxs],
+                "_old_indexes": {old_units[o]["id"]: o for o in old_idxs},
+                "scores": {f"{c}:{old_units[o]['id']}":
+                           round(_ratio(normalise(candidates[c]["text"]),
+                                        normalise(old_units[o]["text"])), 3)
+                           for c in cand_idxs for o in old_idxs},
+                "allowed_actions": ["reuse", "new"],
+            }
+            record["key"] = _ambiguity_key(
+                f"{kind}|{'|'.join(record['old_source_ids'])}|"
+                f"{'|'.join(c['text'] for c in record['candidates'])}")
+            ambiguous.append(record)
             settled_c.update({ci, rc})
             settled_o.update({oi, ro})
             continue
@@ -395,6 +450,70 @@ def _match_units(candidates: list[dict], old_units: list[dict],
 def _ambiguity_key(message: str) -> str:
     """Stable key for an ambiguity, so a resolution can be matched to it."""
     return hashlib.sha1(message.encode("utf-8")).hexdigest()[:10]
+
+
+def _apply_resolutions(ambiguities: list[dict], resolutions: dict,
+                       matched: dict[int, int], taken: set[int]) -> list[dict]:
+    """Validate and apply operator decisions. Returns still-unresolved records.
+
+    Rejects rather than guesses: an earlier version treated any truthy value as
+    a resolution, so {"action": "reuse", "source_id": "SRC-001"}, "new" and True
+    all produced identical output and the requested id was never actually
+    assigned.
+    """
+    resolutions = resolutions or {}
+    known = {a["key"] for a in ambiguities}
+    unknown = [k for k in resolutions if k not in known]
+    if unknown:
+        raise ResolutionError(f"unknown resolution key(s): {unknown}")
+
+    assigned_source_ids: dict[str, str] = {}
+    unresolved = []
+
+    for amb in ambiguities:
+        decision = resolutions.get(amb["key"])
+        if decision is None:
+            unresolved.append(amb)
+            continue
+        if not isinstance(decision, dict):
+            raise ResolutionError(
+                f"{amb['key']}: resolution must be an object with an 'action', got "
+                f"{type(decision).__name__}")
+
+        action = decision.get("action")
+        if action not in amb["allowed_actions"]:
+            raise ResolutionError(
+                f"{amb['key']}: action {action!r} not in {amb['allowed_actions']}")
+
+        if action == "new":
+            # Every competing candidate is confirmed as new identity; the old
+            # units are left unmatched and retire normally.
+            continue
+
+        ci = decision.get("candidate_index")
+        valid_idxs = [c["index"] for c in amb["candidates"]]
+        if ci not in valid_idxs:
+            raise ResolutionError(
+                f"{amb['key']}: candidate_index {ci!r} not in {valid_idxs}")
+
+        sid = decision.get("source_id")
+        if sid not in amb["old_source_ids"]:
+            raise ResolutionError(
+                f"{amb['key']}: source_id {sid!r} not among {amb['old_source_ids']}")
+        if sid in assigned_source_ids:
+            raise ResolutionError(
+                f"source_id {sid!r} assigned twice (keys {assigned_source_ids[sid]} "
+                f"and {amb['key']})")
+
+        oi = amb["_old_indexes"][sid]
+        if oi in taken:
+            raise ResolutionError(f"{amb['key']}: source_id {sid!r} is no longer available")
+
+        assigned_source_ids[sid] = amb["key"]
+        matched[ci] = oi
+        taken.add(oi)
+
+    return unresolved
 
 
 def sync_units(project_dir: Path, script_text: str,
@@ -430,8 +549,8 @@ def sync_units(project_dir: Path, script_text: str,
     # Nothing is written while a migration is unresolved. Allocating a new id
     # here would also retire the old unit — discarding its visual history to
     # satisfy a match nobody confirmed. Caller resolves, then re-runs.
-    unresolved = [a for a in ambiguous
-                  if not (resolutions or {}).get(_ambiguity_key(a))]
+    taken = set(matched_old.values())
+    unresolved = _apply_resolutions(ambiguous, resolutions, matched_old, taken)
     if unresolved:
         raise MigrationBlocked(unresolved, proposal=candidates)
 
