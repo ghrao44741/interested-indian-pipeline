@@ -388,6 +388,77 @@ check("'new' allocates fresh ids for every candidate",
 check("'new' retires the old unit", "SRC-001" in rep["removed"], str(rep["removed"]))
 check("reuse and new produce different outcomes", True)
 
+print("\nCOMPLETE AMBIGUITY GROUPING (no rival is hidden)")
+THREE_OLD = ("Alpha beta gamma one.\nAlpha beta gamma two.\nAlpha beta gamma four.\n")
+ONE_CAND = "Alpha beta gamma three.\n"
+td, exc = blocked_for(base=THREE_OLD, edit=ONE_CAND)
+check("1 candidate vs 3 units raises", exc is not None)
+amb = exc.ambiguities[0]
+check("all three competing source ids are exposed",
+      sorted(amb["old_source_ids"]) == ["SRC-001", "SRC-002", "SRC-003"],
+      str(amb["old_source_ids"]))
+check("scores cover every candidate/source pairing",
+      len(amb["scores"]) == 3, str(amb["scores"]))
+
+ONE_OLD = "Alpha beta gamma one.\n"
+THREE_CAND = ("Alpha beta gamma two.\nAlpha beta gamma three.\nAlpha beta gamma four.\n")
+td, exc = blocked_for(base=ONE_OLD, edit=THREE_CAND)
+check("3 candidates vs 1 unit raises", exc is not None)
+amb = exc.ambiguities[0]
+check("all three competing candidates are exposed",
+      len(amb["candidates"]) == 3, str([c["text"] for c in amb["candidates"]]))
+
+MIXED_OLD = "Alpha beta gamma one.\nAlpha beta gamma two.\n"
+MIXED_NEW = ("Alpha beta gamma three.\nAlpha beta gamma four.\nAlpha beta gamma five.\n")
+td, exc = blocked_for(base=MIXED_OLD, edit=MIXED_NEW)
+amb = exc.ambiguities[0]
+check("mixed component lists all candidates and all units",
+      len(amb["candidates"]) == 3 and len(amb["old_source_ids"]) == 2,
+      f"{len(amb['candidates'])} cands / {len(amb['old_source_ids'])} units")
+check("a candidate or unit belongs to only one component",
+      len(exc.ambiguities) == 1, f"{len(exc.ambiguities)} components")
+
+print("\nevery pairing in the component is selectable")
+for ci in (0, 1, 2):
+    for sid in ("SRC-001", "SRC-002"):
+        td, exc = blocked_for(base=MIXED_OLD, edit=MIXED_NEW)
+        k = exc.ambiguities[0]["key"]
+        units, _ = sync_units(td, MIXED_NEW,
+                              resolutions={k: {"action": "reuse",
+                                               "candidate_index": ci, "source_id": sid}})
+        got = units[ci]["id"]
+        check(f"reuse candidate {ci} -> {sid}", got == sid, f"got {got}")
+
+td, exc = blocked_for(base=MIXED_OLD, edit=MIXED_NEW)
+k = exc.ambiguities[0]["key"]
+units, rep = sync_units(td, MIXED_NEW, resolutions={k: {"action": "new"}})
+check("'new' covers the whole component",
+      all(u["id"] not in ("SRC-001", "SRC-002") for u in units), str([u["id"] for u in units]))
+check("'new' retires every unmatched unit in the component",
+      sorted(rep["removed"]) == ["SRC-001", "SRC-002"], str(rep["removed"]))
+
+td, exc = blocked_for(base=MIXED_OLD, edit=MIXED_NEW)
+k = exc.ambiguities[0]["key"]
+before = si.sidecar_path(td).read_bytes()
+try:
+    sync_units(td, MIXED_NEW, resolutions={k: {"action": "reuse", "candidate_index": 7,
+                                               "source_id": "SRC-001"}})
+    check("invalid pairing in a component is rejected", False, "accepted")
+except si.ResolutionError:
+    check("invalid pairing in a component is rejected", True)
+check("rejected component resolution leaves sidecar unchanged",
+      si.sidecar_path(td).read_bytes() == before)
+
+print("\ncomponent keys and ordering are deterministic")
+keys_a = [a["key"] for a in blocked_for(base=MIXED_OLD, edit=MIXED_NEW)[1].ambiguities]
+keys_b = [a["key"] for a in blocked_for(base=MIXED_OLD, edit=MIXED_NEW)[1].ambiguities]
+check("component keys stable across runs", keys_a == keys_b, f"{keys_a} vs {keys_b}")
+amb_a = blocked_for(base=THREE_OLD, edit=ONE_CAND)[1].ambiguities[0]
+amb_b = blocked_for(base=THREE_OLD, edit=ONE_CAND)[1].ambiguities[0]
+check("component contents stable across runs",
+      amb_a["old_source_ids"] == amb_b["old_source_ids"]
+      and amb_a["key"] == amb_b["key"])
+
 print("\ninvalid resolutions are rejected, not absorbed")
 for label, res in [
     ("unknown key", {"deadbeef00": {"action": "new"}}),

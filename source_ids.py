@@ -397,52 +397,87 @@ def _match_units(candidates: list[dict], old_units: list[dict],
                 pairs.append((score, ci, oi))
     pairs.sort(key=lambda p: (-p[0], p[1], p[2]))     # deterministic ordering
 
-    settled_c: set[int] = set()
-    settled_o: set[int] = set()
-    for score, ci, oi in pairs:
-        if ci in settled_c or oi in settled_o:
+    # An edge is competitive when it is within epsilon of the best score
+    # available to BOTH of its endpoints. A candidate with a clear winner then
+    # has exactly one competitive edge; anything more is a genuine contest.
+    best_c: dict[int, float] = {}
+    best_o: dict[int, float] = {}
+    for s, ci, oi in pairs:
+        best_c[ci] = max(best_c.get(ci, 0.0), s)
+        best_o[oi] = max(best_o.get(oi, 0.0), s)
+    competitive = [(s, ci, oi) for s, ci, oi in pairs
+                   if s >= best_c[ci] - UNIT_TIE_EPSILON
+                   and s >= best_o[oi] - UNIT_TIE_EPSILON]
+
+    # Connected components over the bipartite graph. Taking only the first rival
+    # hid every additional equally-plausible option: a candidate tying three old
+    # units surfaced two of them, so the operator could not choose the third.
+    parent: dict[tuple, tuple] = {}
+
+    def find(x):
+        parent.setdefault(x, x)
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[rb] = ra
+
+    for _, ci, oi in competitive:
+        union(("c", ci), ("o", oi))
+
+    groups: dict[tuple, dict] = {}
+    for _, ci, oi in competitive:
+        g = groups.setdefault(find(("c", ci)), {"c": set(), "o": set()})
+        g["c"].add(ci)
+        g["o"].add(oi)
+
+    for root in sorted(groups, key=lambda r: (sorted(groups[r]["c"]), sorted(groups[r]["o"]))):
+        cand_idxs = sorted(groups[root]["c"])
+        old_idxs = sorted(groups[root]["o"])
+
+        if len(cand_idxs) == 1 and len(old_idxs) == 1:
+            ci, oi = cand_idxs[0], old_idxs[0]
+            matched[ci] = oi
+            taken.add(oi)
             continue
-        rivals = [(s, c, o) for (s, c, o) in pairs
-                  if (c, o) != (ci, oi) and (c == ci or o == oi)
-                  and c not in settled_c and o not in settled_o
-                  and abs(s - score) < UNIT_TIE_EPSILON]
-        if rivals:
-            rs, rc, ro = rivals[0]
-            cand_idxs = sorted({ci, rc})
-            old_idxs = sorted({oi, ro})
-            if rc == ci:
-                kind = "candidate_matches_several_units"
-                message = (f"'{candidates[ci]['text'][:40]}' matches "
-                           f"{old_units[oi]['id']} and {old_units[ro]['id']} equally")
-            else:
-                kind = "unit_claimed_by_several_candidates"
-                message = (f"{old_units[oi]['id']} is claimed equally by "
-                           f"'{candidates[ci]['text'][:34]}' and "
-                           f"'{candidates[rc]['text'][:34]}'")
-            record = {
-                "kind": kind,
-                "message": message,
-                "candidates": [{"index": c, "text": candidates[c]["text"]}
-                               for c in cand_idxs],
-                "old_source_ids": [old_units[o]["id"] for o in old_idxs],
-                "_old_indexes": {old_units[o]["id"]: o for o in old_idxs},
-                "scores": {f"{c}:{old_units[o]['id']}":
-                           round(_ratio(normalise(candidates[c]["text"]),
-                                        normalise(old_units[o]["text"])), 3)
-                           for c in cand_idxs for o in old_idxs},
-                "allowed_actions": ["reuse", "new"],
-            }
-            record["key"] = _ambiguity_key(
-                f"{kind}|{'|'.join(record['old_source_ids'])}|"
-                f"{'|'.join(c['text'] for c in record['candidates'])}")
-            ambiguous.append(record)
-            settled_c.update({ci, rc})
-            settled_o.update({oi, ro})
-            continue
-        matched[ci] = oi
-        settled_c.add(ci)
-        settled_o.add(oi)
-        taken.add(oi)
+
+        old_ids = [old_units[o]["id"] for o in old_idxs]
+        if len(cand_idxs) == 1:
+            kind = "candidate_matches_several_units"
+            message = (f"'{candidates[cand_idxs[0]]['text'][:40]}' matches "
+                       f"{', '.join(old_ids)} equally")
+        elif len(old_idxs) == 1:
+            kind = "unit_claimed_by_several_candidates"
+            message = (f"{old_ids[0]} is claimed equally by "
+                       + ", ".join(f"'{candidates[c]['text'][:28]}'" for c in cand_idxs))
+        else:
+            kind = "mixed_component"
+            message = (f"{len(cand_idxs)} candidates and {len(old_ids)} units "
+                       f"({', '.join(old_ids)}) are mutually ambiguous")
+
+        record = {
+            "kind": kind,
+            "message": message,
+            "candidates": [{"index": c, "text": candidates[c]["text"]} for c in cand_idxs],
+            "old_source_ids": old_ids,
+            "_old_indexes": {old_units[o]["id"]: o for o in old_idxs},
+            # every candidate/source score in the component, not just the ties
+            "scores": {f"{c}:{old_units[o]['id']}":
+                       round(_ratio(normalise(candidates[c]["text"]),
+                                    normalise(old_units[o]["text"])), 3)
+                       for c in cand_idxs for o in old_idxs},
+            "allowed_actions": ["reuse", "new"],
+        }
+        # Deterministic in the complete component, so the same contest always
+        # produces the same key regardless of iteration order.
+        record["key"] = _ambiguity_key(
+            f"{kind}|{'|'.join(sorted(old_ids))}|"
+            f"{'|'.join(sorted(c['text'] for c in record['candidates']))}")
+        ambiguous.append(record)
 
     return matched, restored, ambiguous
 
