@@ -1,0 +1,15 @@
+{
+  "stage": "voice",
+  "completed": [
+    "topics",
+    "script",
+    "review-script"
+  ],
+  "data": {
+    "title": "The Exam Scandal That Got a Minister Fired By a Party Named After a Cockroach",
+    "slug": "the_exam_scandal_that_got_a_minister_fired_by_a_par",
+    "script_path": "C:\\Bakcup_Asus\\interested_indian_pipeline\\test_2min\\script_the_exam_scandal_that_got_a_minister_fired_by_a_par.txt",
+    "topic_choice": "The Exam Scandal That Got a Minister Fired By a Party Named After a Cockroach"
+  },
+  "retry_counts": {}
+}

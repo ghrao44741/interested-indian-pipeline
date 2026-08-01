@@ -33,6 +33,19 @@ common/bgm/
 
 # Voice preview audio (ElevenLabs test clips — regenerable)
 voice_previews/
+# Stray preview clips written to the repo root by generate_source_audio.py
+# --preview (the in-project ones are already covered by */source_audio/*)
+preview_*.mp3
+
+# Reference material and reading saved into the working folder — third-party
+# content, large, and nothing the pipeline reads. Ignored specifically because
+# CLAUDE.md's own quick-start says "git add -A", which would otherwise sweep
+# multi-MB PDFs into the history.
+*.pdf
+
+# Machine-local tooling config (MCP client endpoints) — environment setup for
+# this workstation, not part of the pipeline.
+config/mcporter.json
 
 # Voice-config sidecars written alongside every generated audio file — describe
 # a regenerable binary that's itself already gitignored (e.g. common/cta/*.mp3,
