@@ -82,6 +82,52 @@ def _pick_production_script(project_dir: Path):
     return min(primary, key=lambda m: len(m.stem)) if primary else matches[-1]
 
 
+def _find_stale_clips(project_dir: Path, scenes: list, tolerance: float = 0.1) -> list:
+    """Scene IDs whose clip on disk does not match the current cutting algorithm.
+
+    Detects clips cut by the old fixed-padding logic, which ended each scene at
+    whisperx_end + 0.15s. Whisper's word-level end times land before the speech
+    has finished decaying, so that sliced the last word off ~25% of scenes in
+    every episode ("...scheduled for June 21st" shipped as "...for 21st").
+
+    Deliberately a consistency check rather than an audio heuristic: energy
+    measurements on the clip alone cannot tell a clean ending from a truncated
+    one (a cut-off word is already decaying by its final frames). Recomputing
+    the expected bounds and comparing durations is exact.
+    """
+    narration = project_dir / "source_audio" / "narration.mp3"
+    if not narration.exists():
+        return []
+    try:
+        from auto_split_scenes_v1_stage3_export import detect_silences, refine_bounds
+    except ImportError:
+        return []
+
+    silences = detect_silences(str(narration))
+    if not silences:
+        return []
+
+    stale = []
+    for i, s in enumerate(scenes):
+        clip = project_dir / s.get("audio", "")
+        if not clip.exists() or s.get("whisperx_start") is None:
+            continue
+        prev_end = scenes[i - 1].get("whisperx_end") if i > 0 else None
+        next_start = scenes[i + 1].get("whisperx_start") if i + 1 < len(scenes) else None
+        cs, ce = refine_bounds(s["whisperx_start"], s["whisperx_end"],
+                               silences, prev_end, next_start)
+        try:
+            out = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                 "-of", "csv=p=0", str(clip)], capture_output=True, text=True)
+            actual = float(out.stdout.strip())
+        except (ValueError, OSError):
+            continue
+        if abs((ce - cs) - actual) > tolerance:
+            stale.append(s["id"])
+    return stale
+
+
 # ── Transcription-accuracy helper (used by ReviewAgent._review_split) ──────────
 
 _NUMBER_WORDS = {
@@ -158,47 +204,64 @@ def _find_transcription_mismatches(source_text: str, manifest_scenes: list) -> l
     return mismatches
 
 
-# ── CTA voice-freshness helper (used by ReviewAgent._review_stitch) ────────────
+# ── Voice config resolution — SINGLE source of truth ──────────────────────────
+# Every consumer (voice stage, split stage, freshness checks) must resolve the
+# active voice through here. They previously each had their own copy of this
+# branching and drifted: the freshness check's 'edge' branch read a "default"
+# key that does not exist in channel_config.json, so with edge active it
+# resolved to en-US-GuyNeural and false-flagged every comparison.
 
-def _check_cta_freshness() -> str:
-    """Compare common/cta/cta.mp3's recorded voice config (sidecar written by
-    generate_source_audio.py) against channel_config.json's CURRENTLY active
-    voice settings. common/cta/cta.mp3 is a SHARED asset (not per-project) that
-    previously went stale (wrong voice) after a provider switch, unnoticed until
-    a human caught it by ear — this replaces "notice by ear" with an automatic
-    diff. Returns a human-readable mismatch description, or "" if fields match.
-    Assumes both files exist — caller is responsible for the exists() checks
-    (missing sidecar and missing config are different situations to report).
-    """
-    sidecar_path = PIPELINE_DIR / "common" / "cta" / "cta.mp3.voice.json"
+def _resolve_configured_voice() -> dict:
+    """Active provider/voice/model + prosody settings from channel_config.json."""
+    out = {"provider": "edge", "voice": "en-US-GuyNeural", "model": "",
+           "speaking_rate": None, "edge_rate": None, "edge_pitch": None}
     cfg_path = PIPELINE_DIR / "channel_config.json"
-    sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
-    cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
-    vcfg = cfg.get("voice", {})
-    cur_provider = vcfg.get("provider", "")
-
-    cur_voice = ""
-    cur_model = ""
-    if cur_provider in ("gemini", "gemini_cloudtts"):
-        cur_voice = vcfg.get("gemini_voice", "")
+    if not cfg_path.exists():
+        return out
+    vcfg = json.loads(cfg_path.read_text(encoding="utf-8")).get("voice", {})
+    provider = vcfg.get("provider", out["provider"])
+    out["provider"] = provider
+    if provider in ("gemini", "gemini_cloudtts"):
+        out["voice"] = vcfg.get("gemini_voice", "Charon")
+        out["speaking_rate"] = vcfg.get("gemini_speaking_rate")
         # Two separate config keys for two different providers — pick the right one.
-        cur_model = vcfg.get(
-            "gemini_cloudtts_model" if cur_provider == "gemini_cloudtts" else "gemini_model", ""
-        )
-    elif cur_provider == "elevenlabs":
-        cur_voice = vcfg.get("elevenlabs_default", vcfg.get("default", ""))
-    elif cur_provider == "edge":
-        cur_voice = vcfg.get("default", "en-US-GuyNeural")
+        out["model"] = vcfg.get(
+            "gemini_cloudtts_model" if provider == "gemini_cloudtts" else "gemini_model", "")
+    elif provider == "elevenlabs":
+        out["voice"] = vcfg.get("elevenlabs_default", vcfg.get("default", out["voice"]))
+        out["model"] = vcfg.get("model", "")
+    elif provider == "grok":
+        out["voice"] = vcfg.get("grok_voice_id", "eve")
+    elif provider == "edge":
+        out["voice"] = vcfg.get("edge_voice", out["voice"])
+        out["edge_rate"] = vcfg.get("edge_rate")
+        out["edge_pitch"] = vcfg.get("edge_pitch")
+    else:
+        out["voice"] = vcfg.get("default", out["voice"])
+    return out
+
+
+def _check_voice_sidecar(sidecar_path: Path) -> str:
+    """Diff a generated audio file's .voice.json against the active config.
+
+    Works for any generated audio — the shared CTA and the episode narration
+    both go stale the same way after a provider switch. Returns a human-readable
+    mismatch description, or "" when they agree.
+    """
+    if not sidecar_path.exists():
+        return f"no sidecar at {sidecar_path.name} — cannot tell which voice made it"
+    sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+    cur = _resolve_configured_voice()
 
     mismatches = []
-    if sidecar.get("provider") != cur_provider:
-        mismatches.append(f"provider {sidecar.get('provider')!r} vs current {cur_provider!r}")
-    if sidecar.get("voice") != cur_voice:
-        mismatches.append(f"voice {sidecar.get('voice')!r} vs current {cur_voice!r}")
-    if cur_model and sidecar.get("model") != cur_model:
-        mismatches.append(f"model {sidecar.get('model')!r} vs current {cur_model!r}")
-
+    if sidecar.get("provider") != cur["provider"]:
+        mismatches.append(f"provider {sidecar.get('provider')!r} vs current {cur['provider']!r}")
+    if sidecar.get("voice") != cur["voice"]:
+        mismatches.append(f"voice {sidecar.get('voice')!r} vs current {cur['voice']!r}")
+    if cur["model"] and sidecar.get("model") != cur["model"]:
+        mismatches.append(f"model {sidecar.get('model')!r} vs current {cur['model']!r}")
     return "; ".join(mismatches)
+
 
 
 CHANNEL_DNA = """You are a viral educational YouTube video creation engine for "The Interested Indian".
@@ -536,6 +599,17 @@ class ReviewAgent:
         narration_path = project_dir / "source_audio" / "narration.mp3"
         audio_file = narration_path if narration_path.exists() else audio_files[0]
 
+        # Did this narration actually get made with the voice we currently config?
+        # The CTA had this check; the narration — the entire episode — did not, so
+        # a stale or overridden voice could only be caught by ear.
+        try:
+            drift = _check_voice_sidecar(Path(str(audio_file) + ".voice.json"))
+            if drift:
+                issues.append(f"{audio_file.name} was generated with a different voice ({drift}) "
+                              f"— re-run the voice stage")
+        except Exception as e:
+            recs.append(f"Could not check narration voice freshness: {e}")
+
         try:
             from pydub import AudioSegment
             audio = AudioSegment.from_file(str(audio_file))
@@ -631,6 +705,16 @@ class ReviewAgent:
         # structural problem (duplicate IDs, too few scenes) does.
         # episode_state's script_path is authoritative; the glob is only a fallback
         # for projects driven by direct script calls (no state file).
+        # Clips cut by the old fixed-padding logic, which shipped "21st" for
+        # "21st June" in every episode produced before the silence-snapping fix.
+        stale = _find_stale_clips(project_dir, scenes)
+        if stale:
+            issues.append(f"{len(stale)} scene clip(s) do not match the current cutting "
+                          f"algorithm — likely truncating the last word: "
+                          f"{', '.join(stale[:6])}{' …' if len(stale) > 6 else ''}")
+            recs.append("Re-cut clips by re-running the split stage "
+                        "(auto_split_scenes_v1_stage3_export.py)")
+
         production_script = Path(ctx["script_path"]) if ctx.get("script_path") else None
         if not production_script or not production_script.exists():
             production_script = _pick_production_script(project_dir)
@@ -813,7 +897,7 @@ class ReviewAgent:
             )
         else:
             try:
-                mismatch = _check_cta_freshness()
+                mismatch = _check_voice_sidecar(cta_sidecar)
                 if mismatch:
                     issues.append(f"CTA audio voice config is stale ({mismatch}) — regenerate common/cta/cta.mp3")
             except Exception as e:
@@ -1941,37 +2025,15 @@ class OrchestratorAgent:
         print(f"{sep}\n")
 
     def _resolve_voice_config(self):
-        """Resolve (provider, voice, speaking_rate, edge_rate, edge_pitch) from channel_config.json.
+        """(provider, voice, speaking_rate, edge_rate, edge_pitch) for the stages.
 
-        Shared by _stage_voice (to synthesise) and _stage_split (to stamp the real
-        voice into manifest.json instead of the split script's argparse default).
+        Thin adapter over the module-level _resolve_configured_voice() so the
+        voice stage, the split stage and the freshness checks cannot drift apart
+        — which is exactly how the freshness check ended up resolving 'edge' to
+        a key that does not exist in channel_config.json.
         """
-        provider      = "edge"
-        voice         = "en-US-GuyNeural"
-        speaking_rate = None   # None → omit flag → generate_source_audio.py uses its own default
-        edge_rate     = None
-        edge_pitch    = None
-        cfg_path = PIPELINE_DIR / "channel_config.json"
-        if cfg_path.exists():
-            import json as _json
-            cfg      = _json.loads(cfg_path.read_text(encoding="utf-8"))
-            vcfg     = cfg.get("voice", {})
-            provider = vcfg.get("provider", provider)
-            # Resolve voice by provider so Gemini/ElevenLabs/Grok/Edge each get the right key
-            if provider in ("gemini", "gemini_cloudtts"):
-                voice         = vcfg.get("gemini_voice", "Charon")
-                speaking_rate = vcfg.get("gemini_speaking_rate")  # e.g. 0.85
-            elif provider == "elevenlabs":
-                voice = vcfg.get("elevenlabs_default", vcfg.get("default", voice))
-            elif provider == "grok":
-                voice = vcfg.get("grok_voice_id", "eve")
-            elif provider == "edge":
-                voice      = vcfg.get("edge_voice", voice)
-                edge_rate  = vcfg.get("edge_rate")   # e.g. "+12%"
-                edge_pitch = vcfg.get("edge_pitch")  # e.g. "+15Hz"
-            else:
-                voice = vcfg.get("default", voice)
-        return provider, voice, speaking_rate, edge_rate, edge_pitch
+        v = _resolve_configured_voice()
+        return (v["provider"], v["voice"], v["speaking_rate"], v["edge_rate"], v["edge_pitch"])
 
     def _stage_voice(self):
         gen_audio = PIPELINE_DIR / "generate_source_audio.py"

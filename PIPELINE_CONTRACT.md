@@ -72,10 +72,39 @@ hand, and a contract that only the orchestrator enforces is a contract that does
 
 ## 3. Status
 
-Implemented: `voice` sidecar-vs-config check is *specified but not yet wired* (the CTA equivalent
-exists — mirror it). `split` truncation/bleed validation exists as a working script from the
-2026-07-31 session and should be promoted into `_review_split`. Stitch duration invariant is
-checked by hand today.
+**Built (2026-07-31):**
 
-Not yet built: `verify_stage.py` as a single standalone entry point. That is the piece that makes
-this a contract rather than a wish, because it works whether or not the orchestrator is used.
+- `verify_stage.py` — standalone contract runner. Works with no `episode_state.json`, so it covers
+  projects built by direct script calls, which is all of them. Exit 0 = met, 1 = violated,
+  2 = no such project. Suitable as a pre-publish gate.
+
+      python verify_stage.py --project pilot_neet_scandal --all
+      python verify_stage.py --project pilot_neet_scandal --stage split
+
+- `_resolve_configured_voice()` — one source of truth for the active voice. Every consumer resolves
+  through it. They had each carried their own copy of the provider branching and drifted: the
+  freshness check's `edge` branch read a `default` key that does not exist in
+  `channel_config.json`, so with edge active it resolved to `en-US-GuyNeural` and false-flagged
+  every comparison.
+- `_check_voice_sidecar()` — generalised from the CTA-only version; now also runs against the
+  **narration** in `_review_voice`, closing #9 (a stale or overridden voice was previously
+  detectable only by ear).
+- `_find_stale_clips()` — recomputes each scene's expected cut with the current algorithm and
+  compares against the clip on disk, closing #1. Verified to discriminate: 0/132 and 0/27 on
+  re-cut projects, 39/107 on `ep01_v1`, which has never been re-cut.
+- `_pick_production_script()` — closes #7; `episode_state`'s `script_path` is authoritative.
+
+Deliberately *not* an audio heuristic: measuring a clip's own tail energy cannot separate a clean
+ending from a truncated one, because a cut-off word is already decaying by its final frames. Tested
+and rejected — it flagged `SCENE-030`, which is verifiably correct.
+
+**Still open:**
+
+- Stitch's `abs(video − audio) < 0.5s` invariant is checked by hand, not asserted in `_review_stitch`.
+- Reviewers remain advisory (`passed=True`, score floored). `verify_stage.py` compensates by
+  treating any reported issue as a violation, but the agents themselves should block.
+- `ep01`, `ep01_v1` and `test_script` still hold the truncation and need a re-cut + re-stitch if
+  ever revived. `ep01_v1` measures 39/107 stale.
+- `stitch_video_longform.py` still resolves grouped images by *copying* files into `images/`,
+  producing duplicates indistinguishable from generated art. `shorts_pipeline2` resolves at read
+  time and writes nothing — adopt that.
