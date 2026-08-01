@@ -1178,6 +1178,72 @@ In parallel with pipeline work, drafted YouTube channel launch assets. Confirmed
 - `495a57f` — fix: audio/video desync in stitch + caption rendering overhaul
 - `c84dae2` — feat: switch production voice to edge-tts/Prabhat, fix pronunciation defects
 
+---
+
+## Session — 2026-07-31 (later): regen against the fixed script, two orchestrator bugs, and the real cause of the "word chop" class
+
+### Two corrections to the entry above
+Both of these were written up above as settled, and both were wrong:
+- **"June dropped from June 21st — did not reproduce, likely a one-off synthesis glitch."** It was not a glitch and it was not one-off. It is a reproducible, systematic truncation bug in the *split* stage (root cause below), hitting 22–30% of scenes in every episode this pipeline has ever produced.
+- **"Scene-boundary word-splitting … inherent risk of the auto-split approach; a fresh split gets different (not necessarily better) boundaries, not a guaranteed fix."** Also wrong. It has a specific, fixable cause and is now fixed deterministically.
+
+### Regen decision and how the episode was actually rebuilt
+Chose the cheap path over the full regen the handoff proposed, based on evidence rather than assumption: transcribing the *old* render showed the question→declarative rewrites were already in it, so the only text drift was the two pronunciation fixes. That made a prompts/images regen unnecessary — `voice → split → stitch` only, reusing all images, zero xAI spend.
+
+The resplit produced 132 scenes instead of 133 (old SCENE-081/082 merged into one), which misaligned 51 images. Rather than regenerate them, verified it was a clean off-by-one (51/51 text match at shift +1) and remapped the files. Also cleared stale `SCENE-133..139` clips/images left over from an even earlier split.
+
+### Two orchestrator bugs found before running anything (`84b4765`)
+`pilot_neet_scandal` has never had an `episode_state.json` — it was always driven by direct script calls, so the orchestrator path was never exercised for it and two bugs sat there undetected. Both would have silently wrecked the regen:
+- `_stage_split` selected `sorted(source_audio/*.mp3)[0]`. That directory accumulates voice tests and `preview_*.mp3`, so it would have transcribed `edge_prabhat_test.mp3` — a 30-second clip — instead of the narration.
+- `_stage_split` never passed `--voice`, so `auto_split_scenes` stamped its argparse default `en-US-JennyNeural` into every manifest, and `_stage_voice` read that back as a "per-episode override" — re-narrating the whole episode in an American female voice, discarding the configured Prabhat.
+
+Fixing only those would have made things worse: with manifests then recording the *real* voice, any future `channel_config.json` voice change would be silently ignored on any project that already had a manifest. `manifest.json`'s `voice` is a *record* (rewritten by every split), not an input, so it is no longer read as an override — only `episode_state`'s own `data.voice` counts.
+
+### The actual root cause of the word chops — it is in the SPLIT, not the stitch
+User pushback ("stitch was working fine until two days ago, we were only testing voice clone — something to think about") was correct that stitch was not to blame, and the git history agrees: `auto_split_scenes_v1_stage3_export.py` had not been touched in the last three days.
+
+`cut_audio_clip()` cut each scene at `whisperx_end + 0.15s`. Whisper's word-level end timestamps land *before* the speech finishes decaying — for "June" it was ~1.3s early — so the last word of a scene got sliced off, and the rendered video dropped it entirely. Proved by transcribing the same span two ways: `SCENE-030.mp3` (the clip that goes into the video) → "…scheduled for 21st **May**", the identical span cut from `narration.mp3` → "…scheduled for 21st **June**". The narration was always correct; the clip was not.
+
+**This predates every voice switch.** Measured with an energy-based detector across three episodes and three different TTS providers:
+
+| Episode | Date | Voice | Chopped scenes |
+|---|---|---|---|
+| `ep01_v1` | 07-21 | edge era | 27 / 107 (25%) |
+| `test_2min` | 07-27 | gemini_cloudtts / Charon | 8 / 27 (30%) |
+| `pilot_neet_scandal` | 07-31 | edge / Prabhat | 29 / 132 (22%) |
+
+Corroborated independently: `test_2min`'s 07-27 render is missing "he wasn't." from "…in about forty-eight hours, he wasn't." — the detector flagged `SCENE-023` (last word `"wasn't."`) before the transcript was checked. The voice switch changed only *which* words landed on boundaries; this time one of them ("June") was load-bearing enough to notice. Also note `NEET-UG` rendered as "Neat Uji" back on Charon — that mispronunciation was never Prabhat-specific either.
+
+### The fix (`auto_split_scenes_v1_stage3_export.py`)
+- `detect_silences()` — one ffmpeg `silencedetect` pass over the narration, returning every silence region. Pure ffmpeg deliberately: the split stage runs under the WhisperX venv, which has no `pydub`.
+- `refine_bounds()` — snaps each scene to real audio instead of trusting Whisper. Tail extends to the *start* of the silence immediately preceding the next scene's speech; lead begins at the *end* of the silence immediately preceding this scene's speech.
+- **No-overlap guarantee**: scene N's tail stops at a silence's start and scene N+1's lead begins at that same silence's end, so two clips cannot overlap by construction.
+- Falls back to the old fixed padding if no silences are detected, but now prints a loud warning instead of silently reverting to the buggy behaviour.
+
+Got it wrong twice before it was right, both caught by testing rather than reading:
+1. Stopping at the *first* silence after the scene end — often a pause *inside* the sentence ("…48 hours, ⟨pause⟩ he wasn't") — still truncated.
+2. Picking the *earliest* qualifying silence for the lead made `SCENE-112` reach back across `SCENE-111`'s extended tail, so the render said "but it wasn't that" **twice**. That duplication was only caught because the user asked for `local_mp4_analyzer.py` to be run on the output.
+
+**Verification:** every clip transcribed and diffed against its manifest text, checking both truncation *and* bleed — `pilot_neet_scandal` 132 clips and `test_2min` 27 clips both come back **0 truncations / 0 bleed** (down from 29 and 8). Remaining flags are ASR spelling variants of the same audio ("centres/centers", "aadhaar/adhar"). `refine_bounds` also has direct edge-case tests (no-overlap invariant, final-scene cap, empty-silence input, never-shorter-than-Whisper-span). In the final render: "21st **June**", "48 hours, where **he wasn't**", "60 to 70% **overlap**" (previously the nonsense "at 62s"). A/V drift 16ms.
+
+### Why no review agent caught any of this
+Review agents run **only** inside `_run_with_review()`, called from the orchestrator's stage loop — there is no other call site and no skip flag. Since `pilot_neet_scandal` never went through the orchestrator, **not one review has ever run for this episode.**
+
+Worth knowing: `_review_voice` already runs `review_narration_audio.py`, which does a transcript-vs-script diff and raises "possible mispronunciation/skipped/garbled text" — exactly the NEET-UG defect. That check was already built and wired; it simply never fired. The same reviewer also already excludes `preview_*.mp3` and prefers `narration.mp3` — the very audio-selection logic `_stage_split` was missing. Caveat: it is advisory-only (`passed=True` unconditionally, score floored at 7), so it would have *reported*, not blocked.
+
+Gap that remains: nothing compares the *narration's* `.voice.json` sidecar against the configured voice — the existing freshness check covers only the CTA. That is what would have caught the JennyNeural override instantly.
+
+### Review of the sibling `shorts_pipeline2` stitch
+Compared group handling. Our `resolve_group_images()` only fills *missing* member images (`if not os.path.exists(target)`), so it never overwrites real generated art. But it works by **copying files into `images/`**, producing duplicates indistinguishable from genuine generated images — which is exactly what made the 133→132 remap fiddly and how stale `SCENE-133..139` files lingered. `shorts_pipeline2` instead resolves at read time (`find_video_source`, priority scene → group) and writes nothing. Recommend adopting that. On whether grouping is needed at all for long-form: argued *for* keeping it — scenes here are one sentence each (~6s), so dropping grouping means a new image every 6s for 14 minutes plus ~14 more generated images per episode; grouping re-unifies sentences belonging to one visual beat.
+
+### Pending / handoff
+- The chop fix is committed but **only `pilot_neet_scandal` and `test_2min` have been re-cut**. `ep01`/`ep01_v1`/`test_script` still contain the truncation (25% of scenes for `ep01_v1`) and need a re-cut + re-stitch if ever revisited or published.
+- `ep01` is uploaded but private and **has this bug baked in** — do not publish it as-is.
+- Wire `local_mp4_analyzer.py` (or the clip-level truncation/bleed validator built this session) into the pipeline as a real review step. Every defect found today was found by transcribing output; nothing automated flagged them.
+- Add a narration `.voice.json` freshness check to `_review_voice`, mirroring the existing CTA one.
+- Consider adopting `shorts_pipeline2`'s read-time group resolution instead of copying images.
+- Unchanged from before: channel banner + About text drafted but unapproved; `common/bgm/CREDITS.txt` attribution still needs to go in the YouTube description before publishing.
+
 ### Pending / handoff — READ THIS FIRST in the next session
 - **The current stitched/captioned video is STALE.** It was rendered with the pre-pronunciation-fix script (still says "NETUG"/"an ETUG" for NEET-UG, "Ask it" instead of "Pass it, become a doctor"). The script file itself already has both fixes applied and committed (`c84dae2`) — what's outstanding is running the pipeline against it.
 - **Immediate next step**: decide full regen (narration → split → prompts → images → overlays → stitch, ~40+ min, matches the process already proven to work today) vs. a surgical audio-patch (cheaper but doesn't get a fresh scene split, so can't potentially dodge the "candidate"/"two" boundary-glitch class of issue, and is fiddlier to splice correctly). Session ended on this open question — user was about to decide when the session was paused to save state.

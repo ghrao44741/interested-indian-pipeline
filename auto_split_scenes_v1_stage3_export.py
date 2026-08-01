@@ -353,10 +353,94 @@ def write_timestamped_script(manifest_scenes: list, project: str) -> str:
         f.write("\n".join(lines))
     return out_path
 
-def cut_audio_clip(source_audio: str, start: float, end: float, output_path: str, padding: float = 0.15):
-    """Use ffmpeg to cut a clip from the source audio with small padding."""
-    start_padded = max(0, start - padding)
-    duration = (end - start) + (padding * 2)
+MIN_EDGE_PADDING = 0.15   # never cut tighter than the old fixed pad
+SAFETY_MARGIN    = 0.05   # keep off the neighbour's first word
+ATTACK_BACKOFF   = 0.05   # start a hair inside the silence so the first consonant survives
+MAX_TAIL_EXTEND  = 2.50   # cap for the final scene, which has no next-scene boundary
+
+
+def detect_silences(source_audio: str, noise_db: int = -40, min_dur: float = 0.12):
+    """Return [(silence_start, silence_end), ...] via ffmpeg's silencedetect.
+
+    Pure ffmpeg on purpose — the split stage runs under the WhisperX venv, which
+    has no pydub.
+    """
+    cmd = ["ffmpeg", "-i", source_audio, "-af",
+           f"silencedetect=n={noise_db}dB:d={min_dur}", "-f", "null", "-"]
+    out = subprocess.run(cmd, capture_output=True, text=True).stderr
+    silences, cur = [], None
+    for line in out.splitlines():
+        if "silence_start:" in line:
+            try:
+                cur = float(line.split("silence_start:")[1].strip().split()[0])
+            except (ValueError, IndexError):
+                cur = None
+        elif "silence_end:" in line and cur is not None:
+            try:
+                silences.append((cur, float(line.split("silence_end:")[1].strip().split()[0])))
+            except (ValueError, IndexError):
+                pass
+            cur = None
+    return silences
+
+
+def refine_bounds(start: float, end: float, silences, prev_end=None, next_start=None):
+    """Widen a scene's [start, end] out to where the audio actually goes quiet.
+
+    Whisper's word-level end times land *before* the speech has finished
+    decaying — sometimes by over a second — so cutting at end + a fixed 0.15s
+    sliced the last word off. The rendered video then dropped it entirely
+    ("...scheduled for June 21st" -> "...for 21st", which ASR hears as "May").
+    Measured across three episodes and three different TTS providers this hit
+    22-30% of scenes, so it is voice-independent and predates the voice switch.
+
+    The tail extends to the start of the next detected silence, and the lead
+    back to the end of the previous one, each clamped so a clip can never reach
+    into a neighbouring scene's speech.
+    """
+    # Tail: the silence that immediately precedes the NEXT scene's speech is the
+    # true end of this scene. Deliberately not the *first* silence after `end` —
+    # that is often a pause inside the sentence (".. in about 48 hours, <pause>
+    # he wasn't."), and stopping there re-creates the very truncation this fixes.
+    # The final scene has no next-scene boundary; without a cap it would run to
+    # the last silence anywhere in the file and swallow the trailing dead air.
+    limit = (next_start - SAFETY_MARGIN) if next_start is not None else end + MAX_TAIL_EXTEND
+    clip_end = end + MIN_EDGE_PADDING
+    for s_start, _ in silences:
+        if end - 0.05 <= s_start <= limit:
+            clip_end = max(clip_end, s_start)   # keep the latest qualifying one
+    clip_end = min(clip_end, limit)
+
+    # Lead: the end of the silence *immediately* before this scene's speech —
+    # the latest qualifying one, not the earliest. Taking the earliest reached
+    # back across the previous scene's extended tail, so both clips contained
+    # the same words and the render said them twice.
+    # The previous scene's tail stops at that same silence's *start*, so keying
+    # off its *end* (minus a hair, to not clip the word's attack) guarantees the
+    # two clips can never overlap.
+    floor_ = (prev_end + SAFETY_MARGIN) if prev_end is not None else 0.0
+    lead_ends = [s_end for _, s_end in silences if s_end <= start + 0.05]
+    if lead_ends:
+        clip_start = max(lead_ends) - ATTACK_BACKOFF
+    else:
+        clip_start = start - MIN_EDGE_PADDING
+    clip_start = max(clip_start, floor_, 0.0)
+    clip_start = min(clip_start, start)
+
+    clip_end = max(clip_end, end)          # never cut shorter than Whisper's span
+    return clip_start, clip_end
+
+
+def cut_audio_clip(source_audio: str, start: float, end: float, output_path: str,
+                   padding: float = 0.15, prev_end: float = None, next_start: float = None,
+                   silences=None):
+    """Cut a clip from the source audio, extended to the real speech boundaries."""
+    if silences:
+        start_padded, clip_end = refine_bounds(start, end, silences, prev_end, next_start)
+        duration = clip_end - start_padded
+    else:
+        start_padded = max(0, start - padding)
+        duration = (end - start) + (padding * 2)
 
     cmd = [
         "ffmpeg", "-y",
@@ -465,6 +549,14 @@ def main():
     # Step 4: Cut audio clips and build manifest
     print(f"\n{'─' * 55}")
     print("Cutting audio clips...")
+    # Detected once for the whole narration, then reused for every clip so each
+    # scene can be extended to where the speech actually stops (see refine_bounds).
+    silences = detect_silences(audio_path)
+    if silences:
+        print(f"  {len(silences)} silence region(s) detected for boundary snapping")
+    else:
+        print("  ⚠ No silence regions detected — falling back to fixed padding, which is "
+              "known to truncate the last word of ~25% of scenes. Check ffmpeg/silencedetect.")
     manifest_scenes = []
 
     for i, scene in enumerate(scenes, 1):
@@ -473,7 +565,12 @@ def main():
         audio_filename = f"audio/{scene_id}.mp3"
         output_path = f"{args.project}/{audio_filename}"
 
-        cut_audio_clip(audio_path, scene["start"], scene["end"], output_path)
+        # Neighbour boundaries so the clip can pad into the surrounding silence
+        # without ever reaching into the adjacent scene's speech.
+        prev_end   = scenes[i - 2]["end"]   if i >= 2            else None
+        next_start = scenes[i]["start"]     if i < len(scenes)   else None
+        cut_audio_clip(audio_path, scene["start"], scene["end"], output_path,
+                       prev_end=prev_end, next_start=next_start, silences=silences)
 
         flag = " ⚠️  OVER LIMIT" if duration > args.max_seconds else ""
         corrected_text = apply_brand_corrections(scene["text"])

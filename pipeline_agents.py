@@ -61,6 +61,27 @@ BANNED_WORDS = [
 STAGE_ORDER = ["topics", "script", "review-script", "voice", "split", "prompts", "images",
                "overlays", "stitch", "metadata", "thumbnail", "chapters", "upload"]
 
+# Working copies the reviewers must never mistake for the production script.
+SCRIPT_VARIANT_SUFFIXES = ("_previous", "_draft", "_draft_tagged", "_tagged", "_old", "_backup")
+
+
+def _pick_production_script(project_dir: Path):
+    """Return the project's real script, ignoring drafts/backups.
+
+    Callers used sorted(glob("script_*.txt"))[-1], which sorts
+    'script_x_PREVIOUS.txt' *after* 'script_x.txt' — so the reviewers silently
+    diffed the manifest against the previous draft and reported rewritten
+    sentences as ASR mishearings.
+    """
+    matches = sorted(project_dir.glob("script_*.txt"))
+    if not matches:
+        return None
+    primary = [m for m in matches
+               if not any(m.stem.lower().endswith(s) for s in SCRIPT_VARIANT_SUFFIXES)]
+    # shortest stem = the base name without any variant suffix
+    return min(primary, key=lambda m: len(m.stem)) if primary else matches[-1]
+
+
 # ── Transcription-accuracy helper (used by ReviewAgent._review_split) ──────────
 
 _NUMBER_WORDS = {
@@ -539,8 +560,7 @@ class ReviewAgent:
             script_path = ctx.get("script_path")
             script_path = Path(script_path) if script_path else None
             if not script_path or not script_path.exists():
-                matches = sorted(project_dir.glob("script_*.txt"))
-                script_path = matches[-1] if matches else None
+                script_path = _pick_production_script(project_dir)
 
             print("  Running narration audio review (Whisper transcript + seam/silence scan)...")
             data = rna.review(audio_file, script_path, whisper_model="base")
@@ -609,9 +629,13 @@ class ReviewAgent:
         # reach burned-in captions. One combined issue regardless of count, so a
         # handful of small mishearings doesn't crash the score the same way a
         # structural problem (duplicate IDs, too few scenes) does.
-        script_matches = sorted(project_dir.glob("script_*.txt"))
-        if script_matches:
-            source_text = script_matches[-1].read_text(encoding="utf-8")
+        # episode_state's script_path is authoritative; the glob is only a fallback
+        # for projects driven by direct script calls (no state file).
+        production_script = Path(ctx["script_path"]) if ctx.get("script_path") else None
+        if not production_script or not production_script.exists():
+            production_script = _pick_production_script(project_dir)
+        if production_script:
+            source_text = production_script.read_text(encoding="utf-8")
             mismatches = _find_transcription_mismatches(source_text, scenes)
             if mismatches:
                 issues.append(f"{len(mismatches)} possible transcription mismatch(es) — see recommendations")
