@@ -29,6 +29,24 @@ PIPELINE_DIR = Path(__file__).parent
 # Stages whose artifacts exist on disk and can be checked after the fact.
 CHECKABLE = ["voice", "split", "prompts", "images", "stitch"]
 
+# Reviewers that call Claude (_claude_assess) and cannot run without a client.
+# Skipped with a clear message rather than reported as a contract violation —
+# "the check could not run" and "the check failed" are different outcomes.
+CLIENT_REQUIRED = {"prompts"}
+
+
+def build_client():
+    """An Anthropic client if a key is configured, else None."""
+    try:
+        import anthropic
+        from dotenv import load_dotenv
+        load_dotenv(PIPELINE_DIR / ".env")
+    except ImportError:
+        return None
+    import os
+    key = os.getenv("ANTHROPIC_API_KEY")
+    return anthropic.Anthropic(api_key=key) if key else None
+
 
 def build_context(project_dir: Path) -> dict:
     """Reconstruct just enough of the orchestrator's context to run reviews.
@@ -61,14 +79,21 @@ def build_context(project_dir: Path) -> dict:
 
 
 def run(project_dir: Path, stages: list) -> int:
-    agent = ReviewAgent(None)
+    client = build_client()
+    agent = ReviewAgent(client)
     ctx = build_context(project_dir)
     print(f"project : {project_dir.name}")
     print(f"script  : {Path(ctx.get('script_path', '?')).name}")
+    if client is None:
+        print("client  : none (ANTHROPIC_API_KEY not set) — Claude-backed checks will be skipped")
 
-    violated = []
+    violated, skipped = [], []
     for stage in stages:
         print(f"\n{'─' * 58}\nSTAGE: {stage}")
+        if stage in CLIENT_REQUIRED and client is None:
+            print("  SKIPPED — needs ANTHROPIC_API_KEY")
+            skipped.append(stage)
+            continue
         try:
             result = agent.review(stage, ctx)
         except Exception as e:
@@ -88,10 +113,12 @@ def run(project_dir: Path, stages: list) -> int:
             violated.append(stage)
 
     print(f"\n{'=' * 58}")
+    if skipped:
+        print(f"SKIPPED (not verified): {', '.join(skipped)}")
     if violated:
         print(f"CONTRACT VIOLATED: {', '.join(violated)}")
         return 1
-    print("CONTRACT MET")
+    print("CONTRACT MET" + (" (for the stages that ran)" if skipped else ""))
     return 0
 
 

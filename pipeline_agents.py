@@ -94,18 +94,23 @@ def _find_stale_clips(project_dir: Path, scenes: list, tolerance: float = 0.1) -
     measurements on the clip alone cannot tell a clean ending from a truncated
     one (a cut-off word is already decaying by its final frames). Recomputing
     the expected bounds and comparing durations is exact.
+
+    Returns None when the check could not run at all (missing narration, or the
+    split module's whisperx/torch imports unavailable in this environment) —
+    distinct from [] meaning "checked, nothing stale". A check that silently
+    disables itself is worse than one that fails loudly.
     """
     narration = project_dir / "source_audio" / "narration.mp3"
     if not narration.exists():
-        return []
+        return None
     try:
         from auto_split_scenes_v1_stage3_export import detect_silences, refine_bounds
     except ImportError:
-        return []
+        return None
 
     silences = detect_silences(str(narration))
     if not silences:
-        return []
+        return None
 
     stale = []
     for i, s in enumerate(scenes):
@@ -602,11 +607,18 @@ class ReviewAgent:
         # Did this narration actually get made with the voice we currently config?
         # The CTA had this check; the narration — the entire episode — did not, so
         # a stale or overridden voice could only be caught by ear.
+        sidecar = Path(str(audio_file) + ".voice.json")
         try:
-            drift = _check_voice_sidecar(Path(str(audio_file) + ".voice.json"))
-            if drift:
-                issues.append(f"{audio_file.name} was generated with a different voice ({drift}) "
-                              f"— re-run the voice stage")
+            if not sidecar.exists():
+                # Pre-dates sidecar tracking — can't verify, but that is not the
+                # same as a confirmed mismatch, so don't fail the stage over it.
+                recs.append(f"{audio_file.name} has no voice-config sidecar (predates this check) "
+                            f"— re-run the voice stage to enable voice-drift detection")
+            else:
+                drift = _check_voice_sidecar(sidecar)
+                if drift:
+                    issues.append(f"{audio_file.name} was generated with a different voice "
+                                  f"({drift}) — re-run the voice stage")
         except Exception as e:
             recs.append(f"Could not check narration voice freshness: {e}")
 
@@ -708,7 +720,10 @@ class ReviewAgent:
         # Clips cut by the old fixed-padding logic, which shipped "21st" for
         # "21st June" in every episode produced before the silence-snapping fix.
         stale = _find_stale_clips(project_dir, scenes)
-        if stale:
+        if stale is None:
+            recs.append("Could not verify clip cut boundaries (no narration.mp3, or whisperx/torch "
+                        "unavailable here) — the last-word truncation check did NOT run")
+        elif stale:
             issues.append(f"{len(stale)} scene clip(s) do not match the current cutting "
                           f"algorithm — likely truncating the last word: "
                           f"{', '.join(stale[:6])}{' …' if len(stale) > 6 else ''}")
