@@ -1255,3 +1255,159 @@ Compared group handling. Our `resolve_group_images()` only fills *missing* membe
 - `TASKS.md` `#13`/`#15` (Pexels grade-matching, B-roll A/B render) still unimplemented by design; `#14` (HTML-rendered scene graphics) now has real trigger cases logged from two separate sessions.
 - The A/V-sync bug (`apad` fix, from the previous commit) was long-standing in `stitch_video_longform.py` — worth re-checking any previously "finished" episode (ep01, test_script) for the same drift if they're revisited.
 
+
+---
+
+## Session — 2026-07-31 → 08-01 (continued): contract enforcement, delivery quality, visual direction, voice pivot
+
+**This section supersedes the "Pending / handoff" block above**, which described the state before the
+pilot was regenerated and is now stale in almost every particular.
+
+### 1. The pilot was regenerated — cheaply, on evidence
+The handoff proposed full regen (~40+ min) vs. a surgical patch. Neither was right. Transcribing the
+*old* render showed the question-to-declarative rewrites were already in it, so the only text drift
+was the two pronunciation fixes — meaning prompts and images did not need regenerating at all. Ran
+`voice → split → stitch` only, reusing every image, zero xAI spend. The re-split went 133 → 132
+scenes (SCENE-081/082 merged); rather than regenerate 51 images, verified a clean off-by-one (51/51
+text match at shift +1) and remapped the files.
+
+### 2. Two orchestrator bugs, found before they fired (`84b4765`)
+`pilot_neet_scandal` has never had an `episode_state.json` — it was always driven by direct script
+calls, so the orchestrator path was never exercised and two bugs sat there undetected:
+- `_stage_split` picked `sorted(source_audio/*.mp3)[0]`, which is a 30-second voice-test clip, not the
+  narration.
+- `_stage_split` never passed `--voice`, so `auto_split_scenes` stamped its argparse default
+  `en-US-JennyNeural` into every manifest, and `_stage_voice` read it back as a "per-episode override"
+  — which would have re-narrated the whole episode in an American female voice.
+
+Fixing only those would have made things worse: with manifests then recording the real voice, any
+future `channel_config.json` voice change would be silently ignored. `manifest.json`'s `voice` is a
+*record*, not an input, and is no longer read as an override.
+
+### 3. The word-chop bug — present since the first episode (`ae9ecfc`)
+User pushback ("stitch was working fine until two days ago") was correct: stitch was never at fault,
+and git confirmed `auto_split_scenes` had not been touched. `cut_audio_clip()` cut each scene at
+`whisperx_end + 0.15s`, but Whisper's word-end times land *before* the speech decays — for "June" by
+~1.3s — so the last word was sliced off. Proved by transcribing the same span two ways: the clip used
+in the video said "...21st **May**", the identical span from `narration.mp3` said "...21st **June**".
+
+Measured across three episodes and three TTS providers: `ep01_v1` 27/107 (25%), `test_2min` 8/27
+(30%), `pilot_neet_scandal` 29/132 (22%). **Nothing broke two days ago** — the voice switch only
+changed which words landed on boundaries. `test_2min`'s 07-27 render is audibly missing "he wasn't."
+for the same reason, and NEET-UG rendered as "Neat Uji" back on Charon, so that defect was never
+Prabhat-specific either.
+
+Fix: `detect_silences()` (one ffmpeg `silencedetect` pass — pure ffmpeg, since the split runs under
+the WhisperX venv which has no pydub) plus `refine_bounds()`, which snaps each scene to real audio.
+The tail extends to the start of the silence preceding the next scene's speech; the lead begins at
+the end of the silence preceding this scene's. Keying off opposite ends of the same silence makes
+overlap impossible by construction. Got it wrong twice first — stopping at the *first* silence (often
+an intra-sentence pause) still truncated, and picking the *earliest* lead silence made the render say
+"but it wasn't that" **twice**. Both caught only by transcribing output. Verified: 132 and 27 clips,
+0 truncations / 0 bleed.
+
+### 4. Why no agent caught any of it — and the contract (`dc383c7`, `1b0c585`, `5a7d1f9`)
+Review agents run **only** inside `_run_with_review()`, called from the orchestrator loop. No episode
+here has ever used the orchestrator, so **not one review had ever run**. Worse, the checks already
+existed: `_review_voice` runs `review_narration_audio.py` (a transcript-vs-script diff — exactly the
+NEET-UG defect) and `_review_split` has `_find_transcription_mismatches`, whose own comment says it
+exists to catch mishearings "before they reach burned-in captions" — the user's caption complaint.
+
+Built `PIPELINE_CONTRACT.md` (mishap catalogue + per-stage postconditions) and `verify_stage.py`, a
+standalone runner needing no `episode_state.json`, since a contract only the orchestrator enforces is
+not a contract. Also fixed:
+- Reviewers read `sorted(glob("script_*.txt"))[-1]`, which sorts `_PREVIOUS.txt` *after* the real
+  script — so the accuracy check diffed against the previous draft and reported rewritten sentences
+  as ASR errors.
+- `_check_cta_freshness`'s `edge` branch read a `default` key that does not exist in
+  `channel_config.json`, so with edge active it resolved to `en-US-GuyNeural` and false-flagged every
+  comparison. All consumers now resolve through one `_resolve_configured_voice()`.
+- Narration had no freshness check at all (only the CTA did) — added.
+- `_find_stale_clips()` recomputes each scene's expected cut and compares to disk: 0/132 and 0/27 on
+  re-cut projects, **39/107 on `ep01_v1`**. An audio heuristic was tried first and rejected — a clip's
+  own tail energy cannot separate a clean ending from a truncated one.
+
+### 5. Delivery quality, from an external review (`0eebbec`)
+Measured rather than assumed. Three claims were real, one was not:
+- **Loudness -21.2 LUFS.** Real. `generate_source_audio.py` normalises narration to -14 LUFS, then
+  ffmpeg's `amix` (default `normalize=1`) scales every input by 1/n — a flat -6dB — silently
+  discarding it. Now mixes with `normalize=0` plus a final `loudnorm`. Measured **-14.3 LUFS**, TP -0.7.
+- **Bitrate 483 kbps.** Real. No `-crf`/`-b:v` anywhere, so libx264 used its default CRF 23.
+  Intermediates now CRF 16 (they are re-encoded twice downstream), delivery CRF 18. Measured **914 kbps**.
+- **Caption text too small.** Real. ASS `FontSize` was 28 in a 1920x1080 frame. Now 52, with
+  `MAX_LINE_CHARS` re-tuned 34 → 32, plus `_rebalance()` so merged chunks stop orphaning single words
+  ("...for 21st" / "June.").
+- **"No captions"** — not a pipeline fault; the uncaptioned `_final.mp4` had been uploaded instead of
+  `_captioned.mp4`. Real hazard though: near-identical filenames.
+
+`BRAND_CORRECTIONS` also contained only the *sibling channel's* entries, so every mis-transcription
+reached the captions. Populated with this channel's terms; 8 scenes corrected, no false positives.
+
+### 6. Visual direction (`0838f04`) — `VISUAL_DIRECTION.md`
+Two production reviews looked contradictory (cut the character to 25-30% vs. invest heavily in him)
+but together say: **fewer character shots, each perfectly consistent.** Today it is the inverse.
+Measured mix over 116 shots: CARTOON **89%**, PHOTO 5%, CHART 6%, MAP **0%**. Not an infrastructure
+gap — `route_images.py` already dispatches four types and the map/chart/Pexels generators all work;
+`generate_image_prompts.py` simply picks CARTOON almost every time. Zero maps despite owning an
+accurate GeoJSON renderer was the sharpest miss.
+
+### 7. Pilot content pass — B1-B6 (`96713fe`)
+- **B4** delivered: 2 maps (Rajasthan/Kota; protest spread), 2 stat cards, 2 document cards, 3 Pexels.
+- **B5/B6**: "more than twenty-two lakh" — deliberately chosen because it is true under both the
+  registered (22.79) and appeared (~22.05) figures, and neither was independently verified; the
+  numbers came from the review itself. Plus attribution on the leak claims and an explicit "charges
+  are not convictions" line, since the episode names a currently-charged individual.
+- Two more generator bugs found while doing B4: `generate_chart.py` rendered stats at a fixed 72pt
+  regardless of length (three values overlapped into mush; a *guessed* glyph-width fix clamped back to
+  72 and changed nothing — `_fit_fontsize` now measures the rendered extent), and it saved with
+  `bbox_inches="tight"` so charts came out 1243x706 while printing "1280x720".
+  `generate_india_map.py` drew title and callout both at the top, so wide titles rendered straight
+  through the callout box.
+- **B1 only partly done**: CTA copy improved but still ~9s on a static card. A two-stage closing
+  (question card → subscribe card) needs stitch to support two CTA images — logged, not built.
+
+### 8. Voice direction changed mid-session
+Decision: retention beats accent authenticity — a flat Indian-accented voice costs more than a neutral
+one costs in authenticity, since Indian identity is carried by subject, character and vocabulary. New
+priority order: intonation/emotional range > pacing > credibility > Indian-term pronunciation > accent.
+
+Built `PRONUNCIATION_DICT` in `generate_source_audio.py`, applied once at provider dispatch so every
+backend benefits. It rewrites **only** the string handed to the synthesiser — the script keeps real
+spelling and captions are unaffected, because captions come from WhisperX's transcript and
+`BRAND_CORRECTIONS` maps phonetic artefacts back. So "Neet U.G." is spoken correctly while the caption
+still reads NEET-UG.
+
+Restored the four rhetorical questions (and the CTA question) that had only been flattened to work
+around the previous voice's missing question intonation.
+
+### Commits (9)
+`84b4765` orchestrator audio/voice bugs · `ae9ecfc` scene-clip truncation · `dc383c7` contract doc ·
+`1b0c585` standalone contract + voice-resolution drift · `5a7d1f9` false-outcome paths ·
+`0eebbec` loudness/bitrate/captions · `0f3a03d` track test_2min, ignore strays ·
+`0838f04` visual direction · `96713fe` pronunciation layer + chart/map fixes
+
+### Pending — READ THIS FIRST next session
+1. **Voice selection is the blocker.** Ten candidates generated on one identical passage (two
+   rhetorical questions + lakh/NEET-UG/NTA/CBI/Wangchuk/Bengaluru), all in `voice_previews/`:
+   edge `cand_en-US-{Andrew,Brian,Christopher,Eric}*` and `cand_en-GB-RyanNeural`; xAI at speed 0.9
+   `grok_{naksh,cosmo,atlas,castor,lumen}_sp90` ("cosmos" is spelled `cosmo`). Once picked: set it in
+   `channel_config.json` with a note recording why, then **narrate → split → remap images → stitch**.
+2. **Do not stitch before the voice is chosen** — the current render used Prabhat and the pre-question
+   script. Re-narration shifts scene boundaries again;
+   `scratchpad/remap_by_text.py` does a similarity-based remap (last run: 131/135 matched, 4 new
+   scenes needed art).
+3. **B2/B3 still outstanding**: chapter markers (`generate_chapters.py` has never been run) and a
+   description carrying sources plus the `common/bgm/CREDITS.txt` attribution.
+4. **Publish the CAPTIONED file.** `_final.mp4` and `_captioned.mp4` are near-identical names and the
+   wrong one was uploaded once already.
+5. **`ep01` will be deleted** (user's decision). `ep01_v1` / `test_script` still carry the truncation —
+   39/107 stale clips measured on `ep01_v1` — if ever revived.
+6. **Character locked**: stylized Indian male investigative explainer, late twenties, round gold-rimmed
+   glasses, ivory kurta, youthful-but-adult proportions, confident posture, expressive
+   editorial-cartoon features. The pilot ships with the old 10-14-year-old design (regenerating 132
+   images was ruled out), so the channel debuts with character A and switches at episode 2 — a
+   conscious, accepted discontinuity.
+7. **Post-publish queue** (see `VISUAL_DIRECTION.md`): semantic visual routing with CARTOON capped
+   35-40%, no three consecutive CARTOON shots, and the DOCUMENT type (the two pilot cards are its
+   reference design). Then canonical character sheet → pose library → locked prompt → QC checklist.
+   No LoRA, no parallax infrastructure, no forced 8-12 Mbps export.
