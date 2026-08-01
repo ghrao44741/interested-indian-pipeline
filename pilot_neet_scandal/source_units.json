@@ -1,0 +1,593 @@
+{
+  "version": 1,
+  "units": [
+    {
+      "id": "SRC-001",
+      "paragraph": 0,
+      "text": "In July 2026, India's Education Minister resigned.",
+      "fingerprint": "348d0da9ea99"
+    },
+    {
+      "id": "SRC-002",
+      "paragraph": 0,
+      "text": "Not over money, not over an affair, not over a leaked recording.",
+      "fingerprint": "3a35f4b0f7a8"
+    },
+    {
+      "id": "SRC-003",
+      "paragraph": 0,
+      "text": "He resigned because a political party that does not legally exist, has never run a candidate, and is named entirely after a household pest spent fifty days telling him to.",
+      "fingerprint": "390fb772bc1b"
+    },
+    {
+      "id": "SRC-004",
+      "paragraph": 0,
+      "text": "I've read that sentence back to myself three times and it still doesn't sound real.",
+      "fingerprint": "3e5c9f0ddebd"
+    },
+    {
+      "id": "SRC-005",
+      "paragraph": 1,
+      "text": "Here's how a government loses a fight to cockroaches.",
+      "fingerprint": "36c30e924fdf"
+    },
+    {
+      "id": "SRC-006",
+      "paragraph": 1,
+      "text": "On May 3rd, 2026, more than twenty-two lakh students — roughly the population of a mid-sized European country — sat down for Neet U.G., India's single entrance exam for every medical and dental seat in the country.",
+      "fingerprint": "990f3303ebd0"
+    },
+    {
+      "id": "SRC-007",
+      "paragraph": 1,
+      "text": "You pass it, you become a doctor.",
+      "fingerprint": "54502c6e5218"
+    },
+    {
+      "id": "SRC-008",
+      "paragraph": 1,
+      "text": "You miss it, you wait a full year and try again.",
+      "fingerprint": "a220bff122ea"
+    },
+    {
+      "id": "SRC-009",
+      "paragraph": 1,
+      "text": "No second sitting, no partial credit, no alternate path if your family doesn't have the money for a second attempt at a coaching institute.",
+      "fingerprint": "3e57c38131d2"
+    },
+    {
+      "id": "SRC-010",
+      "paragraph": 1,
+      "text": "That's the whole system, riding on one three-hour test, once a year, for every single one of those twenty-two lakh teenagers.",
+      "fingerprint": "d4e4a6da110a"
+    },
+    {
+      "id": "SRC-011",
+      "paragraph": 2,
+      "text": "And the math on the other side of that test is brutal.",
+      "fingerprint": "8f3b23f5de19"
+    },
+    {
+      "id": "SRC-012",
+      "paragraph": 2,
+      "text": "India has roughly one point three lakh M.B.B.S. seats nationwide, government and private combined.",
+      "fingerprint": "94f19ed7a73c"
+    },
+    {
+      "id": "SRC-013",
+      "paragraph": 2,
+      "text": "Do the division and you get an acceptance rate under six percent — meaning more than nineteen out of every twenty students who sat that exam were always going to walk away disappointed, before anyone leaked anything.",
+      "fingerprint": "b839bd297439"
+    },
+    {
+      "id": "SRC-014",
+      "paragraph": 2,
+      "text": "I did that division twice because I assumed I'd made an error.",
+      "fingerprint": "e0a630903380"
+    },
+    {
+      "id": "SRC-015",
+      "paragraph": 2,
+      "text": "I hadn't.",
+      "fingerprint": "5e5168bd5617"
+    },
+    {
+      "id": "SRC-016",
+      "paragraph": 2,
+      "text": "Which is less \"competitive exam\" and more organic chemistry's answer to the Hunger Games.",
+      "fingerprint": "fade8294f08a"
+    },
+    {
+      "id": "SRC-017",
+      "paragraph": 2,
+      "text": "When a system is already that unforgiving, it doesn't take much to tip it from \"extremely hard\" into \"people will pay anything to cheat it.\"",
+      "fingerprint": "68e603e51d31"
+    },
+    {
+      "id": "SRC-018",
+      "paragraph": 3,
+      "text": "Nine days later, the guessing game caught up with the exam itself.",
+      "fingerprint": "708d443ab3f0"
+    },
+    {
+      "id": "SRC-019",
+      "paragraph": 3,
+      "text": "According to investigators in Rajasthan, \"guess papers\" — pre-circulated question banks — were being sold for up to five lakh rupees each, and somewhere between sixty and seventy percent of the actual paper allegedly matched them.",
+      "fingerprint": "3605aeda1edd"
+    },
+    {
+      "id": "SRC-020",
+      "paragraph": 3,
+      "text": "Not vaguely similar.",
+      "fingerprint": "89c55c283de5"
+    },
+    {
+      "id": "SRC-021",
+      "paragraph": 3,
+      "text": "Matched.",
+      "fingerprint": "d010685fc836"
+    },
+    {
+      "id": "SRC-022",
+      "paragraph": 3,
+      "text": "So the National Testing Agency did the only thing left to do: cancelled the whole exam, opened a CBI probe, and eventually detained thirteen people.",
+      "fingerprint": "eefab6a5a217"
+    },
+    {
+      "id": "SRC-023",
+      "paragraph": 3,
+      "text": "Those thirteen have since been charged.",
+      "fingerprint": "b69b402915cc"
+    },
+    {
+      "id": "SRC-024",
+      "paragraph": 3,
+      "text": "Worth saying plainly: charges are not convictions, and none of this has been tested in court yet.",
+      "fingerprint": "77bb19e37ec5"
+    },
+    {
+      "id": "SRC-025",
+      "paragraph": 3,
+      "text": "Meanwhile, more than twenty-two lakh eighteen-year-olds who'd spent two years of their lives preparing were told to sit tight, and that someone would get back to them.",
+      "fingerprint": "c8dc7ad85dc2"
+    },
+    {
+      "id": "SRC-026",
+      "paragraph": 3,
+      "text": "Imagine training for months, running your race, finishing strong — and then being told someone else on the track may have worn rocket shoes, so could everyone please just line up and run it again next month.",
+      "fingerprint": "ec825c8a49e4"
+    },
+    {
+      "id": "SRC-027",
+      "paragraph": 3,
+      "text": "A re-exam was scheduled for June 21st.",
+      "fingerprint": "76493853ec44"
+    },
+    {
+      "id": "SRC-028",
+      "paragraph": 4,
+      "text": "Who actually pays five lakh rupees for a leaked paper?",
+      "fingerprint": "5e16ebc9692f"
+    },
+    {
+      "id": "SRC-029",
+      "paragraph": 4,
+      "text": "Someone who understands exactly what Neet U.G. is worth to a family.",
+      "fingerprint": "ce51c90b0f54"
+    },
+    {
+      "id": "SRC-030",
+      "paragraph": 4,
+      "text": "Whole towns in India — Kota, in Rajasthan, is the famous one — exist almost entirely as coaching-industry economies, where parents relocate their teenagers for a year or two and pay a serious chunk of household savings on the promise of a medical seat at the end of it.",
+      "fingerprint": "daf52a19eae7"
+    },
+    {
+      "id": "SRC-031",
+      "paragraph": 4,
+      "text": "When the prize is that large and that binary, someone is always going to try selling a shortcut, and someone desperate enough is always going to buy it.",
+      "fingerprint": "83533dfa9202"
+    },
+    {
+      "id": "SRC-032",
+      "paragraph": 4,
+      "text": "The leak wasn't a random glitch in the system.",
+      "fingerprint": "7bada353a735"
+    },
+    {
+      "id": "SRC-033",
+      "paragraph": 4,
+      "text": "It was the system's own economics, working exactly as you'd expect.",
+      "fingerprint": "865d7852de3b"
+    },
+    {
+      "id": "SRC-034",
+      "paragraph": 5,
+      "text": "Here's the part that makes this properly absurd, though: the National Testing Agency exists specifically to prevent this.",
+      "fingerprint": "1b1275a1e887"
+    },
+    {
+      "id": "SRC-035",
+      "paragraph": 5,
+      "text": "It was created in November 2017, pulled out from under India's central school board, with one pitch — take exam administration away from an overloaded education bureaucracy and hand it to a dedicated, modern, professional agency that could run tests at \"international standard.\" That was the actual sales pitch, word for word, back when it launched — like hiring a professional organizer to sort out your messy closet, and nine years later your clothes are on fire and the organizer is the one holding the matches.",
+      "fingerprint": "c4271c047cfd"
+    },
+    {
+      "id": "SRC-036",
+      "paragraph": 5,
+      "text": "The specialist agency built to fix exam integrity is the one whose integrity is now the actual news story.",
+      "fingerprint": "640c95b3313c"
+    },
+    {
+      "id": "SRC-037",
+      "paragraph": 5,
+      "text": "I keep waiting for the twist where this turns out to be a different agency.",
+      "fingerprint": "28f4463629dc"
+    },
+    {
+      "id": "SRC-038",
+      "paragraph": 5,
+      "text": "It never comes.",
+      "fingerprint": "b663bf851bb4"
+    },
+    {
+      "id": "SRC-039",
+      "paragraph": 6,
+      "text": "If this sounds familiar, that's because it already happened.",
+      "fingerprint": "675d7595dbdf"
+    },
+    {
+      "id": "SRC-040",
+      "paragraph": 6,
+      "text": "In 2024, the exact same exam leaked, and the fallout was bad enough that the government formed a high-level committee — led by a former ISRO chairman — with one job: fix the National Testing Agency for good.",
+      "fingerprint": "d900cb235aea"
+    },
+    {
+      "id": "SRC-041",
+      "paragraph": 6,
+      "text": "That committee didn't hold back.",
+      "fingerprint": "ea77dd9462f6"
+    },
+    {
+      "id": "SRC-042",
+      "paragraph": 6,
+      "text": "It filed a hundred and one recommendations — online testing, better candidate authentication, using government schools as secure exam centers.",
+      "fingerprint": "b74f6d39c918"
+    },
+    {
+      "id": "SRC-043",
+      "paragraph": 6,
+      "text": "A hundred and one is an oddly specific number for a to-do list, and by this May, the man who chaired it told the Supreme Court that most of them were done or actively underway — and in Indian bureaucracy, \"actively underway\" carries roughly the same weight as \"I'll text you back\" does in a relationship that's already over.",
+      "fingerprint": "31799182e5f0"
+    },
+    {
+      "id": "SRC-044",
+      "paragraph": 7,
+      "text": "And then, two years after that report landed, the same exam leaked again anyway — through more or less the same hole.",
+      "fingerprint": "647067930103"
+    },
+    {
+      "id": "SRC-045",
+      "paragraph": 7,
+      "text": "In 2024, it was pen-and-paper question sets moving through an offline network of coaching agents before exam day.",
+      "fingerprint": "804a989170ea"
+    },
+    {
+      "id": "SRC-046",
+      "paragraph": 7,
+      "text": "In 2026, it was \"guess papers\" built off leaked question banks, sold for cash, matched against the real thing at sixty to seventy percent overlap.",
+      "fingerprint": "460de75961a7"
+    },
+    {
+      "id": "SRC-047",
+      "paragraph": 7,
+      "text": "Different vocabulary, same underlying failure: a paper-based, once-a-year, winner-takes-almost-nothing exam that has to stay secret for months while it moves through printing presses, transport routes, and exam centers in every state, handled by thousands of people along the way.",
+      "fingerprint": "ccdd9c3889cb"
+    },
+    {
+      "id": "SRC-048",
+      "paragraph": 7,
+      "text": "You only need one weak link in that chain, and apparently, every couple of years, there is one.",
+      "fingerprint": "7d807400b122"
+    },
+    {
+      "id": "SRC-049",
+      "paragraph": 7,
+      "text": "So what exactly was the point of a hundred-and-one-point reform plan, if the thing it was built to stop just happened again anyway?",
+      "fingerprint": "d84e9e388719"
+    },
+    {
+      "id": "SRC-050",
+      "paragraph": 7,
+      "text": "I don't have a good answer for that one, and I've been sitting with it for a while.",
+      "fingerprint": "a8961e742f0c"
+    },
+    {
+      "id": "SRC-051",
+      "paragraph": 8,
+      "text": "While all of this was working its way through the courts, the Chief Justice of India said something he probably wishes he could take back.",
+      "fingerprint": "fbd33f61fb76"
+    },
+    {
+      "id": "SRC-052",
+      "paragraph": 8,
+      "text": "He'd spent months fielding urgent petition after urgent petition over the Neet mess, and during one hearing, talking about young, unemployed activists, he compared them to cockroaches — people who, in his words, don't get jobs, so some of them become RTI activists and \"start attacking everyone.\" You can hear the frustration in that line.",
+      "fingerprint": "1d63cc0d6ad3"
+    },
+    {
+      "id": "SRC-053",
+      "paragraph": 8,
+      "text": "A judge tired of being everyone's last resort.",
+      "fingerprint": "3df1ca2915dc"
+    },
+    {
+      "id": "SRC-054",
+      "paragraph": 8,
+      "text": "But frustration doesn't always translate well into a soundbite, and this one didn't.",
+      "fingerprint": "2a5945519b2f"
+    },
+    {
+      "id": "SRC-055",
+      "paragraph": 8,
+      "text": "It was meant as a dismissal.",
+      "fingerprint": "56e663171b8c"
+    },
+    {
+      "id": "SRC-056",
+      "paragraph": 8,
+      "text": "It landed as a gift.",
+      "fingerprint": "d318c6c4085d"
+    },
+    {
+      "id": "SRC-057",
+      "paragraph": 9,
+      "text": "Within seventy-eight hours, a college student named Abhijeet Dipke had turned that one sentence into a satirical social media page called the Cockroach Janta Party — cockroach, people's party — and it had thirty lakh followers.",
+      "fingerprint": "e8e0f1254322"
+    },
+    {
+      "id": "SRC-058",
+      "paragraph": 9,
+      "text": "Not a real political party.",
+      "fingerprint": "b5f47c5b3e17"
+    },
+    {
+      "id": "SRC-059",
+      "paragraph": 9,
+      "text": "No candidates, no manifesto beyond \"the exam system is broken and somebody in a suit should say so.\" Just a joke account that decided to become the loudest voice in the room.",
+      "fingerprint": "97daf4ab8dd6"
+    },
+    {
+      "id": "SRC-060",
+      "paragraph": 9,
+      "text": "Have you ever seen a group chat rename itself something ridiculous after one bad meeting, and then watched that ridiculous name somehow become the entire group's personality?",
+      "fingerprint": "2b57444be2dc"
+    },
+    {
+      "id": "SRC-061",
+      "paragraph": 9,
+      "text": "That's this, at national scale — except the group chat, in this case, has thirty lakh members and a logo.",
+      "fingerprint": "b16d5421daf6"
+    },
+    {
+      "id": "SRC-062",
+      "paragraph": 9,
+      "text": "I would like it on record that I did not see this coming.",
+      "fingerprint": "ae942e98d470"
+    },
+    {
+      "id": "SRC-063",
+      "paragraph": 10,
+      "text": "The joke did not stay a joke for long.",
+      "fingerprint": "566384ef59e7"
+    },
+    {
+      "id": "SRC-064",
+      "paragraph": 10,
+      "text": "Protesters started carrying actual cockroach signs to Jantar Mantar, Delhi's designated protest lawn, and the movement spread outward to Pune, Bengaluru, and Lucknow.",
+      "fingerprint": "b8c2eff377bd"
+    },
+    {
+      "id": "SRC-065",
+      "paragraph": 10,
+      "text": "A well-known activist, Sonam Wangchuk, joined in with a twenty-six-day hunger strike.",
+      "fingerprint": "0b7ae48938a6"
+    },
+    {
+      "id": "SRC-066",
+      "paragraph": 10,
+      "text": "Wangchuk wasn't some random celebrity endorsement — he'd already built a real reputation from education and climate protests in Ladakh, the kind of credibility that doesn't come from a verified badge.",
+      "fingerprint": "df8f24690403"
+    },
+    {
+      "id": "SRC-067",
+      "paragraph": 10,
+      "text": "His involvement is what turned an internet joke into something newsrooms could no longer file under \"student memes\" and move on from.",
+      "fingerprint": "54c69f1a78af"
+    },
+    {
+      "id": "SRC-068",
+      "paragraph": 10,
+      "text": "And that's really the story of this whole movement: it started as a punchline, built its audience like a meme page, and only afterward picked up the institutional weight — a hunger strike, national headlines, a resignation — that traditional protest movements usually need years to earn.",
+      "fingerprint": "65209eb7dd8f"
+    },
+    {
+      "id": "SRC-069",
+      "paragraph": 11,
+      "text": "For a while, the government's response was to call the whole thing \"anti-national.\" Yes, firing one minister doesn't install biometric scanners or rewrite how the National Testing Agency hires people — fix the system, not just the man standing near it, is not an unreasonable position on its own.",
+      "fingerprint": "ce273a5c98ee"
+    },
+    {
+      "id": "SRC-070",
+      "paragraph": 11,
+      "text": "But you can be technically right and still lose the room completely.",
+      "fingerprint": "1e4696890b79"
+    },
+    {
+      "id": "SRC-071",
+      "paragraph": 11,
+      "text": "I've been technically right about plenty of arguments I still lost, so I sympathize a little.",
+      "fingerprint": "bc92c7c201d8"
+    },
+    {
+      "id": "SRC-072",
+      "paragraph": 12,
+      "text": "Then, on July 20th and 21st, police used lathi charges — the baton crackdowns you've almost certainly seen in a dozen other Indian protest videos.",
+      "fingerprint": "98731bf3515d"
+    },
+    {
+      "id": "SRC-073",
+      "paragraph": 12,
+      "text": "The government said protesters had blocked roads and ignored repeated orders to disperse; protesters said they were standing with placards and got charged anyway.",
+      "fingerprint": "0e160ea136c0"
+    },
+    {
+      "id": "SRC-074",
+      "paragraph": 12,
+      "text": "Both things can be true in different corners of the same crowd.",
+      "fingerprint": "48ba74702d17"
+    },
+    {
+      "id": "SRC-075",
+      "paragraph": 12,
+      "text": "What isn't in dispute is what the footage that actually went viral showed: mostly college students, holding insect-themed placards, getting hit with batons — which, whether or not someone twenty minutes earlier had blocked a road, is not the optics you want if you're trying to argue the crackdown was proportionate.",
+      "fingerprint": "8224f3c2159c"
+    },
+    {
+      "id": "SRC-076",
+      "paragraph": 12,
+      "text": "Two months of \"the minister is staying\" followed by roughly forty-eight hours, in late July, where he wasn't.",
+      "fingerprint": "2e30054bfdcb"
+    },
+    {
+      "id": "SRC-077",
+      "paragraph": 13,
+      "text": "On July 25th, Dharmendra Pradhan resigned as Union Education Minister, writing that he didn't want the country's students left \"trapped in a web of confusion.\" The President accepted it the same day, and Cabinet minister Pralhad Joshi picked up the Education portfolio on top of the one he already had — one person, two Cabinet-level jobs, not because he's uniquely qualified for both but because the desk needed a name on it by evening.",
+      "fingerprint": "f0fc2ad884bd"
+    },
+    {
+      "id": "SRC-078",
+      "paragraph": 13,
+      "text": "Indian Cabinets do this constantly: hand the spare ministry to whoever has room that week, like a portfolio is a task you assign rather than a job someone trains for.",
+      "fingerprint": "5f642a5bcb97"
+    },
+    {
+      "id": "SRC-079",
+      "paragraph": 13,
+      "text": "The Cockroach Janta Party announced it was ending its Jantar Mantar protest \"in good faith\" that same week.",
+      "fingerprint": "d7c453ad8ee2"
+    },
+    {
+      "id": "SRC-080",
+      "paragraph": 13,
+      "text": "Sit with that for a second: a meme account had outlasted a sitting Cabinet minister.",
+      "fingerprint": "e6be8304ab54"
+    },
+    {
+      "id": "SRC-081",
+      "paragraph": 13,
+      "text": "I don't know what I expected from 2026, but it wasn't that.",
+      "fingerprint": "4756fa10c09d"
+    },
+    {
+      "id": "SRC-082",
+      "paragraph": 14,
+      "text": "And then, because this is how Indian bureaucracy always closes a loop, the government announced its response: a new expert committee, pulling from technology, education, and administration, to recommend long-term reforms.",
+      "fingerprint": "abd8ffdf74c8"
+    },
+    {
+      "id": "SRC-083",
+      "paragraph": 14,
+      "text": "Neet U.G. is reportedly moving to computer-based testing next year.",
+      "fingerprint": "168e7106b17a"
+    },
+    {
+      "id": "SRC-084",
+      "paragraph": 14,
+      "text": "Biometric checks, tighter paper-security, more digital surveillance — all promised, again, on top of the hundred and one promises already sitting in a file somewhere from the last time.",
+      "fingerprint": "cc33aeaa6305"
+    },
+    {
+      "id": "SRC-085",
+      "paragraph": 14,
+      "text": "If you've lost count of how many committees I've mentioned in the last two minutes, congratulations — you're feeling roughly one percent of the exhaustion the actual students feel.",
+      "fingerprint": "00a0c7bf72bb"
+    },
+    {
+      "id": "SRC-086",
+      "paragraph": 14,
+      "text": "And while the government was scheduling this one, the cockroaches, somewhere, were presumably already scheduling the next protest.",
+      "fingerprint": "a7508fdb2ea1"
+    },
+    {
+      "id": "SRC-087",
+      "paragraph": 15,
+      "text": "For the more than twenty-two lakh students who actually sat that May exam, none of this committee talk changes what the last few months cost them.",
+      "fingerprint": "cdf38c939892"
+    },
+    {
+      "id": "SRC-088",
+      "paragraph": 15,
+      "text": "A re-exam eight weeks later than planned.",
+      "fingerprint": "556cb41fe034"
+    },
+    {
+      "id": "SRC-089",
+      "paragraph": 15,
+      "text": "A summer spent not knowing whether the score they'd earned would even count.",
+      "fingerprint": "5bf973b4fb82"
+    },
+    {
+      "id": "SRC-090",
+      "paragraph": 15,
+      "text": "Coaching-institute deadlines and hostel leases that don't pause for a CBI probe.",
+      "fingerprint": "006416043db2"
+    },
+    {
+      "id": "SRC-091",
+      "paragraph": 15,
+      "text": "Whatever the next reform report recommends, it arrives too late for the specific batch of eighteen-year-olds who lived through this particular version of the story — which is, if you think about it, the quiet cost hiding underneath every one of these Indian governance stories: the fix always arrives, eventually, for whoever comes after.",
+      "fingerprint": "ba7985e2f01e"
+    },
+    {
+      "id": "SRC-092",
+      "paragraph": 15,
+      "text": "I keep thinking about that one detail more than any other in this story.",
+      "fingerprint": "14c4fd0024a1"
+    },
+    {
+      "id": "SRC-093",
+      "paragraph": 16,
+      "text": "Which brings us back to where we started.",
+      "fingerprint": "471cbcbd5704"
+    },
+    {
+      "id": "SRC-094",
+      "paragraph": 16,
+      "text": "There is already a hundred-and-one-point reform plan sitting on a desk, mostly implemented, from the last time this exact same thing happened — and it wasn't enough to stop it from happening again two years later.",
+      "fingerprint": "ab28cf4ed90b"
+    },
+    {
+      "id": "SRC-095",
+      "paragraph": 16,
+      "text": "So is the real problem that India can't write a good committee report?",
+      "fingerprint": "ca239dcdd479"
+    },
+    {
+      "id": "SRC-096",
+      "paragraph": 16,
+      "text": "Clearly not — it's written two of them now, from two different chairmen, with broadly the same recommendations both times.",
+      "fingerprint": "3051b3f929eb"
+    },
+    {
+      "id": "SRC-097",
+      "paragraph": 16,
+      "text": "The real question isn't whether India can write a reform report.",
+      "fingerprint": "5d0309200009"
+    },
+    {
+      "id": "SRC-098",
+      "paragraph": 16,
+      "text": "It's whether next year's batch of more than twenty-two lakh students gets a fair exam — or just a better logo for whichever protest comes after.",
+      "fingerprint": "850593792fe0"
+    }
+  ]
+}

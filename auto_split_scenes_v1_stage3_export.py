@@ -62,6 +62,11 @@ import json
 import os
 import re
 import subprocess
+from pathlib import Path
+
+# Stdlib-only module — safe to import under the WhisperX venv, which has none of
+# the orchestrator's dependencies.
+import source_ids
 import whisperx
 import gc
 import torch
@@ -518,6 +523,9 @@ def main():
                               "limited VRAM (<8GB) to reduce OOM risk.")
     parser.add_argument("--title", default="Untitled Episode", help="Episode title for manifest")
     parser.add_argument("--voice", default="en-US-JennyNeural", help="Voice used for original generation")
+    parser.add_argument("--script", default=None,
+                        help="Canonical script for persistent source ids. Defaults to the "
+                             "project's production script (drafts/backups excluded).")
     parser.add_argument("--video-type", choices=["ShortVideo", "LongVideo"], default="ShortVideo",
                          help="'ShortVideo' (default): simple sentence-splitting only, no scene "
                               "grouping — you eyeball image pairing yourself. "
@@ -628,6 +636,36 @@ def main():
             "whisperx_start": round(scene["start"], 6),
             "whisperx_end": round(scene["end"], 6)
         })
+
+    # Step 4.5: Attach persistent source identity.
+    #
+    # Scenes above are numbered by position, and position moves on every
+    # re-narration — that renumbering silently reassigned artwork three times in
+    # one session. Identity comes from the script instead: stable SRC ids
+    # assigned per sentence, aligned back to these ASR-derived scenes. SCENE-NNN
+    # stays as display order only.
+    script_path = args.script or source_ids.pick_production_script(args.project)
+    if script_path and Path(script_path).exists():
+        units, change = source_ids.sync_units(
+            Path(args.project), Path(script_path).read_text(encoding="utf-8"))
+        alignment = source_ids.align_scenes(manifest_scenes, units)
+        ambiguous = []
+        for scene, info in zip(manifest_scenes, alignment):
+            scene.update(info)
+            if info["source_match"] != "ok":
+                ambiguous.append(scene["id"])
+
+        print(f"\n✓ Source identity: {len(units)} unit(s) from {Path(script_path).name}")
+        if change["changed"] or change["added"] or change["removed"]:
+            print(f"  script changed since last run — edited: {len(change['changed'])}, "
+                  f"new: {len(change['added'])}, removed: {len(change['removed'])}")
+        if ambiguous:
+            print(f"  ⚠ {len(ambiguous)} scene(s) could not be matched to the script and are "
+                  f"marked ambiguous — artwork will NOT be auto-attached: {', '.join(ambiguous[:6])}"
+                  f"{' …' if len(ambiguous) > 6 else ''}")
+    else:
+        print("\n  ⚠ No production script found — scenes carry no persistent source ids, so "
+              "artwork cannot survive a re-split. Pass --script to enable.")
 
     # Step 5: Write manifest.json
     total_duration = round(sum(s["duration"] for s in manifest_scenes), 3)

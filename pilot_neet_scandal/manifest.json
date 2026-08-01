@@ -3,7 +3,7 @@
   "title": "Untitled Episode",
   "voice": "en-IN-PrabhatNeural",
   "word_segments_file": "source_audio/narration_words.json",
-  "total_duration": 849.18,
+  "total_duration": 740.273,
   "scenes": [
     {
       "id": "SCENE-001",
@@ -12,11 +12,20 @@
       "script": "In July 2026, India's education minister resigned.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.036,
+      "duration": 4.25,
       "whisperx_start": 0.191,
       "whisperx_end": 4.441,
-      "start": 0.0,
-      "end": 5.036
+      "source_ids": [
+        "SRC-001"
+      ],
+      "shot_id": "SRC-001-S01",
+      "source_span": [
+        0,
+        7
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-002",
@@ -25,11 +34,20 @@
       "script": "Not over money, not over an affair, not over a leaked recording.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.132,
+      "duration": 4.33,
       "whisperx_start": 5.343,
       "whisperx_end": 9.673,
-      "start": 5.036,
-      "end": 10.168
+      "source_ids": [
+        "SRC-002"
+      ],
+      "shot_id": "SRC-002-S01",
+      "source_span": [
+        7,
+        19
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-003",
@@ -38,11 +56,20 @@
       "script": "He resigned because a political party that does not legally exist,",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 4.676,
+      "duration": 3.942,
       "whisperx_start": 10.517,
       "whisperx_end": 14.459,
-      "start": 10.168,
-      "end": 14.844
+      "source_ids": [
+        "SRC-003"
+      ],
+      "shot_id": "SRC-003-S01",
+      "source_span": [
+        19,
+        30
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-004",
@@ -51,11 +78,20 @@
       "script": "has never run a candidate and is named entirely after a household pest spent 50 days telling him to.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 7.124,
+      "duration": 6.383,
       "whisperx_start": 14.839,
       "whisperx_end": 21.222,
-      "start": 14.844,
-      "end": 21.968
+      "source_ids": [
+        "SRC-003"
+      ],
+      "shot_id": "SRC-003-S02",
+      "source_span": [
+        30,
+        49
+      ],
+      "match_confidence": 0.947,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-005",
@@ -64,11 +100,20 @@
       "script": "I've read that sentence back to myself three times and it still doesn't sound real.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.492,
+      "duration": 4.682,
       "whisperx_start": 22.083,
       "whisperx_end": 26.765,
-      "start": 21.968,
-      "end": 27.46
+      "source_ids": [
+        "SRC-004"
+      ],
+      "shot_id": "SRC-004-S01",
+      "source_span": [
+        49,
+        64
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-006",
@@ -77,11 +122,20 @@
       "script": "Here's how a government loses a fight to cockroaches.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 3.524,
+      "duration": 2.802,
       "whisperx_start": 27.605,
       "whisperx_end": 30.407,
-      "start": 27.46,
-      "end": 30.984
+      "source_ids": [
+        "SRC-005"
+      ],
+      "shot_id": "SRC-005-S01",
+      "source_span": [
+        64,
+        73
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-007",
@@ -90,11 +144,20 @@
       "script": "On 3rd May 2026, more than 22 lakh students, roughly the population of a mid-sized European country,",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 8.3,
+      "duration": 7.484,
       "whisperx_start": 31.37,
       "whisperx_end": 38.854,
-      "start": 30.984,
-      "end": 39.284
+      "source_ids": [
+        "SRC-006"
+      ],
+      "shot_id": "SRC-006-S01",
+      "source_span": [
+        73,
+        91
+      ],
+      "match_confidence": 0.889,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-008",
@@ -103,11 +166,20 @@
       "script": "sat down for Neet U.G., India's single entrance exam for every medical and dental seat in the country.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 7.388,
+      "duration": 6.583,
       "whisperx_start": 39.154,
       "whisperx_end": 45.737,
-      "start": 39.284,
-      "end": 46.672
+      "source_ids": [
+        "SRC-006"
+      ],
+      "shot_id": "SRC-006-S02",
+      "source_span": [
+        91,
+        110
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-009",
@@ -116,11 +188,20 @@
       "script": "You pass it, you become a doctor.",
       "scene_type": "grouped",
       "visual_group_id": "group-01",
-      "duration": 2.54,
+      "duration": 1.801,
       "whisperx_start": 46.537,
       "whisperx_end": 48.338,
-      "start": 46.672,
-      "end": 49.212
+      "source_ids": [
+        "SRC-007"
+      ],
+      "shot_id": "SRC-007-S01",
+      "source_span": [
+        110,
+        117
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-010",
@@ -129,11 +210,20 @@
       "script": "You miss it, you wait a full year and try again.",
       "scene_type": "grouped",
       "visual_group_id": "group-01",
-      "duration": 3.62,
+      "duration": 2.862,
       "whisperx_start": 49.138,
       "whisperx_end": 52.0,
-      "start": 49.212,
-      "end": 52.832
+      "source_ids": [
+        "SRC-008"
+      ],
+      "shot_id": "SRC-008-S01",
+      "source_span": [
+        117,
+        128
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-011",
@@ -142,11 +232,20 @@
       "script": "No second sitting, no partial credit, no alternate path if your family doesn't have the money for a second attempt at a coaching institute.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 9.116,
+      "duration": 8.322,
       "whisperx_start": 52.913,
       "whisperx_end": 61.235,
-      "start": 52.832,
-      "end": 61.948
+      "source_ids": [
+        "SRC-009"
+      ],
+      "shot_id": "SRC-009-S01",
+      "source_span": [
+        128,
+        152
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-012",
@@ -155,11 +254,20 @@
       "script": "That's the whole system, riding on one 3-hour test, once a year, for every single one of those 22 lakh teenagers.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 8.42,
+      "duration": 7.642,
       "whisperx_start": 62.115,
       "whisperx_end": 69.757,
-      "start": 61.948,
-      "end": 70.368
+      "source_ids": [
+        "SRC-010"
+      ],
+      "shot_id": "SRC-010-S01",
+      "source_span": [
+        152,
+        174
+      ],
+      "match_confidence": 0.909,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-013",
@@ -168,11 +276,20 @@
       "script": "And the math on the other side of that test is brutal.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 4.004,
+      "duration": 3.181,
       "whisperx_start": 70.717,
       "whisperx_end": 73.898,
-      "start": 70.368,
-      "end": 74.372
+      "source_ids": [
+        "SRC-011"
+      ],
+      "shot_id": "SRC-011-S01",
+      "source_span": [
+        174,
+        186
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-014",
@@ -181,11 +298,20 @@
       "script": "India has roughly 1.3 lakh MBBS seats nationwide, government and private combined.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 6.98,
+      "duration": 6.182,
       "whisperx_start": 74.718,
       "whisperx_end": 80.9,
-      "start": 74.372,
-      "end": 81.352
+      "source_ids": [
+        "SRC-012"
+      ],
+      "shot_id": "SRC-012-S01",
+      "source_span": [
+        186,
+        199
+      ],
+      "match_confidence": 0.769,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-015",
@@ -194,11 +320,20 @@
       "script": "do the division and you get an acceptance rate under 6% meaning more than 19 out of",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 6.5,
+      "duration": 5.743,
       "whisperx_start": 81.78,
       "whisperx_end": 87.523,
-      "start": 81.352,
-      "end": 87.852
+      "source_ids": [
+        "SRC-013"
+      ],
+      "shot_id": "SRC-013-S01",
+      "source_span": [
+        199,
+        216
+      ],
+      "match_confidence": 0.882,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-016",
@@ -207,11 +342,20 @@
       "script": "every 20 students who sat that exam were always going to walk away disappointed before anyone leaked anything.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 7.508,
+      "duration": 6.703,
       "whisperx_start": 87.703,
       "whisperx_end": 94.406,
-      "start": 87.852,
-      "end": 95.36
+      "source_ids": [
+        "SRC-013"
+      ],
+      "shot_id": "SRC-013-S02",
+      "source_span": [
+        216,
+        234
+      ],
+      "match_confidence": 0.944,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-017",
@@ -220,11 +364,20 @@
       "script": "I did that division twice because I assumed I'd made an error.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.036,
+      "duration": 4.222,
       "whisperx_start": 95.306,
       "whisperx_end": 99.528,
-      "start": 95.36,
-      "end": 100.396
+      "source_ids": [
+        "SRC-014"
+      ],
+      "shot_id": "SRC-014-S01",
+      "source_span": [
+        234,
+        246
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-018",
@@ -233,11 +386,20 @@
       "script": "I hadn't.",
       "scene_type": "grouped",
       "visual_group_id": "group-02",
-      "duration": 1.244,
+      "duration": 0.42,
       "whisperx_start": 100.409,
       "whisperx_end": 100.829,
-      "start": 100.396,
-      "end": 101.64
+      "source_ids": [
+        "SRC-015"
+      ],
+      "shot_id": "SRC-015-S01",
+      "source_span": [
+        246,
+        248
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-019",
@@ -246,11 +408,20 @@
       "script": "Which is less competitive exam and more organic chemistry's answer to the hunger games.",
       "scene_type": "grouped",
       "visual_group_id": "group-02",
-      "duration": 6.092,
+      "duration": 5.303,
       "whisperx_start": 101.709,
       "whisperx_end": 107.012,
-      "start": 101.64,
-      "end": 107.732
+      "source_ids": [
+        "SRC-016"
+      ],
+      "shot_id": "SRC-016-S01",
+      "source_span": [
+        248,
+        262
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-020",
@@ -259,11 +430,20 @@
       "script": "When a system is already that unforgiving, it doesn't take much to tip it from extremely hard into people will pay anything to cheat it.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 9.02,
+      "duration": 8.242,
       "whisperx_start": 107.912,
       "whisperx_end": 116.154,
-      "start": 107.732,
-      "end": 116.752
+      "source_ids": [
+        "SRC-017"
+      ],
+      "shot_id": "SRC-017-S01",
+      "source_span": [
+        262,
+        287
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-021",
@@ -272,11 +452,20 @@
       "script": "Nine days later, the guessing game caught up with the exam itself.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 4.604,
+      "duration": 3.801,
       "whisperx_start": 117.035,
       "whisperx_end": 120.836,
-      "start": 116.752,
-      "end": 121.356
+      "source_ids": [
+        "SRC-018"
+      ],
+      "shot_id": "SRC-018-S01",
+      "source_span": [
+        287,
+        299
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-022",
@@ -285,11 +474,20 @@
       "script": "According to investigators in Rajasthan, guess papers, pre-circulated question banks, were being sold for up to 5 lakh rupees each,",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 9.116,
+      "duration": 8.322,
       "whisperx_start": 121.736,
       "whisperx_end": 130.058,
-      "start": 121.356,
-      "end": 130.472
+      "source_ids": [
+        "SRC-019"
+      ],
+      "shot_id": "SRC-019-S01",
+      "source_span": [
+        299,
+        320
+      ],
+      "match_confidence": 0.952,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-023",
@@ -298,11 +496,20 @@
       "script": "and somewhere between 60 and 70 percent of the actual paper allegedly matched them.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.756,
+      "duration": 4.962,
       "whisperx_start": 130.458,
       "whisperx_end": 135.42,
-      "start": 130.472,
-      "end": 136.228
+      "source_ids": [
+        "SRC-019"
+      ],
+      "shot_id": "SRC-019-S02",
+      "source_span": [
+        320,
+        334
+      ],
+      "match_confidence": 0.857,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-024",
@@ -311,11 +518,20 @@
       "script": "not vaguely similar.",
       "scene_type": "grouped",
       "visual_group_id": "group-03",
-      "duration": 1.916,
+      "duration": 1.121,
       "whisperx_start": 136.312,
       "whisperx_end": 137.433,
-      "start": 136.228,
-      "end": 138.144
+      "source_ids": [
+        "SRC-020"
+      ],
+      "shot_id": "SRC-020-S01",
+      "source_span": [
+        334,
+        337
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-025",
@@ -324,11 +540,20 @@
       "script": "Matched.",
       "scene_type": "grouped",
       "visual_group_id": "group-03",
-      "duration": 1.1,
+      "duration": 0.3,
       "whisperx_start": 138.273,
       "whisperx_end": 138.573,
-      "start": 138.144,
-      "end": 139.244
+      "source_ids": [
+        "SRC-021"
+      ],
+      "shot_id": "SRC-021-S01",
+      "source_span": [
+        337,
+        338
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-026",
@@ -337,11 +562,20 @@
       "script": "So the National Testing Agency did the only thing left to do, cancelled the whole exam, opened a CBI probe, and eventually detained 13 people.",
       "scene_type": "grouped",
       "visual_group_id": "group-03",
-      "duration": 10.028,
+      "duration": 9.244,
       "whisperx_start": 139.454,
       "whisperx_end": 148.698,
-      "start": 139.244,
-      "end": 149.272
+      "source_ids": [
+        "SRC-022"
+      ],
+      "shot_id": "SRC-022-S01",
+      "source_span": [
+        338,
+        363
+      ],
+      "match_confidence": 0.96,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-027",
@@ -350,11 +584,20 @@
       "script": "Those 13 have since been charged.",
       "scene_type": "grouped",
       "visual_group_id": "group-04",
-      "duration": 2.9,
+      "duration": 2.121,
       "whisperx_start": 149.558,
       "whisperx_end": 151.679,
-      "start": 149.272,
-      "end": 152.172
+      "source_ids": [
+        "SRC-023"
+      ],
+      "shot_id": "SRC-023-S01",
+      "source_span": [
+        363,
+        369
+      ],
+      "match_confidence": 0.833,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-028",
@@ -363,11 +606,20 @@
       "script": "Worth saying plainly, charges are not convictions, and none of this has been tested in court yet.",
       "scene_type": "grouped",
       "visual_group_id": "group-04",
-      "duration": 6.788,
+      "duration": 5.983,
       "whisperx_start": 152.54,
       "whisperx_end": 158.523,
-      "start": 152.172,
-      "end": 158.96
+      "source_ids": [
+        "SRC-024"
+      ],
+      "shot_id": "SRC-024-S01",
+      "source_span": [
+        369,
+        386
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-029",
@@ -376,11 +628,20 @@
       "script": "Meanwhile, more than 22 lakh 18-year-olds who would spend two years of their lives preparing were told to sit tight and that someone would get back to them.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 10.604,
+      "duration": 9.824,
       "whisperx_start": 159.428,
       "whisperx_end": 169.252,
-      "start": 158.96,
-      "end": 169.564
+      "source_ids": [
+        "SRC-025"
+      ],
+      "shot_id": "SRC-025-S01",
+      "source_span": [
+        386,
+        416
+      ],
+      "match_confidence": 0.833,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-030",
@@ -389,11 +650,20 @@
       "script": "Imagine training for months, running your race, finishing strong and then being told someone else on the track may have worn rocket shoes,",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 8.996,
+      "duration": 8.203,
       "whisperx_start": 170.132,
       "whisperx_end": 178.335,
-      "start": 169.564,
-      "end": 178.56
+      "source_ids": [
+        "SRC-026"
+      ],
+      "shot_id": "SRC-026-S01",
+      "source_span": [
+        416,
+        439
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-031",
@@ -402,11 +672,20 @@
       "script": "so could everyone please just line up and run it again next month.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 4.844,
+      "duration": 4.062,
       "whisperx_start": 178.755,
       "whisperx_end": 182.817,
-      "start": 178.56,
-      "end": 183.404
+      "source_ids": [
+        "SRC-026"
+      ],
+      "shot_id": "SRC-026-S02",
+      "source_span": [
+        439,
+        452
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-032",
@@ -415,11 +694,20 @@
       "script": "A re-exam was scheduled for 21st June.",
       "scene_type": "grouped",
       "visual_group_id": "group-05",
-      "duration": 3.38,
+      "duration": 2.021,
       "whisperx_start": 183.697,
       "whisperx_end": 185.718,
-      "start": 183.404,
-      "end": 186.784
+      "source_ids": [
+        "SRC-027"
+      ],
+      "shot_id": "SRC-027-S01",
+      "source_span": [
+        452,
+        460
+      ],
+      "match_confidence": 0.875,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-033",
@@ -428,11 +716,21 @@
       "script": "The kind of person who pays five lakh rupees for a leaked paper is someone who understands exactly what Neet U.G. is worth to a family.",
       "scene_type": "grouped",
       "visual_group_id": "group-05",
-      "duration": 9.308,
+      "duration": 8.547,
       "whisperx_start": 187.252,
       "whisperx_end": 195.799,
-      "start": 186.784,
-      "end": 196.092
+      "source_ids": [
+        "SRC-028",
+        "SRC-029"
+      ],
+      "shot_id": "SRC-028-S01",
+      "source_span": [
+        460,
+        487
+      ],
+      "match_confidence": 0.815,
+      "merged_source": true,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-034",
@@ -441,11 +739,20 @@
       "script": "Whole towns in India,",
       "scene_type": "grouped",
       "visual_group_id": "group-06",
-      "duration": 1.94,
+      "duration": 1.301,
       "whisperx_start": 196.639,
       "whisperx_end": 197.94,
-      "start": 196.092,
-      "end": 198.032
+      "source_ids": [
+        "SRC-030"
+      ],
+      "shot_id": "SRC-030-S01",
+      "source_span": [
+        487,
+        491
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-035",
@@ -454,11 +761,20 @@
       "script": "Kota in Rajasthan is the famous one exist almost entirely as coaching industry economies where parents relocate their teenagers for a year",
       "scene_type": "grouped",
       "visual_group_id": "group-06",
-      "duration": 10.148,
+      "duration": 9.388,
       "whisperx_start": 198.06,
       "whisperx_end": 207.448,
-      "start": 198.032,
-      "end": 208.18
+      "source_ids": [
+        "SRC-030"
+      ],
+      "shot_id": "SRC-030-S02",
+      "source_span": [
+        491,
+        513
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-036",
@@ -467,11 +783,20 @@
       "script": "or two and pay a serious chunk of household savings on the promise of a medical seat at the end of it.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 6.62,
+      "duration": 5.764,
       "whisperx_start": 207.668,
       "whisperx_end": 213.432,
-      "start": 208.18,
-      "end": 214.8
+      "source_ids": [
+        "SRC-030"
+      ],
+      "shot_id": "SRC-030-S03",
+      "source_span": [
+        513,
+        535
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-037",
@@ -480,11 +805,20 @@
       "script": "When the price is that large and that binary, someone is always going to try selling a shortcut and someone desperate enough is always going to buy it.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 9.908,
+      "duration": 9.123,
       "whisperx_start": 214.272,
       "whisperx_end": 223.395,
-      "start": 214.8,
-      "end": 224.708
+      "source_ids": [
+        "SRC-031"
+      ],
+      "shot_id": "SRC-031-S01",
+      "source_span": [
+        535,
+        563
+      ],
+      "match_confidence": 0.964,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-038",
@@ -493,11 +827,20 @@
       "script": "The leak wasn't a random glitch in the system.",
       "scene_type": "grouped",
       "visual_group_id": "group-07",
-      "duration": 3.068,
+      "duration": 2.321,
       "whisperx_start": 224.275,
       "whisperx_end": 226.596,
-      "start": 224.708,
-      "end": 227.776
+      "source_ids": [
+        "SRC-032"
+      ],
+      "shot_id": "SRC-032-S01",
+      "source_span": [
+        563,
+        572
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-039",
@@ -506,11 +849,20 @@
       "script": "It was the system's own economics working exactly as you'd expect.",
       "scene_type": "grouped",
       "visual_group_id": "group-07",
-      "duration": 5.156,
+      "duration": 4.361,
       "whisperx_start": 227.456,
       "whisperx_end": 231.817,
-      "start": 227.776,
-      "end": 232.932
+      "source_ids": [
+        "SRC-033"
+      ],
+      "shot_id": "SRC-033-S01",
+      "source_span": [
+        572,
+        583
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-040",
@@ -519,11 +871,20 @@
       "script": "Here's the part that makes this properly absurd, though the National Testing Agency exists specifically to prevent this.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 7.7,
+      "duration": 6.962,
       "whisperx_start": 232.778,
       "whisperx_end": 239.74,
-      "start": 232.932,
-      "end": 240.632
+      "source_ids": [
+        "SRC-034"
+      ],
+      "shot_id": "SRC-034-S01",
+      "source_span": [
+        583,
+        601
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-041",
@@ -532,11 +893,20 @@
       "script": "It was created in November 2017, pulled out from under India's Central School Board, with one pitch,",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 7.748,
+      "duration": 6.942,
       "whisperx_start": 240.667,
       "whisperx_end": 247.609,
-      "start": 240.632,
-      "end": 248.38
+      "source_ids": [
+        "SRC-035"
+      ],
+      "shot_id": "SRC-035-S01",
+      "source_span": [
+        601,
+        618
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-042",
@@ -545,11 +915,20 @@
       "script": "take exam administration away from an overloaded education bureaucracy and hand it to a dedicated,",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 6.788,
+      "duration": 6.062,
       "whisperx_start": 247.829,
       "whisperx_end": 253.891,
-      "start": 248.38,
-      "end": 255.168
+      "source_ids": [
+        "SRC-035"
+      ],
+      "shot_id": "SRC-035-S02",
+      "source_span": [
+        618,
+        633
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-043",
@@ -558,11 +937,20 @@
       "script": "modern, professional agency that could run tests at international standard.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.348,
+      "duration": 4.562,
       "whisperx_start": 254.171,
       "whisperx_end": 258.733,
-      "start": 255.168,
-      "end": 260.516
+      "source_ids": [
+        "SRC-035"
+      ],
+      "shot_id": "SRC-035-S03",
+      "source_span": [
+        633,
+        643
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-044",
@@ -571,11 +959,20 @@
       "script": "That was the actual sales pitch, word for word,",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 3.644,
+      "duration": 2.862,
       "whisperx_start": 259.613,
       "whisperx_end": 262.475,
-      "start": 260.516,
-      "end": 264.16
+      "source_ids": [
+        "SRC-035"
+      ],
+      "shot_id": "SRC-035-S04",
+      "source_span": [
+        643,
+        652
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-045",
@@ -584,11 +981,20 @@
       "script": "back when it launched like hiring a professional organizer to sort out your messy closet and",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 6.188,
+      "duration": 5.564,
       "whisperx_start": 262.835,
       "whisperx_end": 268.399,
-      "start": 264.16,
-      "end": 270.348
+      "source_ids": [
+        "SRC-035"
+      ],
+      "shot_id": "SRC-035-S05",
+      "source_span": [
+        652,
+        668
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-046",
@@ -597,11 +1003,20 @@
       "script": "9 years later your clothes are on fire and the organizer is the one holding the matches.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 6.14,
+      "duration": 5.443,
       "whisperx_start": 268.419,
       "whisperx_end": 273.862,
-      "start": 270.348,
-      "end": 276.488
+      "source_ids": [
+        "SRC-035"
+      ],
+      "shot_id": "SRC-035-S06",
+      "source_span": [
+        668,
+        685
+      ],
+      "match_confidence": 0.941,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-047",
@@ -610,11 +1025,20 @@
       "script": "The specialist agency built to fix exam integrity is the one whose integrity is now the actual news story.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 7.364,
+      "duration": 6.604,
       "whisperx_start": 274.743,
       "whisperx_end": 281.347,
-      "start": 276.488,
-      "end": 283.852
+      "source_ids": [
+        "SRC-036"
+      ],
+      "shot_id": "SRC-036-S01",
+      "source_span": [
+        685,
+        704
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-048",
@@ -623,11 +1047,20 @@
       "script": "I keep waiting for the twist where this turns out to be a different agency.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.084,
+      "duration": 4.263,
       "whisperx_start": 282.208,
       "whisperx_end": 286.471,
-      "start": 283.852,
-      "end": 288.936
+      "source_ids": [
+        "SRC-037"
+      ],
+      "shot_id": "SRC-037-S01",
+      "source_span": [
+        704,
+        719
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-049",
@@ -636,11 +1069,20 @@
       "script": "It never comes.",
       "scene_type": "grouped",
       "visual_group_id": "group-08",
-      "duration": 1.628,
+      "duration": 0.821,
       "whisperx_start": 287.311,
       "whisperx_end": 288.132,
-      "start": 288.936,
-      "end": 290.564
+      "source_ids": [
+        "SRC-038"
+      ],
+      "shot_id": "SRC-038-S01",
+      "source_span": [
+        719,
+        722
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-050",
@@ -649,11 +1091,20 @@
       "script": "If this sounds familiar, that's because it already happened.",
       "scene_type": "grouped",
       "visual_group_id": "group-08",
-      "duration": 4.076,
+      "duration": 3.302,
       "whisperx_start": 289.028,
       "whisperx_end": 292.33,
-      "start": 290.564,
-      "end": 294.64
+      "source_ids": [
+        "SRC-039"
+      ],
+      "shot_id": "SRC-039-S01",
+      "source_span": [
+        722,
+        731
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-051",
@@ -662,24 +1113,42 @@
       "script": "In 2024, the exact same exam leaked,",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 4.34,
+      "duration": 3.522,
       "whisperx_start": 293.231,
       "whisperx_end": 296.753,
-      "start": 294.64,
-      "end": 298.98
+      "source_ids": [
+        "SRC-040"
+      ],
+      "shot_id": "SRC-040-S01",
+      "source_span": [
+        731,
+        738
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-052",
       "image": "images/SCENE-052.png",
       "audio": "audio/SCENE-052.mp3",
-      "script": "and the fallout was bad enough that the government formed a high-level committee led by a former ISRO chairman with one job – fix the National Testing Agency for good.",
+      "script": "and the fallout was bad enough that the government formed a high-level committee led by a former ISRO chairman with one job \u2013 fix the National Testing Agency for good.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 10.22,
+      "duration": 9.426,
       "whisperx_start": 297.174,
       "whisperx_end": 306.6,
-      "start": 298.98,
-      "end": 309.2
+      "source_ids": [
+        "SRC-040"
+      ],
+      "shot_id": "SRC-040-S02",
+      "source_span": [
+        738,
+        768
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-053",
@@ -688,11 +1157,20 @@
       "script": "That committee didn't hold back.",
       "scene_type": "grouped",
       "visual_group_id": "group-09",
-      "duration": 2.372,
+      "duration": 1.561,
       "whisperx_start": 307.481,
       "whisperx_end": 309.042,
-      "start": 309.2,
-      "end": 311.572
+      "source_ids": [
+        "SRC-041"
+      ],
+      "shot_id": "SRC-041-S01",
+      "source_span": [
+        768,
+        773
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-054",
@@ -701,11 +1179,20 @@
       "script": "It filed 101 recommendations, online testing,",
       "scene_type": "grouped",
       "visual_group_id": "group-09",
-      "duration": 4.172,
+      "duration": 3.383,
       "whisperx_start": 309.905,
       "whisperx_end": 313.288,
-      "start": 311.572,
-      "end": 315.744
+      "source_ids": [
+        "SRC-042"
+      ],
+      "shot_id": "SRC-042-S01",
+      "source_span": [
+        773,
+        779
+      ],
+      "match_confidence": 0.833,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-055",
@@ -714,11 +1201,20 @@
       "script": "better candidate authentication using government schools as secure exam centres.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 6.932,
+      "duration": 6.185,
       "whisperx_start": 313.748,
       "whisperx_end": 319.933,
-      "start": 315.744,
-      "end": 322.676
+      "source_ids": [
+        "SRC-042"
+      ],
+      "shot_id": "SRC-042-S02",
+      "source_span": [
+        779,
+        789
+      ],
+      "match_confidence": 0.9,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-056",
@@ -727,11 +1223,20 @@
       "script": "101 is an oddly specific number for a to-do list and by this May,",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 4.748,
+      "duration": 3.963,
       "whisperx_start": 320.093,
       "whisperx_end": 324.056,
-      "start": 322.676,
-      "end": 327.424
+      "source_ids": [
+        "SRC-043"
+      ],
+      "shot_id": "SRC-043-S01",
+      "source_span": [
+        789,
+        804
+      ],
+      "match_confidence": 0.933,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-057",
@@ -740,11 +1245,20 @@
       "script": "the man who chaired it told the Supreme Court that most of them were done or actively underway and in Indian bureaucracy,",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 7.82,
+      "duration": 7.046,
       "whisperx_start": 324.356,
       "whisperx_end": 331.402,
-      "start": 327.424,
-      "end": 335.244
+      "source_ids": [
+        "SRC-043"
+      ],
+      "shot_id": "SRC-043-S02",
+      "source_span": [
+        804,
+        826
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-058",
@@ -753,11 +1267,20 @@
       "script": "actively underway carries roughly the same weight as I'll text you back does in a relationship that's already over.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 7.484,
+      "duration": 6.646,
       "whisperx_start": 331.762,
       "whisperx_end": 338.408,
-      "start": 335.244,
-      "end": 342.728
+      "source_ids": [
+        "SRC-043"
+      ],
+      "shot_id": "SRC-043-S03",
+      "source_span": [
+        826,
+        845
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-059",
@@ -766,11 +1289,20 @@
       "script": "And then, two years after that report landed, the same exam leaked again anyway through more or less the same hole.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 8.18,
+      "duration": 7.384,
       "whisperx_start": 339.318,
       "whisperx_end": 346.702,
-      "start": 342.728,
-      "end": 350.908
+      "source_ids": [
+        "SRC-044"
+      ],
+      "shot_id": "SRC-044-S01",
+      "source_span": [
+        845,
+        866
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-060",
@@ -779,11 +1311,20 @@
       "script": "In 2024, it was pen and paper question sets moving through an offline network of coaching agents before exam day.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 8.564,
+      "duration": 7.744,
       "whisperx_start": 347.562,
       "whisperx_end": 355.306,
-      "start": 350.908,
-      "end": 359.472
+      "source_ids": [
+        "SRC-045"
+      ],
+      "shot_id": "SRC-045-S01",
+      "source_span": [
+        866,
+        886
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-061",
@@ -792,11 +1333,20 @@
       "script": "In 2026, it was guess papers built of leaked question banks, sold for cash, matched against the real thing at 60-70% overlap.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 10.844,
+      "duration": 8.804,
       "whisperx_start": 356.146,
       "whisperx_end": 364.95,
-      "start": 359.472,
-      "end": 370.316
+      "source_ids": [
+        "SRC-046"
+      ],
+      "shot_id": "SRC-046-S01",
+      "source_span": [
+        886,
+        909
+      ],
+      "match_confidence": 0.87,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-062",
@@ -805,11 +1355,20 @@
       "script": "Different vocabulary, same underlying failure, a paper-based, once-a-year,",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.42,
+      "duration": 4.641,
       "whisperx_start": 367.257,
       "whisperx_end": 371.898,
-      "start": 370.316,
-      "end": 375.736
+      "source_ids": [
+        "SRC-047"
+      ],
+      "shot_id": "SRC-047-S01",
+      "source_span": [
+        909,
+        920
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-063",
@@ -818,11 +1377,20 @@
       "script": "winner-takes-almost-nothing exam that has to stay secret for months while it moves through printing presses,",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 6.5,
+      "duration": 5.721,
       "whisperx_start": 372.118,
       "whisperx_end": 377.839,
-      "start": 375.736,
-      "end": 382.236
+      "source_ids": [
+        "SRC-047"
+      ],
+      "shot_id": "SRC-047-S02",
+      "source_span": [
+        920,
+        938
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-064",
@@ -831,11 +1399,20 @@
       "script": "transport routes, and exam centers in every state, handled by thousands of people along the way.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 6.596,
+      "duration": 5.881,
       "whisperx_start": 378.139,
       "whisperx_end": 384.02,
-      "start": 382.236,
-      "end": 388.832
+      "source_ids": [
+        "SRC-047"
+      ],
+      "shot_id": "SRC-047-S03",
+      "source_span": [
+        938,
+        954
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-065",
@@ -844,11 +1421,20 @@
       "script": "You only need one weak link in that chain, and apparently, every couple of years, there is one.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 7.052,
+      "duration": 6.301,
       "whisperx_start": 384.801,
       "whisperx_end": 391.102,
-      "start": 388.832,
-      "end": 395.884
+      "source_ids": [
+        "SRC-048"
+      ],
+      "shot_id": "SRC-048-S01",
+      "source_span": [
+        954,
+        972
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-066",
@@ -857,11 +1443,20 @@
       "script": "Which raises an obvious problem with the whole reform effort,",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 4.148,
+      "duration": 3.363,
       "whisperx_start": 391.982,
       "whisperx_end": 395.345,
-      "start": 395.884,
-      "end": 400.032
+      "source_ids": [
+        "SRC-049"
+      ],
+      "shot_id": "SRC-049-S01",
+      "source_span": [
+        972,
+        982
+      ],
+      "match_confidence": 0.2,
+      "merged_source": false,
+      "source_match": "ambiguous"
     },
     {
       "id": "SCENE-067",
@@ -870,11 +1465,20 @@
       "script": "a 101-point plan clearly wasn't enough if the thing it was built to stop just happened again anyway.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 7.076,
+      "duration": 6.306,
       "whisperx_start": 395.746,
       "whisperx_end": 402.052,
-      "start": 400.032,
-      "end": 407.108
+      "source_ids": [
+        "SRC-049"
+      ],
+      "shot_id": "SRC-049-S02",
+      "source_span": [
+        982,
+        1001
+      ],
+      "match_confidence": 0.684,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-068",
@@ -883,11 +1487,20 @@
       "script": "I don't have a good answer for that one, and I've been sitting with it for a while.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.588,
+      "duration": 4.745,
       "whisperx_start": 402.912,
       "whisperx_end": 407.657,
-      "start": 407.108,
-      "end": 412.696
+      "source_ids": [
+        "SRC-050"
+      ],
+      "shot_id": "SRC-050-S01",
+      "source_span": [
+        1001,
+        1019
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-069",
@@ -896,11 +1509,20 @@
       "script": "While all of this was working its way through the courts, the Chief Justice of India said something he probably wishes he could take back.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 8.132,
+      "duration": 7.326,
       "whisperx_start": 408.498,
       "whisperx_end": 415.824,
-      "start": 412.696,
-      "end": 420.828
+      "source_ids": [
+        "SRC-051"
+      ],
+      "shot_id": "SRC-051-S01",
+      "source_span": [
+        1019,
+        1044
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-070",
@@ -909,11 +1531,20 @@
       "script": "He'd spent months fielding urgent petition after urgent petition over the NEET mess, and during one hearing, talking about young, unemployed activists,",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 9.668,
+      "duration": 8.942,
       "whisperx_start": 416.681,
       "whisperx_end": 425.623,
-      "start": 420.828,
-      "end": 430.496
+      "source_ids": [
+        "SRC-052"
+      ],
+      "shot_id": "SRC-052-S01",
+      "source_span": [
+        1044,
+        1066
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-071",
@@ -922,11 +1553,20 @@
       "script": "he compared them to cockroaches, people who, in his words, don't get jobs, so some of them become RTI activists and start attacking everyone.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 10.148,
+      "duration": 9.422,
       "whisperx_start": 425.983,
       "whisperx_end": 435.405,
-      "start": 430.496,
-      "end": 440.644
+      "source_ids": [
+        "SRC-052"
+      ],
+      "shot_id": "SRC-052-S02",
+      "source_span": [
+        1066,
+        1090
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-072",
@@ -935,11 +1575,20 @@
       "script": "You can hear the frustration in that line.",
       "scene_type": "grouped",
       "visual_group_id": "group-10",
-      "duration": 3.044,
+      "duration": 2.3,
       "whisperx_start": 436.185,
       "whisperx_end": 438.485,
-      "start": 440.644,
-      "end": 443.688
+      "source_ids": [
+        "SRC-052"
+      ],
+      "shot_id": "SRC-052-S03",
+      "source_span": [
+        1090,
+        1098
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-073",
@@ -948,11 +1597,20 @@
       "script": "A judge tired of being everyone's last resort.",
       "scene_type": "grouped",
       "visual_group_id": "group-10",
-      "duration": 3.452,
+      "duration": 2.661,
       "whisperx_start": 439.365,
       "whisperx_end": 442.026,
-      "start": 443.688,
-      "end": 447.14
+      "source_ids": [
+        "SRC-053"
+      ],
+      "shot_id": "SRC-053-S01",
+      "source_span": [
+        1098,
+        1106
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-074",
@@ -961,11 +1619,20 @@
       "script": "But frustration doesn't always translate well into a soundbite, and this one didn't.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.78,
+      "duration": 5.002,
       "whisperx_start": 442.888,
       "whisperx_end": 447.89,
-      "start": 447.14,
-      "end": 452.92
+      "source_ids": [
+        "SRC-054"
+      ],
+      "shot_id": "SRC-054-S01",
+      "source_span": [
+        1106,
+        1119
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-075",
@@ -974,11 +1641,20 @@
       "script": "It was meant as a dismissal.",
       "scene_type": "grouped",
       "visual_group_id": "group-11",
-      "duration": 2.372,
+      "duration": 1.581,
       "whisperx_start": 448.77,
       "whisperx_end": 450.351,
-      "start": 452.92,
-      "end": 455.292
+      "source_ids": [
+        "SRC-055"
+      ],
+      "shot_id": "SRC-055-S01",
+      "source_span": [
+        1119,
+        1125
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-076",
@@ -987,11 +1663,20 @@
       "script": "It landed as a gift.",
       "scene_type": "grouped",
       "visual_group_id": "group-11",
-      "duration": 1.988,
+      "duration": 1.201,
       "whisperx_start": 451.191,
       "whisperx_end": 452.392,
-      "start": 455.292,
-      "end": 457.28
+      "source_ids": [
+        "SRC-056"
+      ],
+      "shot_id": "SRC-056-S01",
+      "source_span": [
+        1125,
+        1130
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-077",
@@ -1000,11 +1685,20 @@
       "script": "Within 78 hours, a college student named Abhijeet Deepke had turned that one sentence into a satirical social media page called the Cockroach Janata Party,",
       "scene_type": "grouped",
       "visual_group_id": "group-11",
-      "duration": 10.316,
+      "duration": 9.583,
       "whisperx_start": 453.252,
       "whisperx_end": 462.835,
-      "start": 457.28,
-      "end": 467.596
+      "source_ids": [
+        "SRC-057"
+      ],
+      "shot_id": "SRC-057-S01",
+      "source_span": [
+        1130,
+        1155
+      ],
+      "match_confidence": 0.88,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-078",
@@ -1013,11 +1707,20 @@
       "script": "Cockroach, People's Party, and it had 30 lakh followers.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 4.268,
+      "duration": 3.541,
       "whisperx_start": 462.976,
       "whisperx_end": 466.517,
-      "start": 467.596,
-      "end": 471.864
+      "source_ids": [
+        "SRC-057"
+      ],
+      "shot_id": "SRC-057-S02",
+      "source_span": [
+        1155,
+        1164
+      ],
+      "match_confidence": 0.889,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-079",
@@ -1026,11 +1729,20 @@
       "script": "Not a real political party.",
       "scene_type": "grouped",
       "visual_group_id": "group-12",
-      "duration": 2.324,
+      "duration": 1.521,
       "whisperx_start": 467.437,
       "whisperx_end": 468.958,
-      "start": 471.864,
-      "end": 474.188
+      "source_ids": [
+        "SRC-058"
+      ],
+      "shot_id": "SRC-058-S01",
+      "source_span": [
+        1164,
+        1169
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-080",
@@ -1039,11 +1751,20 @@
       "script": "No candidates, no manifesto beyond the exam system is broken and somebody in a suit should say so.",
       "scene_type": "grouped",
       "visual_group_id": "group-12",
-      "duration": 6.836,
+      "duration": 6.062,
       "whisperx_start": 469.796,
       "whisperx_end": 475.858,
-      "start": 474.188,
-      "end": 481.024
+      "source_ids": [
+        "SRC-059"
+      ],
+      "shot_id": "SRC-059-S01",
+      "source_span": [
+        1169,
+        1187
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-081",
@@ -1052,11 +1773,20 @@
       "script": "Just a joke account that decided to become the loudest voice in the room.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 4.604,
+      "duration": 3.821,
       "whisperx_start": 476.699,
       "whisperx_end": 480.52,
-      "start": 481.024,
-      "end": 485.628
+      "source_ids": [
+        "SRC-059"
+      ],
+      "shot_id": "SRC-059-S02",
+      "source_span": [
+        1187,
+        1201
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-082",
@@ -1065,11 +1795,20 @@
       "script": "You've probably seen a group chat rename itself something ridiculous after one bad meeting and then watched that ridiculous name somehow become the entire group's personality.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 10.652,
+      "duration": 9.864,
       "whisperx_start": 481.361,
       "whisperx_end": 491.225,
-      "start": 485.628,
-      "end": 496.28
+      "source_ids": [
+        "SRC-060"
+      ],
+      "shot_id": "SRC-060-S01",
+      "source_span": [
+        1201,
+        1227
+      ],
+      "match_confidence": 0.923,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-083",
@@ -1078,11 +1817,20 @@
       "script": "That's this, at national scale, except the group chat, in this case, has 30 lakh members and a logo.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 7.676,
+      "duration": 6.883,
       "whisperx_start": 492.065,
       "whisperx_end": 498.948,
-      "start": 496.28,
-      "end": 503.956
+      "source_ids": [
+        "SRC-061"
+      ],
+      "shot_id": "SRC-061-S01",
+      "source_span": [
+        1227,
+        1246
+      ],
+      "match_confidence": 0.947,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-084",
@@ -1091,11 +1839,21 @@
       "script": "I would like it on record that I did not see this coming.\" The joke did not stay a joke for long.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 7.268,
+      "duration": 6.464,
       "whisperx_start": 499.803,
       "whisperx_end": 506.267,
-      "start": 503.956,
-      "end": 511.224
+      "source_ids": [
+        "SRC-062",
+        "SRC-063"
+      ],
+      "shot_id": "SRC-062-S01",
+      "source_span": [
+        1246,
+        1268
+      ],
+      "match_confidence": 1.0,
+      "merged_source": true,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-085",
@@ -1104,11 +1862,20 @@
       "script": "Protesters started carrying actual cockroach signs to Jantar Mantar, Delhi's designated protest lawn, and the movement spread outward to Pune, Bengaluru and Lucknow.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 10.676,
+      "duration": 9.946,
       "whisperx_start": 507.147,
       "whisperx_end": 517.093,
-      "start": 511.224,
-      "end": 521.9
+      "source_ids": [
+        "SRC-064"
+      ],
+      "shot_id": "SRC-064-S01",
+      "source_span": [
+        1268,
+        1291
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-086",
@@ -1117,11 +1884,20 @@
       "script": "A well-known activist, Sonam Wangchuk, joined in with a 26-day hunger strike.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.684,
+      "duration": 4.883,
       "whisperx_start": 517.893,
       "whisperx_end": 522.776,
-      "start": 521.9,
-      "end": 527.584
+      "source_ids": [
+        "SRC-065"
+      ],
+      "shot_id": "SRC-065-S01",
+      "source_span": [
+        1291,
+        1305
+      ],
+      "match_confidence": 0.929,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-087",
@@ -1130,11 +1906,20 @@
       "script": "Wangchuk wasn't some random celebrity endorsement.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 3.524,
+      "duration": 2.742,
       "whisperx_start": 523.658,
       "whisperx_end": 526.4,
-      "start": 527.584,
-      "end": 531.108
+      "source_ids": [
+        "SRC-066"
+      ],
+      "shot_id": "SRC-066-S01",
+      "source_span": [
+        1305,
+        1311
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-088",
@@ -1143,11 +1928,20 @@
       "script": "He'd already built a real reputation from education and climate protests in Ladakh, the kind of credibility that doesn't come from a verified badge.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 9.62,
+      "duration": 8.906,
       "whisperx_start": 526.78,
       "whisperx_end": 535.686,
-      "start": 531.108,
-      "end": 540.728
+      "source_ids": [
+        "SRC-066"
+      ],
+      "shot_id": "SRC-066-S02",
+      "source_span": [
+        1311,
+        1335
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-089",
@@ -1156,11 +1950,20 @@
       "script": "His involvement is what turned an internet joke into something newsrooms could no longer file under student memes and move on from.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 8.78,
+      "duration": 8.026,
       "whisperx_start": 536.546,
       "whisperx_end": 544.572,
-      "start": 540.728,
-      "end": 549.508
+      "source_ids": [
+        "SRC-067"
+      ],
+      "shot_id": "SRC-067-S01",
+      "source_span": [
+        1335,
+        1357
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-090",
@@ -1169,11 +1972,20 @@
       "script": "And that's really the story of this whole movement.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 3.332,
+      "duration": 2.522,
       "whisperx_start": 545.483,
       "whisperx_end": 548.005,
-      "start": 549.508,
-      "end": 552.84
+      "source_ids": [
+        "SRC-068"
+      ],
+      "shot_id": "SRC-068-S01",
+      "source_span": [
+        1357,
+        1366
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-091",
@@ -1182,11 +1994,20 @@
       "script": "It started as a punchline, built its audience like a meme page, and only afterward picked up the institutional weight a hunger strike,",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 8.78,
+      "duration": 7.987,
       "whisperx_start": 548.365,
       "whisperx_end": 556.352,
-      "start": 552.84,
-      "end": 561.62
+      "source_ids": [
+        "SRC-068"
+      ],
+      "shot_id": "SRC-068-S02",
+      "source_span": [
+        1366,
+        1389
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-092",
@@ -1195,11 +2016,20 @@
       "script": "national headlines, a resignation that traditional protest movements usually need years to earn.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 6.284,
+      "duration": 5.505,
       "whisperx_start": 556.752,
       "whisperx_end": 562.257,
-      "start": 561.62,
-      "end": 567.904
+      "source_ids": [
+        "SRC-068"
+      ],
+      "shot_id": "SRC-068-S03",
+      "source_span": [
+        1389,
+        1402
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-093",
@@ -1208,11 +2038,20 @@
       "script": "For a while, the government's response was to call the whole thing anti-national.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.156,
+      "duration": 4.384,
       "whisperx_start": 563.137,
       "whisperx_end": 567.521,
-      "start": 567.904,
-      "end": 573.06
+      "source_ids": [
+        "SRC-069"
+      ],
+      "shot_id": "SRC-069-S01",
+      "source_span": [
+        1402,
+        1416
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-094",
@@ -1221,11 +2060,20 @@
       "script": "Yes, firing one minister doesn't install biometric scanners or rewrite how the National Testing Agency hires people, fix the system.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 8.78,
+      "duration": 8.011,
       "whisperx_start": 568.357,
       "whisperx_end": 576.368,
-      "start": 573.06,
-      "end": 581.84
+      "source_ids": [
+        "SRC-069"
+      ],
+      "shot_id": "SRC-069-S02",
+      "source_span": [
+        1416,
+        1436
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-095",
@@ -1234,11 +2082,20 @@
       "script": "Not just the man standing near it, is not an unreasonable position on its own.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.732,
+      "duration": 4.907,
       "whisperx_start": 576.909,
       "whisperx_end": 581.816,
-      "start": 581.84,
-      "end": 587.572
+      "source_ids": [
+        "SRC-069"
+      ],
+      "shot_id": "SRC-069-S03",
+      "source_span": [
+        1436,
+        1451
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-096",
@@ -1247,11 +2104,20 @@
       "script": "But you can be technically right and still lose the room completely.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 4.22,
+      "duration": 3.442,
       "whisperx_start": 582.653,
       "whisperx_end": 586.095,
-      "start": 587.572,
-      "end": 591.792
+      "source_ids": [
+        "SRC-070"
+      ],
+      "shot_id": "SRC-070-S01",
+      "source_span": [
+        1451,
+        1463
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-097",
@@ -1260,11 +2126,20 @@
       "script": "I've been technically right about plenty of arguments I still lost, so I sympathise a little.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 6.38,
+      "duration": 5.583,
       "whisperx_start": 586.935,
       "whisperx_end": 592.518,
-      "start": 591.792,
-      "end": 598.172
+      "source_ids": [
+        "SRC-071"
+      ],
+      "shot_id": "SRC-071-S01",
+      "source_span": [
+        1463,
+        1479
+      ],
+      "match_confidence": 0.938,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-098",
@@ -1273,11 +2148,20 @@
       "script": "Then, on 20th July and 21st, police used lathi charges,",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.468,
+      "duration": 4.682,
       "whisperx_start": 593.358,
       "whisperx_end": 598.04,
-      "start": 598.172,
-      "end": 603.64
+      "source_ids": [
+        "SRC-072"
+      ],
+      "shot_id": "SRC-072-S01",
+      "source_span": [
+        1479,
+        1489
+      ],
+      "match_confidence": 0.9,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-099",
@@ -1286,11 +2170,20 @@
       "script": "the baton crackdowns you've almost certainly seen in a dozen other Indian protest videos.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.804,
+      "duration": 5.043,
       "whisperx_start": 598.36,
       "whisperx_end": 603.403,
-      "start": 603.64,
-      "end": 609.444
+      "source_ids": [
+        "SRC-072"
+      ],
+      "shot_id": "SRC-072-S02",
+      "source_span": [
+        1489,
+        1503
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-100",
@@ -1299,11 +2192,20 @@
       "script": "The government said protesters had blocked roads and ignored repeated orders to disperse.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 6.044,
+      "duration": 5.305,
       "whisperx_start": 604.263,
       "whisperx_end": 609.568,
-      "start": 609.444,
-      "end": 615.488
+      "source_ids": [
+        "SRC-073"
+      ],
+      "shot_id": "SRC-073-S01",
+      "source_span": [
+        1503,
+        1516
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-101",
@@ -1312,11 +2214,20 @@
       "script": "Protesters said they were standing with placards and got charged anyway.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.108,
+      "duration": 4.365,
       "whisperx_start": 609.868,
       "whisperx_end": 614.233,
-      "start": 615.488,
-      "end": 620.596
+      "source_ids": [
+        "SRC-073"
+      ],
+      "shot_id": "SRC-073-S02",
+      "source_span": [
+        1516,
+        1527
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-102",
@@ -1325,11 +2236,20 @@
       "script": "Both things can be true in different corners of the same crowd.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 4.364,
+      "duration": 3.544,
       "whisperx_start": 615.073,
       "whisperx_end": 618.617,
-      "start": 620.596,
-      "end": 624.96
+      "source_ids": [
+        "SRC-074"
+      ],
+      "shot_id": "SRC-074-S01",
+      "source_span": [
+        1527,
+        1539
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-103",
@@ -1338,11 +2258,20 @@
       "script": "What isn't in dispute is what the footage that actually went viral showed.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.108,
+      "duration": 4.304,
       "whisperx_start": 619.508,
       "whisperx_end": 623.812,
-      "start": 624.96,
-      "end": 630.068
+      "source_ids": [
+        "SRC-075"
+      ],
+      "shot_id": "SRC-075-S01",
+      "source_span": [
+        1539,
+        1552
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-104",
@@ -1351,11 +2280,20 @@
       "script": "Mostly college students, holding insect-themed placards, getting hit with batons.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.54,
+      "duration": 4.744,
       "whisperx_start": 624.092,
       "whisperx_end": 628.836,
-      "start": 630.068,
-      "end": 635.608
+      "source_ids": [
+        "SRC-075"
+      ],
+      "shot_id": "SRC-075-S02",
+      "source_span": [
+        1552,
+        1563
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-105",
@@ -1364,11 +2302,20 @@
       "script": "Which, whether or not someone 20 minutes earlier had blocked a road, is not the optics you want if you're trying to argue the crackdown was proportionate.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 9.62,
+      "duration": 8.807,
       "whisperx_start": 629.117,
       "whisperx_end": 637.924,
-      "start": 635.608,
-      "end": 645.228
+      "source_ids": [
+        "SRC-075"
+      ],
+      "shot_id": "SRC-075-S03",
+      "source_span": [
+        1563,
+        1590
+      ],
+      "match_confidence": 0.963,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-106",
@@ -1377,11 +2324,20 @@
       "script": "Two months off, the minister is staying followed by roughly 48 hours, in late July, where he wasn't.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 7.244,
+      "duration": 6.529,
       "whisperx_start": 638.785,
       "whisperx_end": 645.314,
-      "start": 645.228,
-      "end": 652.472
+      "source_ids": [
+        "SRC-076"
+      ],
+      "shot_id": "SRC-076-S01",
+      "source_span": [
+        1590,
+        1608
+      ],
+      "match_confidence": 0.889,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-107",
@@ -1390,11 +2346,20 @@
       "script": "On 25th July, Dharmendra Pradhan resigned as Union Education Minister, writing that he didn't want the country's students left trapped in a web of confusion.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 10.676,
+      "duration": 9.853,
       "whisperx_start": 646.235,
       "whisperx_end": 656.088,
-      "start": 652.472,
-      "end": 663.148
+      "source_ids": [
+        "SRC-077"
+      ],
+      "shot_id": "SRC-077-S01",
+      "source_span": [
+        1608,
+        1633
+      ],
+      "match_confidence": 0.96,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-108",
@@ -1403,11 +2368,20 @@
       "script": "The President accepted it the same day,",
       "scene_type": "grouped",
       "visual_group_id": "group-13",
-      "duration": 2.684,
+      "duration": 1.922,
       "whisperx_start": 656.929,
       "whisperx_end": 658.851,
-      "start": 663.148,
-      "end": 665.832
+      "source_ids": [
+        "SRC-077"
+      ],
+      "shot_id": "SRC-077-S02",
+      "source_span": [
+        1633,
+        1640
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-109",
@@ -1416,11 +2390,20 @@
       "script": "and Cabinet Minister Prahlad Joshi picked up the education portfolio on top of the one he already had one person to cabinet-level jobs,",
       "scene_type": "grouped",
       "visual_group_id": "group-13",
-      "duration": 9.164,
+      "duration": 8.367,
       "whisperx_start": 659.311,
       "whisperx_end": 667.678,
-      "start": 665.832,
-      "end": 674.996
+      "source_ids": [
+        "SRC-077"
+      ],
+      "shot_id": "SRC-077-S03",
+      "source_span": [
+        1640,
+        1664
+      ],
+      "match_confidence": 0.917,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-110",
@@ -1429,11 +2412,20 @@
       "script": "not because he is uniquely qualified for both but because the desk needed a name on it by evening.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 6.476,
+      "duration": 5.665,
       "whisperx_start": 668.158,
       "whisperx_end": 673.823,
-      "start": 674.996,
-      "end": 681.472
+      "source_ids": [
+        "SRC-077"
+      ],
+      "shot_id": "SRC-077-S04",
+      "source_span": [
+        1664,
+        1683
+      ],
+      "match_confidence": 0.895,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-111",
@@ -1442,11 +2434,20 @@
       "script": "Indian cabinets do this constantly, and the spare ministry to whoever has room that week, like a portfolio is a task you assign rather than a job someone trains for.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 10.532,
+      "duration": 9.747,
       "whisperx_start": 674.684,
       "whisperx_end": 684.431,
-      "start": 681.472,
-      "end": 692.004
+      "source_ids": [
+        "SRC-078"
+      ],
+      "shot_id": "SRC-078-S01",
+      "source_span": [
+        1683,
+        1713
+      ],
+      "match_confidence": 0.967,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-112",
@@ -1455,11 +2456,20 @@
       "script": "The cockroach Janata Party announced it was ending its Janata Mantra protest in good faith that same week.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 6.908,
+      "duration": 6.165,
       "whisperx_start": 685.3,
       "whisperx_end": 691.465,
-      "start": 692.004,
-      "end": 698.912
+      "source_ids": [
+        "SRC-079"
+      ],
+      "shot_id": "SRC-079-S01",
+      "source_span": [
+        1713,
+        1731
+      ],
+      "match_confidence": 0.833,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-113",
@@ -1468,11 +2478,20 @@
       "script": "Sit with that for a second, a meme account had outlasted a sitting cabinet minister.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.588,
+      "duration": 4.783,
       "whisperx_start": 692.386,
       "whisperx_end": 697.169,
-      "start": 698.912,
-      "end": 704.5
+      "source_ids": [
+        "SRC-080"
+      ],
+      "shot_id": "SRC-080-S01",
+      "source_span": [
+        1731,
+        1746
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-114",
@@ -1481,11 +2500,20 @@
       "script": "I don't know what I expected from 2026, but it wasn't that.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.444,
+      "duration": 2.942,
       "whisperx_start": 698.05,
       "whisperx_end": 700.992,
-      "start": 704.5,
-      "end": 709.944
+      "source_ids": [
+        "SRC-081"
+      ],
+      "shot_id": "SRC-081-S01",
+      "source_span": [
+        1746,
+        1758
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-115",
@@ -1494,11 +2522,20 @@
       "script": "And then, because this is how Indian bureaucracy always closes a loop, the government announced its response.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 7.22,
+      "duration": 6.404,
       "whisperx_start": 703.65,
       "whisperx_end": 710.054,
-      "start": 709.944,
-      "end": 717.164
+      "source_ids": [
+        "SRC-082"
+      ],
+      "shot_id": "SRC-082-S01",
+      "source_span": [
+        1758,
+        1775
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-116",
@@ -1507,11 +2544,20 @@
       "script": "A new expert committee, pulling from technology, education and administration, to recommend long-term reforms.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 7.388,
+      "duration": 6.604,
       "whisperx_start": 710.354,
       "whisperx_end": 716.958,
-      "start": 717.164,
-      "end": 724.552
+      "source_ids": [
+        "SRC-082"
+      ],
+      "shot_id": "SRC-082-S02",
+      "source_span": [
+        1775,
+        1790
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-117",
@@ -1520,11 +2566,20 @@
       "script": "Neet U.G. is reportedly moving to computer-based testing next year.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 4.724,
+      "duration": 3.942,
       "whisperx_start": 717.872,
       "whisperx_end": 721.814,
-      "start": 724.552,
-      "end": 729.276
+      "source_ids": [
+        "SRC-083"
+      ],
+      "shot_id": "SRC-083-S01",
+      "source_span": [
+        1790,
+        1802
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-118",
@@ -1533,11 +2588,20 @@
       "script": "Biometric checks, tighter paper security, more digital surveillance all promised, again,",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 6.092,
+      "duration": 5.302,
       "whisperx_start": 722.674,
       "whisperx_end": 727.976,
-      "start": 729.276,
-      "end": 735.368
+      "source_ids": [
+        "SRC-084"
+      ],
+      "shot_id": "SRC-084-S01",
+      "source_span": [
+        1802,
+        1813
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-119",
@@ -1546,11 +2610,20 @@
       "script": "on top of the 101 promises already sitting in a file somewhere from the last time.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.684,
+      "duration": 4.862,
       "whisperx_start": 728.297,
       "whisperx_end": 733.159,
-      "start": 735.368,
-      "end": 741.052
+      "source_ids": [
+        "SRC-084"
+      ],
+      "shot_id": "SRC-084-S02",
+      "source_span": [
+        1813,
+        1829
+      ],
+      "match_confidence": 0.938,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-120",
@@ -1559,11 +2632,20 @@
       "script": "If you've lost count of how many committees I've mentioned in the last two minutes, congratulations, you're feeling roughly 1% of the exhaustion the actual students feel.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 10.268,
+      "duration": 9.488,
       "whisperx_start": 734.058,
       "whisperx_end": 743.546,
-      "start": 741.052,
-      "end": 751.32
+      "source_ids": [
+        "SRC-085"
+      ],
+      "shot_id": "SRC-085-S01",
+      "source_span": [
+        1829,
+        1856
+      ],
+      "match_confidence": 0.963,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-121",
@@ -1572,11 +2654,20 @@
       "script": "And while the government was scheduling this one, the cockroaches, somewhere, were presumably already scheduling the next protest.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 7.868,
+      "duration": 7.066,
       "whisperx_start": 744.386,
       "whisperx_end": 751.452,
-      "start": 751.32,
-      "end": 759.188
+      "source_ids": [
+        "SRC-086"
+      ],
+      "shot_id": "SRC-086-S01",
+      "source_span": [
+        1856,
+        1874
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-122",
@@ -1585,11 +2676,20 @@
       "script": "For the more than 22 lakh students who actually sat that May exam, none of this committee talk changes what the last few months cost them.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 9.092,
+      "duration": 8.302,
       "whisperx_start": 752.406,
       "whisperx_end": 760.708,
-      "start": 759.188,
-      "end": 768.28
+      "source_ids": [
+        "SRC-087"
+      ],
+      "shot_id": "SRC-087-S01",
+      "source_span": [
+        1874,
+        1900
+      ],
+      "match_confidence": 0.962,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-123",
@@ -1598,11 +2698,20 @@
       "script": "A re-exam 8 weeks later than planned.",
       "scene_type": "grouped",
       "visual_group_id": "group-14",
-      "duration": 3.188,
+      "duration": 2.401,
       "whisperx_start": 761.568,
       "whisperx_end": 763.969,
-      "start": 768.28,
-      "end": 771.468
+      "source_ids": [
+        "SRC-088"
+      ],
+      "shot_id": "SRC-088-S01",
+      "source_span": [
+        1900,
+        1908
+      ],
+      "match_confidence": 0.875,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-124",
@@ -1611,11 +2720,20 @@
       "script": "A summer spent not knowing whether the score they'd earned would even count.",
       "scene_type": "grouped",
       "visual_group_id": "group-14",
-      "duration": 4.844,
+      "duration": 4.041,
       "whisperx_start": 764.849,
       "whisperx_end": 768.89,
-      "start": 771.468,
-      "end": 776.312
+      "source_ids": [
+        "SRC-089"
+      ],
+      "shot_id": "SRC-089-S01",
+      "source_span": [
+        1908,
+        1921
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-125",
@@ -1624,11 +2742,20 @@
       "script": "Coaching Institute deadlines and hostel leases that don't pause for a CBI probe.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.516,
+      "duration": 4.801,
       "whisperx_start": 769.751,
       "whisperx_end": 774.552,
-      "start": 776.312,
-      "end": 781.828
+      "source_ids": [
+        "SRC-090"
+      ],
+      "shot_id": "SRC-090-S01",
+      "source_span": [
+        1921,
+        1934
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-126",
@@ -1637,11 +2764,20 @@
       "script": "Whatever the next reform report recommends, it arrives too late for the specific batch of 18-year-olds who lived through this particular version of the story, which is,",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 10.172,
+      "duration": 9.385,
       "whisperx_start": 775.382,
       "whisperx_end": 784.767,
-      "start": 781.828,
-      "end": 792.0
+      "source_ids": [
+        "SRC-091"
+      ],
+      "shot_id": "SRC-091-S01",
+      "source_span": [
+        1934,
+        1963
+      ],
+      "match_confidence": 0.966,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-127",
@@ -1650,11 +2786,20 @@
       "script": "if you think about it, the quite cost hiding underneath every one of these Indian governance stories, the fix always arrives, eventually, for whoever comes after.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 10.388,
+      "duration": 9.505,
       "whisperx_start": 785.007,
       "whisperx_end": 794.512,
-      "start": 792.0,
-      "end": 802.388
+      "source_ids": [
+        "SRC-091"
+      ],
+      "shot_id": "SRC-091-S02",
+      "source_span": [
+        1963,
+        1989
+      ],
+      "match_confidence": 0.962,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-128",
@@ -1663,11 +2808,20 @@
       "script": "I keep thinking about that one detail more than any other in this story.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 5.18,
+      "duration": 4.344,
       "whisperx_start": 795.472,
       "whisperx_end": 799.816,
-      "start": 802.388,
-      "end": 807.568
+      "source_ids": [
+        "SRC-092"
+      ],
+      "shot_id": "SRC-092-S01",
+      "source_span": [
+        1989,
+        2003
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-129",
@@ -1676,11 +2830,20 @@
       "script": "Which brings us back to where we started.",
       "scene_type": "grouped",
       "visual_group_id": "group-15",
-      "duration": 3.044,
+      "duration": 2.242,
       "whisperx_start": 800.657,
       "whisperx_end": 802.899,
-      "start": 807.568,
-      "end": 810.612
+      "source_ids": [
+        "SRC-093"
+      ],
+      "shot_id": "SRC-093-S01",
+      "source_span": [
+        2003,
+        2011
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-130",
@@ -1689,11 +2852,20 @@
       "script": "There is already a 101-point reform plan sitting on a desk, mostly implemented,",
       "scene_type": "grouped",
       "visual_group_id": "group-15",
-      "duration": 6.26,
+      "duration": 5.485,
       "whisperx_start": 803.78,
       "whisperx_end": 809.265,
-      "start": 810.612,
-      "end": 816.872
+      "source_ids": [
+        "SRC-094"
+      ],
+      "shot_id": "SRC-094-S01",
+      "source_span": [
+        2011,
+        2025
+      ],
+      "match_confidence": 0.929,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-131",
@@ -1702,11 +2874,20 @@
       "script": "from the last time this exact same thing happened and it wasn't enough to stop it from happening again two years later.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 7.388,
+      "duration": 6.586,
       "whisperx_start": 809.585,
       "whisperx_end": 816.171,
-      "start": 816.872,
-      "end": 824.26
+      "source_ids": [
+        "SRC-094"
+      ],
+      "shot_id": "SRC-094-S02",
+      "source_span": [
+        2025,
+        2047
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-132",
@@ -1715,11 +2896,20 @@
       "script": "The real problem clearly isn't that India can't write a good committee report,",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 4.844,
+      "duration": 4.102,
       "whisperx_start": 817.027,
       "whisperx_end": 821.129,
-      "start": 824.26,
-      "end": 829.104
+      "source_ids": [
+        "SRC-095"
+      ],
+      "shot_id": "SRC-095-S01",
+      "source_span": [
+        2047,
+        2060
+      ],
+      "match_confidence": 0.846,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-133",
@@ -1728,11 +2918,20 @@
       "script": "it's written two of them now, from two different chairmen, with broadly the same recommendations both times.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 6.5,
+      "duration": 5.723,
       "whisperx_start": 821.349,
       "whisperx_end": 827.072,
-      "start": 829.104,
-      "end": 835.604
+      "source_ids": [
+        "SRC-096"
+      ],
+      "shot_id": "SRC-096-S01",
+      "source_span": [
+        2060,
+        2077
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-134",
@@ -1741,11 +2940,20 @@
       "script": "The real question isn't whether India can write a reform report.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 4.268,
+      "duration": 3.522,
       "whisperx_start": 827.952,
       "whisperx_end": 831.474,
-      "start": 835.604,
-      "end": 839.872
+      "source_ids": [
+        "SRC-097"
+      ],
+      "shot_id": "SRC-097-S01",
+      "source_span": [
+        2077,
+        2088
+      ],
+      "match_confidence": 1.0,
+      "merged_source": false,
+      "source_match": "ok"
     },
     {
       "id": "SCENE-135",
@@ -1754,11 +2962,20 @@
       "script": "It's whether next year's batch of more than 22 lakh students gets a fair exam or just a better logo for whichever protest comes after.",
       "scene_type": "standalone",
       "visual_group_id": null,
-      "duration": 9.308,
+      "duration": 8.524,
       "whisperx_start": 832.355,
       "whisperx_end": 840.879,
-      "start": 839.872,
-      "end": 849.18
+      "source_ids": [
+        "SRC-098"
+      ],
+      "shot_id": "SRC-098-S01",
+      "source_span": [
+        2088,
+        2113
+      ],
+      "match_confidence": 0.96,
+      "merged_source": false,
+      "source_match": "ok"
     }
   ]
 }

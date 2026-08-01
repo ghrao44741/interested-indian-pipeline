@@ -61,25 +61,9 @@ BANNED_WORDS = [
 STAGE_ORDER = ["topics", "script", "review-script", "voice", "split", "prompts", "images",
                "overlays", "stitch", "metadata", "thumbnail", "chapters", "upload"]
 
-# Working copies the reviewers must never mistake for the production script.
-SCRIPT_VARIANT_SUFFIXES = ("_previous", "_draft", "_draft_tagged", "_tagged", "_old", "_backup")
-
-
-def _pick_production_script(project_dir: Path):
-    """Return the project's real script, ignoring drafts/backups.
-
-    Callers used sorted(glob("script_*.txt"))[-1], which sorts
-    'script_x_PREVIOUS.txt' *after* 'script_x.txt' — so the reviewers silently
-    diffed the manifest against the previous draft and reported rewritten
-    sentences as ASR mishearings.
-    """
-    matches = sorted(project_dir.glob("script_*.txt"))
-    if not matches:
-        return None
-    primary = [m for m in matches
-               if not any(m.stem.lower().endswith(s) for s in SCRIPT_VARIANT_SUFFIXES)]
-    # shortest stem = the base name without any variant suffix
-    return min(primary, key=lambda m: len(m.stem)) if primary else matches[-1]
+# Single implementation, shared with the split stage — two copies of this logic
+# would drift, which is the failure mode this module has already had twice.
+from source_ids import pick_production_script as _pick_production_script  # noqa: E402
 
 
 def _find_stale_clips(project_dir: Path, scenes: list, tolerance: float = 0.1) -> list:
