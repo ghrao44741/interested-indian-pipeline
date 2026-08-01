@@ -525,7 +525,12 @@ def main():
     parser.add_argument("--voice", default="en-US-JennyNeural", help="Voice used for original generation")
     parser.add_argument("--script", default=None,
                         help="Canonical script for persistent source ids. Defaults to the "
-                             "project's production script (drafts/backups excluded).")
+                             "project's production script (drafts/backups excluded). Required "
+                             "explicitly when a project has several candidate scripts.")
+    parser.add_argument("--allow-missing-script", action="store_true",
+                        help="Development override: split without a canonical script. The "
+                             "manifest is marked identity-blocked and downstream routing and "
+                             "paid generation will refuse it.")
     parser.add_argument("--video-type", choices=["ShortVideo", "LongVideo"], default="ShortVideo",
                          help="'ShortVideo' (default): simple sentence-splitting only, no scene "
                               "grouping — you eyeball image pairing yourself. "
@@ -644,28 +649,52 @@ def main():
     # one session. Identity comes from the script instead: stable SRC ids
     # assigned per sentence, aligned back to these ASR-derived scenes. SCENE-NNN
     # stays as display order only.
-    script_path = args.script or source_ids.pick_production_script(args.project)
+    identity = source_ids.IDENTITY_OK
+    identity_reasons = []
+    script_path = args.script
+    if not script_path and not args.allow_missing_script:
+        # strict: ambiguous or missing script raises rather than guessing, because
+        # everything downstream keys off the identity derived here.
+        script_path = source_ids.pick_production_script(args.project, strict=True)
+    elif not script_path:
+        script_path = source_ids.pick_production_script(args.project, strict=False)
+
     if script_path and Path(script_path).exists():
         units, change = source_ids.sync_units(
             Path(args.project), Path(script_path).read_text(encoding="utf-8"))
-        alignment = source_ids.align_scenes(manifest_scenes, units)
-        ambiguous = []
-        for scene, info in zip(manifest_scenes, alignment):
+        for scene, info in zip(manifest_scenes, source_ids.align_scenes(manifest_scenes, units)):
             scene.update(info)
-            if info["source_match"] != "ok":
-                ambiguous.append(scene["id"])
+
+        # Persistent visual identity, anchored to the text each visual was
+        # approved against — so a re-split re-attaches artwork by overlap rather
+        # than by recomputed S01/S02 position.
+        assignments, tie_issues = source_ids.assign_visual_assets(units, manifest_scenes)
+        for scene, info in zip(manifest_scenes, assignments):
+            scene.update(info)
+        source_ids._write_atomic(
+            source_ids.sidecar_path(Path(args.project)),
+            {"version": source_ids.SIDECAR_VERSION,
+             "next_seq": max((source_ids._seq_of(u["id"]) for u in units), default=0) + 1,
+             "units": units})
+
+        identity, identity_reasons = source_ids.identity_state(manifest_scenes)
 
         print(f"\n✓ Source identity: {len(units)} unit(s) from {Path(script_path).name}")
         if change["changed"] or change["added"] or change["removed"]:
             print(f"  script changed since last run — edited: {len(change['changed'])}, "
                   f"new: {len(change['added'])}, removed: {len(change['removed'])}")
-        if ambiguous:
-            print(f"  ⚠ {len(ambiguous)} scene(s) could not be matched to the script and are "
-                  f"marked ambiguous — artwork will NOT be auto-attached: {', '.join(ambiguous[:6])}"
-                  f"{' …' if len(ambiguous) > 6 else ''}")
+        for issue in tie_issues[:4]:
+            print(f"  ⚠ visual tie: {issue}")
+        if identity == source_ids.IDENTITY_BLOCKED:
+            print(f"\n  ⛔ IDENTITY BLOCKED — routing and paid generation will refuse this manifest:")
+            for r in identity_reasons:
+                print(f"     - {r}")
+            print("     Resolve by correcting the script or re-running the affected scenes.")
     else:
-        print("\n  ⚠ No production script found — scenes carry no persistent source ids, so "
-              "artwork cannot survive a re-split. Pass --script to enable.")
+        identity = source_ids.IDENTITY_BLOCKED
+        identity_reasons = ["no canonical script — scenes carry no persistent identity"]
+        print("\n  ⚠ No canonical script — artwork cannot survive a re-split "
+              "(--allow-missing-script was used).")
 
     # Step 5: Write manifest.json
     total_duration = round(sum(s["duration"] for s in manifest_scenes), 3)
@@ -675,6 +704,10 @@ def main():
         "voice": args.voice,
         "word_segments_file": words_filename,
         "total_duration": total_duration,
+        # Downstream gate: routing and paid generation must refuse a blocked
+        # manifest rather than generate against uncertain identity.
+        "identity_state": identity,
+        "identity_reasons": identity_reasons,
         "scenes": manifest_scenes
     }
 

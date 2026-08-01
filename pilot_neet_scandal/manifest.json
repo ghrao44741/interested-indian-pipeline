@@ -4,6 +4,10 @@
   "voice": "en-IN-PrabhatNeural",
   "word_segments_file": "source_audio/narration_words.json",
   "total_duration": 740.273,
+  "identity_state": "blocked",
+  "identity_reasons": [
+    "1 scene(s) not matched to the script: SCENE-066"
+  ],
   "scenes": [
     {
       "id": "SCENE-001",
@@ -18,14 +22,17 @@
       "source_ids": [
         "SRC-001"
       ],
-      "shot_id": "SRC-001-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-001-I01",
+      "asr_word_span": [
         0,
         7
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-001-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-002",
@@ -40,14 +47,17 @@
       "source_ids": [
         "SRC-002"
       ],
-      "shot_id": "SRC-002-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-002-I01",
+      "asr_word_span": [
         7,
         19
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-002-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-003",
@@ -62,14 +72,17 @@
       "source_ids": [
         "SRC-003"
       ],
-      "shot_id": "SRC-003-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-003-I01",
+      "asr_word_span": [
         19,
         30
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-003-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-004",
@@ -84,14 +97,17 @@
       "source_ids": [
         "SRC-003"
       ],
-      "shot_id": "SRC-003-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-003-I02",
+      "asr_word_span": [
         30,
         49
       ],
       "match_confidence": 0.947,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-003-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-005",
@@ -106,14 +122,17 @@
       "source_ids": [
         "SRC-004"
       ],
-      "shot_id": "SRC-004-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-004-I01",
+      "asr_word_span": [
         49,
         64
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-004-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-006",
@@ -128,14 +147,17 @@
       "source_ids": [
         "SRC-005"
       ],
-      "shot_id": "SRC-005-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-005-I01",
+      "asr_word_span": [
         64,
         73
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-005-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-007",
@@ -150,14 +172,17 @@
       "source_ids": [
         "SRC-006"
       ],
-      "shot_id": "SRC-006-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-006-I01",
+      "asr_word_span": [
         73,
         91
       ],
       "match_confidence": 0.889,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-006-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-008",
@@ -172,14 +197,17 @@
       "source_ids": [
         "SRC-006"
       ],
-      "shot_id": "SRC-006-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-006-I02",
+      "asr_word_span": [
         91,
         110
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-006-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-009",
@@ -194,14 +222,17 @@
       "source_ids": [
         "SRC-007"
       ],
-      "shot_id": "SRC-007-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-007-I01",
+      "asr_word_span": [
         110,
         117
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-007-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-010",
@@ -216,14 +247,17 @@
       "source_ids": [
         "SRC-008"
       ],
-      "shot_id": "SRC-008-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-008-I01",
+      "asr_word_span": [
         117,
         128
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-008-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-011",
@@ -238,14 +272,17 @@
       "source_ids": [
         "SRC-009"
       ],
-      "shot_id": "SRC-009-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-009-I01",
+      "asr_word_span": [
         128,
         152
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-009-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-012",
@@ -260,14 +297,17 @@
       "source_ids": [
         "SRC-010"
       ],
-      "shot_id": "SRC-010-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-010-I01",
+      "asr_word_span": [
         152,
         174
       ],
       "match_confidence": 0.909,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-010-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-013",
@@ -282,14 +322,17 @@
       "source_ids": [
         "SRC-011"
       ],
-      "shot_id": "SRC-011-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-011-I01",
+      "asr_word_span": [
         174,
         186
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-011-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-014",
@@ -304,14 +347,17 @@
       "source_ids": [
         "SRC-012"
       ],
-      "shot_id": "SRC-012-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-012-I01",
+      "asr_word_span": [
         186,
         199
       ],
       "match_confidence": 0.769,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-012-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-015",
@@ -326,14 +372,17 @@
       "source_ids": [
         "SRC-013"
       ],
-      "shot_id": "SRC-013-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-013-I01",
+      "asr_word_span": [
         199,
         216
       ],
       "match_confidence": 0.882,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-013-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-016",
@@ -348,14 +397,17 @@
       "source_ids": [
         "SRC-013"
       ],
-      "shot_id": "SRC-013-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-013-I02",
+      "asr_word_span": [
         216,
         234
       ],
       "match_confidence": 0.944,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-013-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-017",
@@ -370,14 +422,17 @@
       "source_ids": [
         "SRC-014"
       ],
-      "shot_id": "SRC-014-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-014-I01",
+      "asr_word_span": [
         234,
         246
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-014-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-018",
@@ -392,14 +447,17 @@
       "source_ids": [
         "SRC-015"
       ],
-      "shot_id": "SRC-015-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-015-I01",
+      "asr_word_span": [
         246,
         248
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-015-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-019",
@@ -414,14 +472,17 @@
       "source_ids": [
         "SRC-016"
       ],
-      "shot_id": "SRC-016-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-016-I01",
+      "asr_word_span": [
         248,
         262
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-016-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-020",
@@ -436,14 +497,17 @@
       "source_ids": [
         "SRC-017"
       ],
-      "shot_id": "SRC-017-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-017-I01",
+      "asr_word_span": [
         262,
         287
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-017-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-021",
@@ -458,14 +522,17 @@
       "source_ids": [
         "SRC-018"
       ],
-      "shot_id": "SRC-018-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-018-I01",
+      "asr_word_span": [
         287,
         299
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-018-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-022",
@@ -480,14 +547,17 @@
       "source_ids": [
         "SRC-019"
       ],
-      "shot_id": "SRC-019-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-019-I01",
+      "asr_word_span": [
         299,
         320
       ],
       "match_confidence": 0.952,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-019-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-023",
@@ -502,14 +572,17 @@
       "source_ids": [
         "SRC-019"
       ],
-      "shot_id": "SRC-019-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-019-I02",
+      "asr_word_span": [
         320,
         334
       ],
       "match_confidence": 0.857,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-019-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-024",
@@ -524,14 +597,17 @@
       "source_ids": [
         "SRC-020"
       ],
-      "shot_id": "SRC-020-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-020-I01",
+      "asr_word_span": [
         334,
         337
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-020-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-025",
@@ -546,14 +622,17 @@
       "source_ids": [
         "SRC-021"
       ],
-      "shot_id": "SRC-021-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-021-I01",
+      "asr_word_span": [
         337,
         338
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-021-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-026",
@@ -568,14 +647,17 @@
       "source_ids": [
         "SRC-022"
       ],
-      "shot_id": "SRC-022-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-022-I01",
+      "asr_word_span": [
         338,
         363
       ],
       "match_confidence": 0.96,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-022-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-027",
@@ -590,14 +672,17 @@
       "source_ids": [
         "SRC-023"
       ],
-      "shot_id": "SRC-023-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-023-I01",
+      "asr_word_span": [
         363,
         369
       ],
       "match_confidence": 0.833,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-023-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-028",
@@ -612,14 +697,17 @@
       "source_ids": [
         "SRC-024"
       ],
-      "shot_id": "SRC-024-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-024-I01",
+      "asr_word_span": [
         369,
         386
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-024-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-029",
@@ -634,14 +722,17 @@
       "source_ids": [
         "SRC-025"
       ],
-      "shot_id": "SRC-025-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-025-I01",
+      "asr_word_span": [
         386,
         416
       ],
       "match_confidence": 0.833,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-025-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-030",
@@ -656,14 +747,17 @@
       "source_ids": [
         "SRC-026"
       ],
-      "shot_id": "SRC-026-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-026-I01",
+      "asr_word_span": [
         416,
         439
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-026-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-031",
@@ -678,14 +772,17 @@
       "source_ids": [
         "SRC-026"
       ],
-      "shot_id": "SRC-026-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-026-I02",
+      "asr_word_span": [
         439,
         452
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-026-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-032",
@@ -700,14 +797,17 @@
       "source_ids": [
         "SRC-027"
       ],
-      "shot_id": "SRC-027-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-027-I01",
+      "asr_word_span": [
         452,
         460
       ],
       "match_confidence": 0.875,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-027-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-033",
@@ -723,14 +823,17 @@
         "SRC-028",
         "SRC-029"
       ],
-      "shot_id": "SRC-028-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-028-I01",
+      "asr_word_span": [
         460,
         487
       ],
       "match_confidence": 0.815,
       "merged_source": true,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-028-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-034",
@@ -745,14 +848,17 @@
       "source_ids": [
         "SRC-030"
       ],
-      "shot_id": "SRC-030-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-030-I01",
+      "asr_word_span": [
         487,
         491
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-030-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-035",
@@ -767,14 +873,17 @@
       "source_ids": [
         "SRC-030"
       ],
-      "shot_id": "SRC-030-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-030-I02",
+      "asr_word_span": [
         491,
         513
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-030-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-036",
@@ -789,14 +898,17 @@
       "source_ids": [
         "SRC-030"
       ],
-      "shot_id": "SRC-030-S03",
-      "source_span": [
+      "shot_instance_id": "SRC-030-I03",
+      "asr_word_span": [
         513,
         535
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-030-C",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-037",
@@ -811,14 +923,17 @@
       "source_ids": [
         "SRC-031"
       ],
-      "shot_id": "SRC-031-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-031-I01",
+      "asr_word_span": [
         535,
         563
       ],
       "match_confidence": 0.964,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-031-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-038",
@@ -833,14 +948,17 @@
       "source_ids": [
         "SRC-032"
       ],
-      "shot_id": "SRC-032-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-032-I01",
+      "asr_word_span": [
         563,
         572
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-032-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-039",
@@ -855,14 +973,17 @@
       "source_ids": [
         "SRC-033"
       ],
-      "shot_id": "SRC-033-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-033-I01",
+      "asr_word_span": [
         572,
         583
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-033-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-040",
@@ -877,14 +998,17 @@
       "source_ids": [
         "SRC-034"
       ],
-      "shot_id": "SRC-034-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-034-I01",
+      "asr_word_span": [
         583,
         601
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-034-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-041",
@@ -899,14 +1023,17 @@
       "source_ids": [
         "SRC-035"
       ],
-      "shot_id": "SRC-035-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-035-I01",
+      "asr_word_span": [
         601,
         618
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-035-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-042",
@@ -921,14 +1048,17 @@
       "source_ids": [
         "SRC-035"
       ],
-      "shot_id": "SRC-035-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-035-I02",
+      "asr_word_span": [
         618,
         633
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-035-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-043",
@@ -943,14 +1073,17 @@
       "source_ids": [
         "SRC-035"
       ],
-      "shot_id": "SRC-035-S03",
-      "source_span": [
+      "shot_instance_id": "SRC-035-I03",
+      "asr_word_span": [
         633,
         643
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-035-C",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-044",
@@ -965,14 +1098,17 @@
       "source_ids": [
         "SRC-035"
       ],
-      "shot_id": "SRC-035-S04",
-      "source_span": [
+      "shot_instance_id": "SRC-035-I04",
+      "asr_word_span": [
         643,
         652
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-035-D",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-045",
@@ -987,14 +1123,17 @@
       "source_ids": [
         "SRC-035"
       ],
-      "shot_id": "SRC-035-S05",
-      "source_span": [
+      "shot_instance_id": "SRC-035-I05",
+      "asr_word_span": [
         652,
         668
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-035-E",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-046",
@@ -1009,14 +1148,17 @@
       "source_ids": [
         "SRC-035"
       ],
-      "shot_id": "SRC-035-S06",
-      "source_span": [
+      "shot_instance_id": "SRC-035-I06",
+      "asr_word_span": [
         668,
         685
       ],
       "match_confidence": 0.941,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-035-F",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-047",
@@ -1031,14 +1173,17 @@
       "source_ids": [
         "SRC-036"
       ],
-      "shot_id": "SRC-036-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-036-I01",
+      "asr_word_span": [
         685,
         704
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-036-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-048",
@@ -1053,14 +1198,17 @@
       "source_ids": [
         "SRC-037"
       ],
-      "shot_id": "SRC-037-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-037-I01",
+      "asr_word_span": [
         704,
         719
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-037-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-049",
@@ -1075,14 +1223,17 @@
       "source_ids": [
         "SRC-038"
       ],
-      "shot_id": "SRC-038-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-038-I01",
+      "asr_word_span": [
         719,
         722
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-038-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-050",
@@ -1097,14 +1248,17 @@
       "source_ids": [
         "SRC-039"
       ],
-      "shot_id": "SRC-039-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-039-I01",
+      "asr_word_span": [
         722,
         731
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-039-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-051",
@@ -1119,14 +1273,17 @@
       "source_ids": [
         "SRC-040"
       ],
-      "shot_id": "SRC-040-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-040-I01",
+      "asr_word_span": [
         731,
         738
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-040-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-052",
@@ -1141,14 +1298,17 @@
       "source_ids": [
         "SRC-040"
       ],
-      "shot_id": "SRC-040-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-040-I02",
+      "asr_word_span": [
         738,
         768
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-040-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-053",
@@ -1163,14 +1323,17 @@
       "source_ids": [
         "SRC-041"
       ],
-      "shot_id": "SRC-041-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-041-I01",
+      "asr_word_span": [
         768,
         773
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-041-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-054",
@@ -1185,14 +1348,17 @@
       "source_ids": [
         "SRC-042"
       ],
-      "shot_id": "SRC-042-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-042-I01",
+      "asr_word_span": [
         773,
         779
       ],
       "match_confidence": 0.833,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-042-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-055",
@@ -1207,14 +1373,17 @@
       "source_ids": [
         "SRC-042"
       ],
-      "shot_id": "SRC-042-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-042-I02",
+      "asr_word_span": [
         779,
         789
       ],
       "match_confidence": 0.9,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-042-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-056",
@@ -1229,14 +1398,17 @@
       "source_ids": [
         "SRC-043"
       ],
-      "shot_id": "SRC-043-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-043-I01",
+      "asr_word_span": [
         789,
         804
       ],
       "match_confidence": 0.933,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-043-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-057",
@@ -1251,14 +1423,17 @@
       "source_ids": [
         "SRC-043"
       ],
-      "shot_id": "SRC-043-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-043-I02",
+      "asr_word_span": [
         804,
         826
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-043-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-058",
@@ -1273,14 +1448,17 @@
       "source_ids": [
         "SRC-043"
       ],
-      "shot_id": "SRC-043-S03",
-      "source_span": [
+      "shot_instance_id": "SRC-043-I03",
+      "asr_word_span": [
         826,
         845
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-043-C",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-059",
@@ -1295,14 +1473,17 @@
       "source_ids": [
         "SRC-044"
       ],
-      "shot_id": "SRC-044-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-044-I01",
+      "asr_word_span": [
         845,
         866
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-044-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-060",
@@ -1317,14 +1498,17 @@
       "source_ids": [
         "SRC-045"
       ],
-      "shot_id": "SRC-045-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-045-I01",
+      "asr_word_span": [
         866,
         886
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-045-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-061",
@@ -1339,14 +1523,17 @@
       "source_ids": [
         "SRC-046"
       ],
-      "shot_id": "SRC-046-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-046-I01",
+      "asr_word_span": [
         886,
         909
       ],
       "match_confidence": 0.87,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-046-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-062",
@@ -1361,14 +1548,17 @@
       "source_ids": [
         "SRC-047"
       ],
-      "shot_id": "SRC-047-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-047-I01",
+      "asr_word_span": [
         909,
         920
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-047-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-063",
@@ -1383,14 +1573,17 @@
       "source_ids": [
         "SRC-047"
       ],
-      "shot_id": "SRC-047-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-047-I02",
+      "asr_word_span": [
         920,
         938
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-047-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-064",
@@ -1405,14 +1598,17 @@
       "source_ids": [
         "SRC-047"
       ],
-      "shot_id": "SRC-047-S03",
-      "source_span": [
+      "shot_instance_id": "SRC-047-I03",
+      "asr_word_span": [
         938,
         954
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-047-C",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-065",
@@ -1427,14 +1623,17 @@
       "source_ids": [
         "SRC-048"
       ],
-      "shot_id": "SRC-048-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-048-I01",
+      "asr_word_span": [
         954,
         972
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-048-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-066",
@@ -1449,14 +1648,16 @@
       "source_ids": [
         "SRC-049"
       ],
-      "shot_id": "SRC-049-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-049-I01",
+      "asr_word_span": [
         972,
         982
       ],
       "match_confidence": 0.2,
       "merged_source": false,
-      "source_match": "ambiguous"
+      "source_match": "NEEDS_REVIEW",
+      "visual_asset_id": null,
+      "visual_match": "NEEDS_REVIEW"
     },
     {
       "id": "SCENE-067",
@@ -1471,14 +1672,17 @@
       "source_ids": [
         "SRC-049"
       ],
-      "shot_id": "SRC-049-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-049-I02",
+      "asr_word_span": [
         982,
         1001
       ],
       "match_confidence": 0.684,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-049-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-068",
@@ -1493,14 +1697,17 @@
       "source_ids": [
         "SRC-050"
       ],
-      "shot_id": "SRC-050-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-050-I01",
+      "asr_word_span": [
         1001,
         1019
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-050-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-069",
@@ -1515,14 +1722,17 @@
       "source_ids": [
         "SRC-051"
       ],
-      "shot_id": "SRC-051-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-051-I01",
+      "asr_word_span": [
         1019,
         1044
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-051-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-070",
@@ -1537,14 +1747,17 @@
       "source_ids": [
         "SRC-052"
       ],
-      "shot_id": "SRC-052-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-052-I01",
+      "asr_word_span": [
         1044,
         1066
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-052-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-071",
@@ -1559,14 +1772,17 @@
       "source_ids": [
         "SRC-052"
       ],
-      "shot_id": "SRC-052-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-052-I02",
+      "asr_word_span": [
         1066,
         1090
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-052-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-072",
@@ -1581,14 +1797,17 @@
       "source_ids": [
         "SRC-052"
       ],
-      "shot_id": "SRC-052-S03",
-      "source_span": [
+      "shot_instance_id": "SRC-052-I03",
+      "asr_word_span": [
         1090,
         1098
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-052-C",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-073",
@@ -1603,14 +1822,17 @@
       "source_ids": [
         "SRC-053"
       ],
-      "shot_id": "SRC-053-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-053-I01",
+      "asr_word_span": [
         1098,
         1106
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-053-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-074",
@@ -1625,14 +1847,17 @@
       "source_ids": [
         "SRC-054"
       ],
-      "shot_id": "SRC-054-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-054-I01",
+      "asr_word_span": [
         1106,
         1119
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-054-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-075",
@@ -1647,14 +1872,17 @@
       "source_ids": [
         "SRC-055"
       ],
-      "shot_id": "SRC-055-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-055-I01",
+      "asr_word_span": [
         1119,
         1125
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-055-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-076",
@@ -1669,14 +1897,17 @@
       "source_ids": [
         "SRC-056"
       ],
-      "shot_id": "SRC-056-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-056-I01",
+      "asr_word_span": [
         1125,
         1130
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-056-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-077",
@@ -1691,14 +1922,17 @@
       "source_ids": [
         "SRC-057"
       ],
-      "shot_id": "SRC-057-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-057-I01",
+      "asr_word_span": [
         1130,
         1155
       ],
       "match_confidence": 0.88,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-057-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-078",
@@ -1713,14 +1947,17 @@
       "source_ids": [
         "SRC-057"
       ],
-      "shot_id": "SRC-057-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-057-I02",
+      "asr_word_span": [
         1155,
         1164
       ],
       "match_confidence": 0.889,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-057-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-079",
@@ -1735,14 +1972,17 @@
       "source_ids": [
         "SRC-058"
       ],
-      "shot_id": "SRC-058-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-058-I01",
+      "asr_word_span": [
         1164,
         1169
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-058-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-080",
@@ -1757,14 +1997,17 @@
       "source_ids": [
         "SRC-059"
       ],
-      "shot_id": "SRC-059-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-059-I01",
+      "asr_word_span": [
         1169,
         1187
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-059-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-081",
@@ -1779,14 +2022,17 @@
       "source_ids": [
         "SRC-059"
       ],
-      "shot_id": "SRC-059-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-059-I02",
+      "asr_word_span": [
         1187,
         1201
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-059-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-082",
@@ -1801,14 +2047,17 @@
       "source_ids": [
         "SRC-060"
       ],
-      "shot_id": "SRC-060-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-060-I01",
+      "asr_word_span": [
         1201,
         1227
       ],
       "match_confidence": 0.923,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-060-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-083",
@@ -1823,14 +2072,17 @@
       "source_ids": [
         "SRC-061"
       ],
-      "shot_id": "SRC-061-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-061-I01",
+      "asr_word_span": [
         1227,
         1246
       ],
       "match_confidence": 0.947,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-061-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-084",
@@ -1846,14 +2098,17 @@
         "SRC-062",
         "SRC-063"
       ],
-      "shot_id": "SRC-062-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-062-I01",
+      "asr_word_span": [
         1246,
         1268
       ],
       "match_confidence": 1.0,
       "merged_source": true,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-062-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-085",
@@ -1868,14 +2123,17 @@
       "source_ids": [
         "SRC-064"
       ],
-      "shot_id": "SRC-064-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-064-I01",
+      "asr_word_span": [
         1268,
         1291
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-064-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-086",
@@ -1890,14 +2148,17 @@
       "source_ids": [
         "SRC-065"
       ],
-      "shot_id": "SRC-065-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-065-I01",
+      "asr_word_span": [
         1291,
         1305
       ],
       "match_confidence": 0.929,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-065-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-087",
@@ -1912,14 +2173,17 @@
       "source_ids": [
         "SRC-066"
       ],
-      "shot_id": "SRC-066-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-066-I01",
+      "asr_word_span": [
         1305,
         1311
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-066-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-088",
@@ -1934,14 +2198,17 @@
       "source_ids": [
         "SRC-066"
       ],
-      "shot_id": "SRC-066-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-066-I02",
+      "asr_word_span": [
         1311,
         1335
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-066-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-089",
@@ -1956,14 +2223,17 @@
       "source_ids": [
         "SRC-067"
       ],
-      "shot_id": "SRC-067-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-067-I01",
+      "asr_word_span": [
         1335,
         1357
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-067-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-090",
@@ -1978,14 +2248,17 @@
       "source_ids": [
         "SRC-068"
       ],
-      "shot_id": "SRC-068-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-068-I01",
+      "asr_word_span": [
         1357,
         1366
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-068-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-091",
@@ -2000,14 +2273,17 @@
       "source_ids": [
         "SRC-068"
       ],
-      "shot_id": "SRC-068-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-068-I02",
+      "asr_word_span": [
         1366,
         1389
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-068-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-092",
@@ -2022,14 +2298,17 @@
       "source_ids": [
         "SRC-068"
       ],
-      "shot_id": "SRC-068-S03",
-      "source_span": [
+      "shot_instance_id": "SRC-068-I03",
+      "asr_word_span": [
         1389,
         1402
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-068-C",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-093",
@@ -2044,14 +2323,17 @@
       "source_ids": [
         "SRC-069"
       ],
-      "shot_id": "SRC-069-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-069-I01",
+      "asr_word_span": [
         1402,
         1416
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-069-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-094",
@@ -2066,14 +2348,17 @@
       "source_ids": [
         "SRC-069"
       ],
-      "shot_id": "SRC-069-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-069-I02",
+      "asr_word_span": [
         1416,
         1436
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-069-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-095",
@@ -2088,14 +2373,17 @@
       "source_ids": [
         "SRC-069"
       ],
-      "shot_id": "SRC-069-S03",
-      "source_span": [
+      "shot_instance_id": "SRC-069-I03",
+      "asr_word_span": [
         1436,
         1451
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-069-C",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-096",
@@ -2110,14 +2398,17 @@
       "source_ids": [
         "SRC-070"
       ],
-      "shot_id": "SRC-070-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-070-I01",
+      "asr_word_span": [
         1451,
         1463
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-070-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-097",
@@ -2132,14 +2423,17 @@
       "source_ids": [
         "SRC-071"
       ],
-      "shot_id": "SRC-071-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-071-I01",
+      "asr_word_span": [
         1463,
         1479
       ],
       "match_confidence": 0.938,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-071-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-098",
@@ -2154,14 +2448,17 @@
       "source_ids": [
         "SRC-072"
       ],
-      "shot_id": "SRC-072-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-072-I01",
+      "asr_word_span": [
         1479,
         1489
       ],
       "match_confidence": 0.9,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-072-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-099",
@@ -2176,14 +2473,17 @@
       "source_ids": [
         "SRC-072"
       ],
-      "shot_id": "SRC-072-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-072-I02",
+      "asr_word_span": [
         1489,
         1503
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-072-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-100",
@@ -2198,14 +2498,17 @@
       "source_ids": [
         "SRC-073"
       ],
-      "shot_id": "SRC-073-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-073-I01",
+      "asr_word_span": [
         1503,
         1516
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-073-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-101",
@@ -2220,14 +2523,17 @@
       "source_ids": [
         "SRC-073"
       ],
-      "shot_id": "SRC-073-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-073-I02",
+      "asr_word_span": [
         1516,
         1527
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-073-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-102",
@@ -2242,14 +2548,17 @@
       "source_ids": [
         "SRC-074"
       ],
-      "shot_id": "SRC-074-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-074-I01",
+      "asr_word_span": [
         1527,
         1539
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-074-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-103",
@@ -2264,14 +2573,17 @@
       "source_ids": [
         "SRC-075"
       ],
-      "shot_id": "SRC-075-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-075-I01",
+      "asr_word_span": [
         1539,
         1552
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-075-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-104",
@@ -2286,14 +2598,17 @@
       "source_ids": [
         "SRC-075"
       ],
-      "shot_id": "SRC-075-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-075-I02",
+      "asr_word_span": [
         1552,
         1563
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-075-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-105",
@@ -2308,14 +2623,17 @@
       "source_ids": [
         "SRC-075"
       ],
-      "shot_id": "SRC-075-S03",
-      "source_span": [
+      "shot_instance_id": "SRC-075-I03",
+      "asr_word_span": [
         1563,
         1590
       ],
       "match_confidence": 0.963,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-075-C",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-106",
@@ -2330,14 +2648,17 @@
       "source_ids": [
         "SRC-076"
       ],
-      "shot_id": "SRC-076-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-076-I01",
+      "asr_word_span": [
         1590,
         1608
       ],
       "match_confidence": 0.889,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-076-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-107",
@@ -2352,14 +2673,17 @@
       "source_ids": [
         "SRC-077"
       ],
-      "shot_id": "SRC-077-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-077-I01",
+      "asr_word_span": [
         1608,
         1633
       ],
       "match_confidence": 0.96,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-077-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-108",
@@ -2374,14 +2698,17 @@
       "source_ids": [
         "SRC-077"
       ],
-      "shot_id": "SRC-077-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-077-I02",
+      "asr_word_span": [
         1633,
         1640
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-077-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-109",
@@ -2396,14 +2723,17 @@
       "source_ids": [
         "SRC-077"
       ],
-      "shot_id": "SRC-077-S03",
-      "source_span": [
+      "shot_instance_id": "SRC-077-I03",
+      "asr_word_span": [
         1640,
         1664
       ],
       "match_confidence": 0.917,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-077-C",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-110",
@@ -2418,14 +2748,17 @@
       "source_ids": [
         "SRC-077"
       ],
-      "shot_id": "SRC-077-S04",
-      "source_span": [
+      "shot_instance_id": "SRC-077-I04",
+      "asr_word_span": [
         1664,
         1683
       ],
       "match_confidence": 0.895,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-077-D",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-111",
@@ -2440,14 +2773,17 @@
       "source_ids": [
         "SRC-078"
       ],
-      "shot_id": "SRC-078-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-078-I01",
+      "asr_word_span": [
         1683,
         1713
       ],
       "match_confidence": 0.967,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-078-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-112",
@@ -2462,14 +2798,17 @@
       "source_ids": [
         "SRC-079"
       ],
-      "shot_id": "SRC-079-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-079-I01",
+      "asr_word_span": [
         1713,
         1731
       ],
       "match_confidence": 0.833,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-079-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-113",
@@ -2484,14 +2823,17 @@
       "source_ids": [
         "SRC-080"
       ],
-      "shot_id": "SRC-080-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-080-I01",
+      "asr_word_span": [
         1731,
         1746
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-080-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-114",
@@ -2506,14 +2848,17 @@
       "source_ids": [
         "SRC-081"
       ],
-      "shot_id": "SRC-081-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-081-I01",
+      "asr_word_span": [
         1746,
         1758
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-081-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-115",
@@ -2528,14 +2873,17 @@
       "source_ids": [
         "SRC-082"
       ],
-      "shot_id": "SRC-082-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-082-I01",
+      "asr_word_span": [
         1758,
         1775
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-082-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-116",
@@ -2550,14 +2898,17 @@
       "source_ids": [
         "SRC-082"
       ],
-      "shot_id": "SRC-082-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-082-I02",
+      "asr_word_span": [
         1775,
         1790
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-082-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-117",
@@ -2572,14 +2923,17 @@
       "source_ids": [
         "SRC-083"
       ],
-      "shot_id": "SRC-083-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-083-I01",
+      "asr_word_span": [
         1790,
         1802
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-083-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-118",
@@ -2594,14 +2948,17 @@
       "source_ids": [
         "SRC-084"
       ],
-      "shot_id": "SRC-084-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-084-I01",
+      "asr_word_span": [
         1802,
         1813
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-084-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-119",
@@ -2616,14 +2973,17 @@
       "source_ids": [
         "SRC-084"
       ],
-      "shot_id": "SRC-084-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-084-I02",
+      "asr_word_span": [
         1813,
         1829
       ],
       "match_confidence": 0.938,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-084-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-120",
@@ -2638,14 +2998,17 @@
       "source_ids": [
         "SRC-085"
       ],
-      "shot_id": "SRC-085-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-085-I01",
+      "asr_word_span": [
         1829,
         1856
       ],
       "match_confidence": 0.963,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-085-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-121",
@@ -2660,14 +3023,17 @@
       "source_ids": [
         "SRC-086"
       ],
-      "shot_id": "SRC-086-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-086-I01",
+      "asr_word_span": [
         1856,
         1874
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-086-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-122",
@@ -2682,14 +3048,17 @@
       "source_ids": [
         "SRC-087"
       ],
-      "shot_id": "SRC-087-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-087-I01",
+      "asr_word_span": [
         1874,
         1900
       ],
       "match_confidence": 0.962,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-087-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-123",
@@ -2704,14 +3073,17 @@
       "source_ids": [
         "SRC-088"
       ],
-      "shot_id": "SRC-088-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-088-I01",
+      "asr_word_span": [
         1900,
         1908
       ],
       "match_confidence": 0.875,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-088-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-124",
@@ -2726,14 +3098,17 @@
       "source_ids": [
         "SRC-089"
       ],
-      "shot_id": "SRC-089-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-089-I01",
+      "asr_word_span": [
         1908,
         1921
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-089-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-125",
@@ -2748,14 +3123,17 @@
       "source_ids": [
         "SRC-090"
       ],
-      "shot_id": "SRC-090-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-090-I01",
+      "asr_word_span": [
         1921,
         1934
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-090-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-126",
@@ -2770,14 +3148,17 @@
       "source_ids": [
         "SRC-091"
       ],
-      "shot_id": "SRC-091-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-091-I01",
+      "asr_word_span": [
         1934,
         1963
       ],
       "match_confidence": 0.966,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-091-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-127",
@@ -2792,14 +3173,17 @@
       "source_ids": [
         "SRC-091"
       ],
-      "shot_id": "SRC-091-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-091-I02",
+      "asr_word_span": [
         1963,
         1989
       ],
       "match_confidence": 0.962,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-091-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-128",
@@ -2814,14 +3198,17 @@
       "source_ids": [
         "SRC-092"
       ],
-      "shot_id": "SRC-092-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-092-I01",
+      "asr_word_span": [
         1989,
         2003
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-092-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-129",
@@ -2836,14 +3223,17 @@
       "source_ids": [
         "SRC-093"
       ],
-      "shot_id": "SRC-093-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-093-I01",
+      "asr_word_span": [
         2003,
         2011
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-093-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-130",
@@ -2858,14 +3248,17 @@
       "source_ids": [
         "SRC-094"
       ],
-      "shot_id": "SRC-094-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-094-I01",
+      "asr_word_span": [
         2011,
         2025
       ],
       "match_confidence": 0.929,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-094-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-131",
@@ -2880,14 +3273,17 @@
       "source_ids": [
         "SRC-094"
       ],
-      "shot_id": "SRC-094-S02",
-      "source_span": [
+      "shot_instance_id": "SRC-094-I02",
+      "asr_word_span": [
         2025,
         2047
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-094-B",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-132",
@@ -2902,14 +3298,17 @@
       "source_ids": [
         "SRC-095"
       ],
-      "shot_id": "SRC-095-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-095-I01",
+      "asr_word_span": [
         2047,
         2060
       ],
       "match_confidence": 0.846,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-095-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-133",
@@ -2924,14 +3323,17 @@
       "source_ids": [
         "SRC-096"
       ],
-      "shot_id": "SRC-096-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-096-I01",
+      "asr_word_span": [
         2060,
         2077
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-096-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-134",
@@ -2946,14 +3348,17 @@
       "source_ids": [
         "SRC-097"
       ],
-      "shot_id": "SRC-097-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-097-I01",
+      "asr_word_span": [
         2077,
         2088
       ],
       "match_confidence": 1.0,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-097-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     },
     {
       "id": "SCENE-135",
@@ -2968,14 +3373,17 @@
       "source_ids": [
         "SRC-098"
       ],
-      "shot_id": "SRC-098-S01",
-      "source_span": [
+      "shot_instance_id": "SRC-098-I01",
+      "asr_word_span": [
         2088,
         2113
       ],
       "match_confidence": 0.96,
       "merged_source": false,
-      "source_match": "ok"
+      "source_match": "ok",
+      "visual_asset_id": "VIS-098-A",
+      "visual_match": "new",
+      "visual_confidence": 1.0
     }
   ]
 }
