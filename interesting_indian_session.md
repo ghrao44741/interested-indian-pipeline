@@ -1411,3 +1411,157 @@ around the previous voice's missing question intonation.
    35-40%, no three consecutive CARTOON shots, and the DOCUMENT type (the two pilot cards are its
    reference design). Then canonical character sheet → pose library → locked prompt → QC checklist.
    No LoRA, no parallax infrastructure, no forced 8-12 Mbps export.
+
+---
+
+## Session — 2026-08-01 (continued): persistent identity, character lock, pose library
+
+Twelve commits. Two long review cycles, each of which found real defects in work
+that had already been reported as passing — the pattern worth carrying forward is
+that every one was reproduced before being fixed, and several were caught by the
+tests rather than by reading the code.
+
+### Persistent content IDs (`00909bb` → `ebd7de3`, six commits)
+
+**The problem.** Artwork was keyed by `SCENE-NNN`, which is a *position*. Every
+re-narration re-runs WhisperX and any wording change renumbers scenes, so image 82
+silently became the artwork for a different sentence. This happened three times in
+one session (133 → 132 → 135), each needing a manual similarity remap.
+
+**The design.** Identity now comes from the script, before narration exists:
+`SRC-001` per canonical sentence. Four identities are deliberately kept distinct,
+and only two may key artwork:
+
+| identity | persistence |
+|---|---|
+| `source_id` | persistent script identity |
+| `scene_id` | display order — transient |
+| `shot_instance_id` | current split — transient, **never keys artwork** |
+| `visual_asset_id` | persistent approved visual |
+
+Many-to-many by construction: the splitter cuts long sentences at commas and
+merges short ones, so `source_ids` is always a list. Scenes come from WhisperX's
+transcript rather than the script, so recognised words are aligned back to the
+canonical script by sequence alignment; mishearings make exact matching
+impossible, so it is fuzzy by design and anything unplaceable becomes
+`NEEDS_REVIEW` rather than being bound to artwork.
+
+**Defects found across five review rounds**, all reproduced first:
+1. **Duplicate ids.** Positional ids were assigned before matching, so inserting a
+   sentence at the top produced two units both called `SRC-001`. Now two passes,
+   with fresh ids allocated last from a monotonic counter.
+2. **Reorder lost identity.** Matching searched only a forward window, so
+   reversing three sentences kept one id and issued two new ones — unchanged text,
+   lost identity. Replaced with staged matching: exact fingerprints globally
+   first, duplicates from ordered queues, fuzzy only on the remainder.
+3. **Wrong visual reuse.** Character-level `SequenceMatcher` scored `"alpha beta"`
+   against `"gamma delta"` at **0.571** — no shared word — above the reuse
+   threshold. Reuse now requires word-level overlap (token F1, stopwords excluded).
+4. **High-water mark regression.** The split stage rewrote the sidecar with
+   `max(current ids) + 1`, which *lowers* the counter when the highest unit was
+   deleted, recycling a retired id. Public `save_units()` never regresses it.
+5. **Ambiguous migration mutated identity.** `sync_units` reported ambiguity then
+   carried on, allocating a new id and retiring the old unit — discarding its
+   visual history to satisfy a match nobody confirmed. Now transactional:
+   `MigrationBlocked` raises before anything is written.
+6. **Resolutions did not apply.** Any truthy value counted, so `reuse`, `"new"`
+   and `True` produced identical output and the requested id was never assigned.
+   Ambiguities are now structured records with keys, candidate indexes, competing
+   ids, per-pair scores and allowed actions.
+7. **Sidecar invariants.** Duplicates were checked only within active units, so an
+   id could be simultaneously live and retired, and `next_seq` could sit below an
+   existing id.
+8. **Incomplete ambiguity grouping.** Only the first rival was reported, so a
+   candidate tying three units surfaced two of them. Replaced with connected
+   components over the bipartite graph.
+
+Deleted units are retired rather than dropped, keeping text, fingerprint, visual
+slots and lifecycle state; a returning sentence reclaims its original id *and* its
+approved visual history. **133 deterministic fixtures**, identical across runs.
+
+Pilot is intentionally **identity-blocked on SCENE-066** — its audio predates the
+restored rhetorical questions, so the script no longer contains that sentence.
+That block is correct and clears on re-narration.
+
+### Character Checkpoint 1 (`b37dd97`, `d64bb40`)
+
+Host redesigned from a 10–14-year-old to a stylized Indian male investigative
+explainer in his late twenties. Three face iterations, each a controlled
+refinement rather than a redesign: v2 matured the jaw, neck and eye size but
+overshot hair volume, rendered glasses as concentric rings and widened the face;
+v3 corrected all three from both references at once.
+
+**The insight that mattered came from review, not from me:** the body master still
+contained the superseded younger face, and metadata saying "clothing authority
+only" cannot stop an image model averaging the face it can see. The drift in the
+three-quarter views was that averaging happening. The fix was an anchor with no
+wrong face in it — an integrated full-body master carrying v3's face, promoted to
+`body_master` v4 with the old one archived and added to `prohibited_anchors`.
+
+Authority is now explicit and machine-readable: face master owns face/hair/
+glasses/age, body master owns clothing/proportions/sandals, and **both** are
+required for any full-body or upper-torso generation.
+
+Provenance (sha256, dimensions, model, generation mode, status, date) is recorded
+for every master, so an anchor can be told apart from a regenerated lookalike.
+
+### Pose library (`cf5db10` → `7769ebc`)
+
+Eleven transparent assets across two batches, all generated from both approved
+masters with no single-reference fallback. Native transparency is rejected by the
+edit endpoint when references are supplied, so a validated edge-seeded flood-fill
+removal runs instead — edge-seeded because the kurta is nearly the same cream as
+the background, and a global colour match would punch holes through the clothing.
+All verified: 75–84% transparent, binary alpha, corners clear, zero fringe.
+
+`pose_registry.resolve()` is the only supported resolver: exact registry paths,
+hash verified against the value recorded at approval, no `verify_hash` bypass,
+path containment against traversal and escaping symlinks. `seated_reading_document`
+is `approved_scene_bound` — its desk and chair are baked in — and resolve refuses
+it unless the caller passes `scene_bound=True`.
+
+**Hardening round defects**, again all reproduced first: replay built its record
+with the *observed* hash before comparing it, so a tampered file recorded its own
+tampering as truth and the CLI exited 0; an unrecorded file appended nothing so a
+shortened list read as success; computed alpha was ignored; and `--force`
+overwrote approved bytes in place. Regeneration of an approved pose now writes a
+versioned candidate recorded separately as pending-approval.
+
+Two things measured rather than assumed: direction is derived from rendered pixels
+(torso centre from the legs, then arm reach either side) after a first attempt
+comparing bounding-box thirds reported **both** pointing poses backwards — the
+torso sits in the third opposite the extended arm. `neutral_presenter` returns
+symmetric as a control.
+
+### Honestly recorded as unproven
+
+"Globbing is impossible throughout runtime" is **not** proven. The router and
+compositor do not exist, so nothing consumes the resolver yet. The spec states
+this under `NOT_yet_proven`, and `tests/test_no_runtime_globbing.py` is committed
+now so it fails the moment someone wires them the wrong way.
+
+### Commits (12)
+`00909bb` persistent ids · `b9d83cc` duplicate ids, visual identity, blocking ·
+`74d6d4f` retire deleted ids, reorder, word overlap · `00888d4` transactional
+migration, retired history · `050cf53` resolutions apply, sidecar invariants ·
+`ebd7de3` complete ambiguity components · `b37dd97` approved masters ·
+`d64bb40` integrated body master v4 · `cf5db10` pose batch 1 + registry ·
+`669d96e` pose batch 2 · `ab9e409` replay provenance, library v2 ·
+`7769ebc` integrity, force and containment hardening
+
+### Pending — next session, in order
+1. **Task 6** — wire `require_clean_identity()` into `plan_visuals.py`,
+   `route_images.py` and every paid generation entry point, and wire the router
+   and compositor to `pose_registry.resolve()` with positive assertions. Mandatory
+   before any paid pilot image.
+2. **Voice decision — still the blocker.** Ten candidates in `voice_previews/`:
+   five edge (Andrew, Brian, Christopher, Eric, en-GB Ryan) and five xAI at 0.9
+   (naksh, cosmo, atlas, castor, lumen), plus three slower renders (naksh 0.85,
+   atlas 0.85, Andrew −15%). Nothing downstream can proceed without it.
+3. **Re-narrate** with the chosen voice → clears the SCENE-066 identity block.
+4. **Semantic visual dry-run** (`plan_visuals.py`) → Checkpoint 3, before any paid
+   pilot scene generation.
+
+Character and pose design work is closed. Test suites to keep green:
+`test_source_ids`, `test_pose_registry`, `test_pose_cli_hardening`,
+`test_no_runtime_globbing`.
