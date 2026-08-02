@@ -26,6 +26,8 @@ sys.path.insert(0, str(PIPELINE_DIR))
 from export_character_package import CREAM, MUTED, NAVY, font, head_box, head_height  # noqa: E402
 from generate_poses import validate_alpha  # noqa: E402
 
+BATCH = 1
+
 
 def checkerboard(size, sq=16):
     img = Image.new("RGB", size, (255, 255, 255))
@@ -37,9 +39,9 @@ def checkerboard(size, sq=16):
     return img
 
 
-def load_poses(spec):
+def load_poses(spec, batch=1):
     out = []
-    for r in spec["pose_library"].get("batch_1_results", []):
+    for r in spec["pose_library"].get(f"batch_{batch}_results", []):
         if r.get("ok"):
             p = PIPELINE_DIR / r["path"]
             if p.exists():
@@ -48,15 +50,18 @@ def load_poses(spec):
 
 
 def contact_sheet(poses):
-    cell, pad, lab, hdr = 340, 14, 44, 56
-    W = len(poses) * (cell + pad) + pad
-    H = hdr + cell + lab + 2 * pad
+    cell, pad, lab, hdr = 300, 14, 44, 56
+    cols = min(len(poses), 4)
+    rows = (len(poses) + cols - 1) // cols
+    W = cols * (cell + pad) + pad
+    H = hdr + rows * (cell + lab + pad) + pad
     sheet = Image.new("RGB", (W, H), CREAM)
     d = ImageDraw.Draw(sheet)
-    d.text((pad, 14), "Pose batch 1 — shown on a checkerboard so transparency is visible",
+    d.text((pad, 14), f"Pose batch {BATCH} — shown on a checkerboard so transparency is visible",
            font=font(True, 21), fill=NAVY)
     for i, (r, im) in enumerate(poses):
-        x, y = pad + i * (cell + pad), hdr + pad
+        rw, cl = divmod(i, cols)
+        x, y = pad + cl * (cell + pad), hdr + pad + rw * (cell + lab + pad)
         thumb = im.copy(); thumb.thumbnail((cell, cell))
         tile = checkerboard((cell, cell))
         tile.paste(thumb, ((cell - thumb.width) // 2, (cell - thumb.height) // 2), thumb)
@@ -65,7 +70,7 @@ def contact_sheet(poses):
         d.text((x + 2, y + cell + 6), r["id"], font=font(True, 17), fill=NAVY)
         d.text((x + 2, y + cell + 25), f"{r['alpha']['transparent_pct']}% alpha · {r['transparency']}",
                font=font(False, 13), fill=MUTED)
-    p = OUT / "pose_contact_sheet.png"; sheet.save(p); print(f"  ✓ {p.name}")
+    p = OUT / f"pose_contact_sheet_b{BATCH}.png"; sheet.save(p); print(f"  ✓ {p.name}")
 
 
 def identity_sheet(spec, poses):
@@ -95,7 +100,7 @@ def identity_sheet(spec, poses):
         sheet.paste(im, (x + (cw - im.width) // 2, y + (ch - im.height)))
         d.rectangle([x, y, x + cw, y + ch], outline=(214, 206, 194), width=1)
         d.text((x + 2, y + ch + 6), label, font=font(True, 15), fill=NAVY)
-    p = OUT / "pose_identity_sheet.png"; sheet.save(p); print(f"  ✓ {p.name}")
+    p = OUT / f"pose_identity_sheet_b{BATCH}.png"; sheet.save(p); print(f"  ✓ {p.name}")
 
 
 def composites(poses):
@@ -127,7 +132,7 @@ def composites(poses):
             d.rectangle([x, y, x + cell, y + cell], outline=(200, 192, 180), width=1)
             txt = (250, 247, 242) if bname == "dark" else NAVY
             d.text((x + 6, y + 6), f"{r['id']} · {bname}", font=font(True, 14), fill=txt)
-    p = OUT / "pose_composites.png"; sheet.save(p); print(f"  ✓ {p.name}")
+    p = OUT / f"pose_composites_b{BATCH}.png"; sheet.save(p); print(f"  ✓ {p.name}")
 
 
 def edges(poses):
@@ -153,12 +158,16 @@ def edges(poses):
         d.text((x + 2, y + cell + 6), r["id"], font=font(True, 15), fill=NAVY)
         d.text((x + 2, y + cell + 24), f"fringe sample: {r['alpha']['fringe_pixels_sampled']} px",
                font=font(False, 13), fill=MUTED)
-    p = OUT / "pose_edges.png"; sheet.save(p); print(f"  ✓ {p.name}")
+    p = OUT / f"pose_edges_b{BATCH}.png"; sheet.save(p); print(f"  ✓ {p.name}")
 
 
 def main():
+    import argparse
+    ap = argparse.ArgumentParser(); ap.add_argument("--batch", type=int, default=1)
+    global BATCH
+    BATCH = batch = ap.parse_args().batch
     spec = json.loads(SPEC_PATH.read_text(encoding="utf-8"))
-    poses = load_poses(spec)
+    poses = load_poses(spec, batch)
     if not poses:
         sys.exit("no poses found")
     OUT.mkdir(parents=True, exist_ok=True)
@@ -188,9 +197,9 @@ def main():
         report.append({**r, "live_alpha": live, "verified_sha256": digest})
 
     print(f"\nfailures: {failures or 'none'}")
-    (OUT / "pose_validation.json").write_text(
+    (OUT / f"pose_validation_b{BATCH}.json").write_text(
         json.dumps({"poses": report, "failures": failures}, indent=2), encoding="utf-8")
-    print(f"written: {(OUT / 'pose_validation.json').relative_to(PIPELINE_DIR)}")
+    print(f"written: {(OUT / f'pose_validation_b{BATCH}.json').relative_to(PIPELINE_DIR)}")
     return 1 if failures else 0
 
 

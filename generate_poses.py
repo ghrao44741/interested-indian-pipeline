@@ -123,10 +123,11 @@ def validate_alpha(img: Image.Image) -> dict:
     }
 
 
-def generate_batch(spec: dict, client, force: bool = False) -> list[dict]:
+def generate_batch(spec: dict, client, batch: int = 1, force: bool = False) -> list[dict]:
     pl = spec["pose_library"]
-    if pl.get("status") != "authorized-batch-1":
-        sys.exit(f"  pose library status is {pl.get('status')!r} — not authorized")
+    if f"batch-{batch}-authorized" not in pl.get("status", "") and        pl.get("status") != f"authorized-batch-{batch}":
+        sys.exit(f"  pose library status is {pl.get('status')!r} — batch {batch} not authorized")
+    poses_key = f"batch_{batch}"
 
     body = PIPELINE_DIR / spec["references"]["body_master"]
     face = PIPELINE_DIR / spec["references"]["face_master"]
@@ -137,9 +138,13 @@ def generate_batch(spec: dict, client, force: bool = False) -> list[dict]:
     auth = spec["master_authority"]
     out_dir = PIPELINE_DIR / "character" / "poses"
     out_dir.mkdir(parents=True, exist_ok=True)
+    # Raws never land in the runtime directory — a glob there must not be able to
+    # find an opaque, unapproved image even transiently.
+    raw_dir = PIPELINE_DIR / "character" / "pose_sources" / f"batch{batch}"
+    raw_dir.mkdir(parents=True, exist_ok=True)
     results = []
 
-    for pose in pl["batch_1"]:
+    for pose in pl[poses_key]:
         out = out_dir / f"host_{pose['id']}.png"
         if out.exists() and not force:
             print(f"  skip {out.name} (exists)")
@@ -157,7 +162,8 @@ def generate_batch(spec: dict, client, force: bool = False) -> list[dict]:
             "Isolated character on a plain uniform background, no scenery, no shadow "
             "cast onto any surface."
         )
-        prompt = build_prompt(spec, brief, expression="neutral, relaxed mouth",
+        prompt = build_prompt(spec, brief,
+                              expression=pose.get("expression", "neutral, relaxed mouth"),
                               framing="full_body")
 
         handles, data, native = [], None, False
@@ -196,7 +202,7 @@ def generate_batch(spec: dict, client, force: bool = False) -> list[dict]:
             results.append({"id": pose["id"], "ok": False, "error": "no image returned"})
             continue
 
-        raw = out_dir / f"_raw_{pose['id']}.png"
+        raw = raw_dir / f"_raw_{pose['id']}.png"
         raw.write_bytes(data)
         img = Image.open(raw).convert("RGBA")
 
@@ -222,6 +228,13 @@ def generate_batch(spec: dict, client, force: bool = False) -> list[dict]:
             "alpha": check,
             "created": date.today().isoformat(),
             "status": "pending-approval",
+            "batch": batch,
+            "direction": pose.get("expect_direction"),
+            "negative_space": pose.get("expect_negative_space"),
+            "props": pose.get("expect_props", []),
+            "framing": "full_body",
+            "includes_geometry": [],
+            "expression": pose.get("expression"),
         })
         print(f"  ✓ {out.name}  ({results[-1]['transparency']}, "
               f"{check['transparent_pct']}% transparent)")
@@ -231,17 +244,14 @@ def generate_batch(spec: dict, client, force: bool = False) -> list[dict]:
 
 def main():
     ap = argparse.ArgumentParser(description="Generate transparent pose assets")
-    ap.add_argument("--batch-1", action="store_true", help="Generate the four authorized poses")
+    ap.add_argument("--batch", type=int, default=1, help="Which authorized batch to generate")
     ap.add_argument("--force", action="store_true")
     args = ap.parse_args()
-    if not args.batch_1:
-        ap.error("pass --batch-1")
-
     spec = load_spec()
-    results = generate_batch(spec, get_client(), force=args.force)
+    results = generate_batch(spec, get_client(), batch=args.batch, force=args.force)
 
     fresh = load_spec()
-    fresh["pose_library"]["batch_1_results"] = results
+    fresh["pose_library"][f"batch_{args.batch}_results"] = results
     SPEC_PATH.write_text(json.dumps(fresh, indent=2, ensure_ascii=False), encoding="utf-8")
 
     ok = [r for r in results if r.get("ok")]

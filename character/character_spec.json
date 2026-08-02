@@ -211,7 +211,7 @@
     }
   ],
   "pose_library": {
-    "status": "batch-1-approved; batch-2-authorized",
+    "status": "batch-1-approved; batch-2-pending-approval",
     "output_requirement": "transparent RGBA, or a validated background-removal stage with per-asset verification",
     "anchor": "BOTH approved masters for every pose",
     "blocked_on": "approval of the integrated full-body master candidate",
@@ -478,6 +478,186 @@
         ],
         "generic_compositing_allowed": false,
         "routing_requirement": "only route to this asset when the scene already calls for a desk-and-document setting; the furniture is baked in and cannot be separated from the figure"
+      },
+      "pointing_viewer_left": {
+        "id": "pointing_viewer_left",
+        "path": "character/poses/host_pointing_viewer_left.png",
+        "sha256": "f0e6c6b895782c193f3938f9a53606cf949602070d998a86e72b61b2adcc06bf",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "created": "2026-08-01",
+        "batch": 2,
+        "status": "pending-approval",
+        "framing": "full_body",
+        "includes_geometry": [],
+        "generic_compositing_allowed": true,
+        "expression": "neutral, relaxed mouth",
+        "classification": "reusable_directional_pose",
+        "direction": "points_viewer_left",
+        "points_to": "viewer_left",
+        "negative_space": "viewer_left",
+        "pointing_hand": {
+          "anatomical": "subject_right_hand",
+          "appears_on": "viewer_left",
+          "note": "measured from rendered pixels (arm reach from torso centre), not inferred"
+        },
+        "props": []
+      },
+      "thinking_hand_at_chin": {
+        "id": "thinking_hand_at_chin",
+        "path": "character/poses/host_thinking_hand_at_chin.png",
+        "sha256": "d2467599c3e4d6d70a519f137f13741f1200ce0478e381da835ffd14612b4c1e",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "created": "2026-08-01",
+        "batch": 2,
+        "status": "pending-approval",
+        "framing": "full_body",
+        "includes_geometry": [],
+        "generic_compositing_allowed": true,
+        "expression": "curious: one eyebrow raised, eyes looking slightly upward, mouth closed",
+        "classification": "reusable_pose",
+        "direction": "front",
+        "negative_space": "both_sides",
+        "props": []
+      },
+      "skeptical_arms_crossed": {
+        "id": "skeptical_arms_crossed",
+        "path": "character/poses/host_skeptical_arms_crossed.png",
+        "sha256": "6ec714d31a84ed5d588115511bce2125d4a015bc09540d35e17ce196913c3a2e",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "created": "2026-08-01",
+        "batch": 2,
+        "status": "pending-approval",
+        "framing": "full_body",
+        "includes_geometry": [],
+        "generic_compositing_allowed": true,
+        "expression": "skeptical: one eyebrow lowered, side glance, asymmetric closed mouth",
+        "classification": "reusable_pose",
+        "direction": "front",
+        "negative_space": "both_sides",
+        "props": []
+      },
+      "concerned_explaining": {
+        "id": "concerned_explaining",
+        "path": "character/poses/host_concerned_explaining.png",
+        "sha256": "36f324de2d0fec11492c0ef0eedcf768122708cd315d58b4f4680febe4eacb02",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "created": "2026-08-01",
+        "batch": 2,
+        "status": "pending-approval",
+        "framing": "full_body",
+        "includes_geometry": [],
+        "generic_compositing_allowed": true,
+        "expression": "concerned: eyebrows angled upward at inner ends, small downturned mouth",
+        "classification": "reusable_pose",
+        "direction": "front",
+        "negative_space": "both_sides",
+        "props": []
+      },
+      "confident_conclusion": {
+        "id": "confident_conclusion",
+        "path": "character/poses/host_confident_conclusion.png",
+        "sha256": "26d99fd5443d575c4de155f364c3643662b552b1fe6923b08ebd45eb7384388c",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "created": "2026-08-01",
+        "batch": 2,
+        "status": "pending-approval",
+        "framing": "full_body",
+        "includes_geometry": [],
+        "generic_compositing_allowed": true,
+        "expression": "confident: level brows, direct gaze, slight closed-mouth smile",
+        "classification": "reusable_pose",
+        "direction": "front",
+        "negative_space": "both_sides",
+        "props": []
+      },
+      "holding_phone_evidence": {
+        "id": "holding_phone_evidence",
+        "path": "character/poses/host_holding_phone_evidence.png",
+        "sha256": "eb2e36d863d4e8fd6d355ef207048a6dc68bdd90a1ecb9bb60e486031b34dbd8",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "created": "2026-08-01",
+        "batch": 2,
+        "status": "pending-approval",
+        "framing": "full_body",
+        "includes_geometry": [],
+        "generic_compositing_allowed": true,
+        "expression": "neutral, relaxed mouth, eyes on the phone screen",
+        "classification": "reusable_pose_with_prop",
+        "direction": "front",
+        "negative_space": "both_sides",
+        "props": [
+          "phone"
+        ],
+        "prop_note": "phone is held, not environmental geometry; figure remains free-floating"
+      },
+      "examining_chart_standing": {
+        "id": "examining_chart_standing",
+        "path": "character/poses/host_examining_chart_standing.png",
+        "sha256": "b76e13819b39b0415b78d81c02e730149d1dddfc790a2eddfd6e5a4b04c38e5b",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "created": "2026-08-01",
+        "batch": 2,
+        "status": "pending-approval",
+        "framing": "full_body",
+        "includes_geometry": [],
+        "generic_compositing_allowed": true,
+        "expression": "curious, focused on the sheet",
+        "classification": "reusable_pose_with_prop",
+        "direction": "front",
+        "negative_space": "both_sides",
+        "props": [
+          "document"
+        ],
+        "prop_note": "sheet is held in both hands; no desk or furniture"
       }
     },
     "discovery_rule": "Resolve ONLY exact paths from this registry via pose_registry.resolve(). Never glob character/poses/*.png — raw, in-progress or unapproved files must not be discoverable.",
@@ -488,31 +668,36 @@
         "id": "pointing_viewer_left",
         "brief": "standing, turned slightly toward subject-right, subject-right arm extended pointing to an empty area on the viewer's left, leaving that area clear",
         "expect_direction": "points_viewer_left",
-        "expect_negative_space": "viewer_left"
+        "expect_negative_space": "viewer_left",
+        "expression": "neutral, relaxed mouth"
       },
       {
         "id": "thinking_hand_at_chin",
         "brief": "standing, one hand raised with fingers at the chin in a thoughtful gesture, looking slightly upward",
         "expect_direction": "front",
-        "expect_negative_space": "both_sides"
+        "expect_negative_space": "both_sides",
+        "expression": "curious: one eyebrow raised, eyes looking slightly upward, mouth closed"
       },
       {
         "id": "skeptical_arms_crossed",
         "brief": "standing with arms crossed over the chest, one eyebrow lowered, skeptical",
         "expect_direction": "front",
-        "expect_negative_space": "both_sides"
+        "expect_negative_space": "both_sides",
+        "expression": "skeptical: one eyebrow lowered, side glance, asymmetric closed mouth"
       },
       {
         "id": "concerned_explaining",
         "brief": "standing, concerned expression, one hand raised in a small restrained explanatory gesture near chest height",
         "expect_direction": "front",
-        "expect_negative_space": "both_sides"
+        "expect_negative_space": "both_sides",
+        "expression": "concerned: eyebrows angled upward at inner ends, small downturned mouth"
       },
       {
         "id": "confident_conclusion",
         "brief": "standing upright and settled, confident closed-mouth expression, hands relaxed, one hand lightly gesturing outward at waist height",
         "expect_direction": "front",
-        "expect_negative_space": "both_sides"
+        "expect_negative_space": "both_sides",
+        "expression": "confident: level brows, direct gaze, slight closed-mouth smile"
       },
       {
         "id": "holding_phone_evidence",
@@ -521,7 +706,8 @@
         "expect_negative_space": "both_sides",
         "expect_props": [
           "phone"
-        ]
+        ],
+        "expression": "neutral, relaxed mouth, eyes on the phone screen"
       },
       {
         "id": "examining_chart_standing",
@@ -530,7 +716,8 @@
         "expect_negative_space": "both_sides",
         "expect_props": [
           "document"
-        ]
+        ],
+        "expression": "curious, focused on the sheet"
       }
     ],
     "batch_2_rules": [
@@ -542,7 +729,301 @@
       "no furniture or environmental geometry unless classified scene-bound",
       "record direction, negative-space side, props and framing for every asset",
       "no horizontal mirroring to create directional variants — it would reverse the hair silhouette and the upper-left lighting"
-    ]
+    ],
+    "batch_2_results": [
+      {
+        "id": "pointing_viewer_left",
+        "ok": true,
+        "path": "character/poses/host_pointing_viewer_left.png",
+        "sha256": "f0e6c6b895782c193f3938f9a53606cf949602070d998a86e72b61b2adcc06bf",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "removal": {
+          "method": "edge_seeded_flood_fill",
+          "tolerance": 26,
+          "cleared_fraction": 0.8242
+        },
+        "alpha": {
+          "has_alpha": true,
+          "transparent_pct": 82.42,
+          "partial_pct": 0.0,
+          "corners_transparent": true,
+          "fringe_pixels_sampled": 0,
+          "subject_bbox": [
+            304,
+            40,
+            786,
+            992
+          ]
+        },
+        "created": "2026-08-01",
+        "status": "pending-approval",
+        "batch": 2,
+        "direction": "points_viewer_left",
+        "negative_space": "viewer_left",
+        "props": [],
+        "framing": "full_body",
+        "includes_geometry": [],
+        "expression": "neutral, relaxed mouth"
+      },
+      {
+        "id": "thinking_hand_at_chin",
+        "ok": true,
+        "path": "character/poses/host_thinking_hand_at_chin.png",
+        "sha256": "d2467599c3e4d6d70a519f137f13741f1200ce0478e381da835ffd14612b4c1e",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "removal": {
+          "method": "edge_seeded_flood_fill",
+          "tolerance": 26,
+          "cleared_fraction": 0.821
+        },
+        "alpha": {
+          "has_alpha": true,
+          "transparent_pct": 82.1,
+          "partial_pct": 0.0,
+          "corners_transparent": true,
+          "fringe_pixels_sampled": 0,
+          "subject_bbox": [
+            364,
+            32,
+            666,
+            991
+          ]
+        },
+        "created": "2026-08-01",
+        "status": "pending-approval",
+        "batch": 2,
+        "direction": "front",
+        "negative_space": "both_sides",
+        "props": [],
+        "framing": "full_body",
+        "includes_geometry": [],
+        "expression": "curious: one eyebrow raised, eyes looking slightly upward, mouth closed"
+      },
+      {
+        "id": "skeptical_arms_crossed",
+        "ok": true,
+        "path": "character/poses/host_skeptical_arms_crossed.png",
+        "sha256": "6ec714d31a84ed5d588115511bce2125d4a015bc09540d35e17ce196913c3a2e",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "removal": {
+          "method": "edge_seeded_flood_fill",
+          "tolerance": 26,
+          "cleared_fraction": 0.837
+        },
+        "alpha": {
+          "has_alpha": true,
+          "transparent_pct": 83.7,
+          "partial_pct": 0.0,
+          "corners_transparent": true,
+          "fringe_pixels_sampled": 0,
+          "subject_bbox": [
+            356,
+            40,
+            632,
+            993
+          ]
+        },
+        "created": "2026-08-01",
+        "status": "pending-approval",
+        "batch": 2,
+        "direction": "front",
+        "negative_space": "both_sides",
+        "props": [],
+        "framing": "full_body",
+        "includes_geometry": [],
+        "expression": "skeptical: one eyebrow lowered, side glance, asymmetric closed mouth"
+      },
+      {
+        "id": "concerned_explaining",
+        "ok": true,
+        "path": "character/poses/host_concerned_explaining.png",
+        "sha256": "36f324de2d0fec11492c0ef0eedcf768122708cd315d58b4f4680febe4eacb02",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "removal": {
+          "method": "edge_seeded_flood_fill",
+          "tolerance": 26,
+          "cleared_fraction": 0.8203
+        },
+        "alpha": {
+          "has_alpha": true,
+          "transparent_pct": 82.03,
+          "partial_pct": 0.0,
+          "corners_transparent": true,
+          "fringe_pixels_sampled": 0,
+          "subject_bbox": [
+            305,
+            42,
+            663,
+            993
+          ]
+        },
+        "created": "2026-08-01",
+        "status": "pending-approval",
+        "batch": 2,
+        "direction": "front",
+        "negative_space": "both_sides",
+        "props": [],
+        "framing": "full_body",
+        "includes_geometry": [],
+        "expression": "concerned: eyebrows angled upward at inner ends, small downturned mouth"
+      },
+      {
+        "id": "confident_conclusion",
+        "ok": true,
+        "path": "character/poses/host_confident_conclusion.png",
+        "sha256": "26d99fd5443d575c4de155f364c3643662b552b1fe6923b08ebd45eb7384388c",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "removal": {
+          "method": "edge_seeded_flood_fill",
+          "tolerance": 26,
+          "cleared_fraction": 0.8174
+        },
+        "alpha": {
+          "has_alpha": true,
+          "transparent_pct": 81.74,
+          "partial_pct": 0.0,
+          "corners_transparent": true,
+          "fringe_pixels_sampled": 0,
+          "subject_bbox": [
+            309,
+            37,
+            784,
+            995
+          ]
+        },
+        "created": "2026-08-01",
+        "status": "pending-approval",
+        "batch": 2,
+        "direction": "front",
+        "negative_space": "both_sides",
+        "props": [],
+        "framing": "full_body",
+        "includes_geometry": [],
+        "expression": "confident: level brows, direct gaze, slight closed-mouth smile"
+      },
+      {
+        "id": "holding_phone_evidence",
+        "ok": true,
+        "path": "character/poses/host_holding_phone_evidence.png",
+        "sha256": "eb2e36d863d4e8fd6d355ef207048a6dc68bdd90a1ecb9bb60e486031b34dbd8",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "removal": {
+          "method": "edge_seeded_flood_fill",
+          "tolerance": 26,
+          "cleared_fraction": 0.8267
+        },
+        "alpha": {
+          "has_alpha": true,
+          "transparent_pct": 82.67,
+          "partial_pct": 0.0,
+          "corners_transparent": true,
+          "fringe_pixels_sampled": 0,
+          "subject_bbox": [
+            351,
+            43,
+            660,
+            993
+          ]
+        },
+        "created": "2026-08-01",
+        "status": "pending-approval",
+        "batch": 2,
+        "direction": "front",
+        "negative_space": "both_sides",
+        "props": [
+          "phone"
+        ],
+        "framing": "full_body",
+        "includes_geometry": [],
+        "expression": "neutral, relaxed mouth, eyes on the phone screen"
+      },
+      {
+        "id": "examining_chart_standing",
+        "ok": true,
+        "path": "character/poses/host_examining_chart_standing.png",
+        "sha256": "b76e13819b39b0415b78d81c02e730149d1dddfc790a2eddfd6e5a4b04c38e5b",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "removal": {
+          "method": "edge_seeded_flood_fill",
+          "tolerance": 26,
+          "cleared_fraction": 0.823
+        },
+        "alpha": {
+          "has_alpha": true,
+          "transparent_pct": 82.3,
+          "partial_pct": 0.0,
+          "corners_transparent": true,
+          "fringe_pixels_sampled": 0,
+          "subject_bbox": [
+            325,
+            39,
+            656,
+            994
+          ]
+        },
+        "created": "2026-08-01",
+        "status": "pending-approval",
+        "batch": 2,
+        "direction": "front",
+        "negative_space": "both_sides",
+        "props": [
+          "document"
+        ],
+        "framing": "full_body",
+        "includes_geometry": [],
+        "expression": "curious, focused on the sheet"
+      }
+    ],
+    "direction_measurement": "Direction is measured from rendered pixels: torso centre from the legs (which no gesture displaces), then arm reach either side of it. An earlier attempt compared left/right thirds of the bounding box and reported both pointing poses backwards, because the torso sits in the third opposite the extended arm. neutral_presenter returns symmetric as a control."
   },
   "references": {
     "body_master": "character/canonical/body-master.png",
