@@ -86,3 +86,8 @@ Thumbs.db
 # exact file hashes. Committing one would let a stale approval travel to a
 # checkout where the manifest or plan differs.
 */checkpoint_3_approval.json
+
+# Runtime route-failure records are per-run execution state bound to a
+# failure revision. Committing one would carry a stale blocking state into a
+# checkout whose plan and approval are different.
+*/route_failures.json

@@ -183,17 +183,23 @@ class World:
 
 
 def plan(root, proj):
+    """Write both artifacts, as plan_visuals.py does: the JSON the gate executes
+    and the markdown the human reads. Approval now binds both."""
     with World(root):
         p = plan_visuals.build_plan(proj)
-        (proj / plan_visuals.PLAN_JSON).write_text(
-            json.dumps(p, indent=2, ensure_ascii=False), encoding="utf-8")
+    (proj / plan_visuals.PLAN_JSON).write_text(
+        json.dumps(p, indent=2, ensure_ascii=False), encoding="utf-8")
+    (proj / plan_visuals.PLAN_MD).write_text(plan_visuals.render_md(p), encoding="utf-8")
     return p
 
 
 def approve(root, proj, approver="Reviewer"):
+    # The phrase names the plan, so it has to be read off the plan on disk.
+    plan_id = json.loads(
+        (proj / plan_visuals.PLAN_JSON).read_text(encoding="utf-8"))["plan_id"]
     with World(root):
         return ac.write_approval(proj, approver,
-                                 ac.confirmation_phrase(proj.name))
+                                 ac.confirmation_phrase(proj.name, plan_id))
 
 
 def verdict(root, proj, kind="generation", **kw):
@@ -280,7 +286,9 @@ try:
     check("generation gate passes", not rep.blockers, str(rep.blockers))
     rec = json.loads((proj / gate.APPROVAL_NAME).read_text(encoding="utf-8"))
     for field in gate.APPROVAL_REQUIRED_FIELDS:
-        check(f"approval records {field}", bool(rec.get(field)))
+        # `is not None`, not truthiness: failure_revision is legitimately 0 on a
+        # project where no route has ever failed.
+        check(f"approval records {field}", rec.get(field) is not None)
     check("approval binds the manifest hash",
           rec["manifest_sha256"] == sha(proj / "manifest.json"))
     check("approval binds the visual-plan hash",
@@ -466,18 +474,17 @@ try:
         calls["ai"] += 1
         return True
 
+    executable = json.loads(
+        (proj / plan_visuals.PLAN_JSON).read_text(encoding="utf-8"))
     with World(root), \
          mock.patch.object(route_images, "run_pexels", fail_pexels), \
          mock.patch.object(route_images, "run_ai_batch", count_ai), \
          mock.patch.object(route_images, "run_map", lambda *a, **k: True), \
-         mock.patch.object(route_images, "run_host", lambda *a, **k: False):
-        with World(root):
-            shots = route_images.parse_shots(proj / route_images.PROMPTS_FILE)
-        code = route_images.dispatch_routes(proj, ROOT, shots, overwrite=True)
+         mock.patch.object(route_images, "run_host", lambda *a, **k: True):
+        code = route_images.dispatch_routes(proj, ROOT, executable, overwrite=True)
     check("the failing PHOTO shot was attempted once", calls["pexels"] == 1)
-    check("it did not become an AI generation",
-          calls["ai"] == 1, f"AI batch ran {calls['ai']}x — it should run only for "
-                            f"the one genuine CARTOON shot")
+    check("it did not become an AI generation", calls["ai"] == 0,
+          f"AI batch ran {calls['ai']}x after a PHOTO failure")
     check("dispatch reports failure", code == 1, f"exit={code}")
     check("the missing PHOTO file was not created",
           not (proj / "images" / "SCENE-002.png").exists())
@@ -489,14 +496,18 @@ try:
     check("approved and ready", not verdict(root, proj).blockers)
     (proj / route_images.PROMPTS_FILE).write_text(
         PROMPTS_OK.replace("TYPE: PHOTO", "TYPE: CARTOON"), encoding="utf-8")
-    # The prompts file is not hashed by the approval, so the gate alone does not
-    # notice — the planner does, and the re-plan invalidates the approval.
+    # The routing input is bound now, so the gate notices immediately — before
+    # anyone re-plans. That is the hole this closed: a free PHOTO route could be
+    # edited into a paid AI route with both approved hashes intact.
+    check("the gate notices the edited prompts at once",
+          blocked_on(verdict(root, proj), "routing input is unchanged since approval"),
+          str(verdict(root, proj).blockers))
     p2 = plan(root, proj)
     check("the re-plan sees the new route", p2["mix"].get("CARTOON") == 2,
           str(p2["mix"]))
     check("the changed cost is visible", p2["paid_generation"]["shots"] == 2,
           str(p2["paid_generation"]))
-    check("the old approval no longer applies",
+    check("the old approval still does not apply",
           blocked_on(verdict(root, proj), "visual plan is unchanged since approval"))
 
     # ── 13 ───────────────────────────────────────────────────────────────────
@@ -562,10 +573,10 @@ try:
                            lambda *a, **k: spent.append("ai") or True), \
          mock.patch.object(route_images, "run_host",
                            lambda *a, **k: spent.append("host") or True):
-        with World(root):
-            shots = route_images.parse_shots(proj / route_images.PROMPTS_FILE)
+        executable = json.loads(
+            (proj / plan_visuals.PLAN_JSON).read_text(encoding="utf-8"))
         try:
-            route_images.dispatch_routes(proj, ROOT, shots, overwrite=True)
+            route_images.dispatch_routes(proj, ROOT, executable, overwrite=True)
             check("dispatch refused", False, "it dispatched")
         except gate.GateBlocked:
             check("dispatch refused", True)

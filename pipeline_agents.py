@@ -2113,6 +2113,32 @@ class OrchestratorAgent:
         gen = PIPELINE_DIR / "generate_image_prompts.py"
         self._run_cmd([sys.executable, str(gen), "--project", str(self.project_dir)], label="generate_image_prompts.py")
 
+        # Review and edit the prompts HERE — before planning, and long before
+        # approval. This used to sit in _stage_images, after the generation gate
+        # had passed, which meant an edit could change routing and cost while the
+        # approval that authorised the spend stayed valid. Editing now flows
+        # naturally into reclassify -> replan -> reapprove, because the plan
+        # records the prompts file's hash.
+        prompts_path = self.project_dir / "image_prompts_one_line_per_prompt.md"
+        if prompts_path.exists():
+            counts: dict[str, int] = {}
+            for m in re.finditer(r"TYPE:\s*(\w+)", prompts_path.read_text(encoding="utf-8")):
+                counts[m.group(1)] = counts.get(m.group(1), 0) + 1
+            print(f"\n  Image prompts written: {prompts_path.name}")
+            for t in sorted(counts):
+                print(f"    {t:8s}: {counts[t]}")
+            print("  Reading them now is free. Every edit made after the visual "
+                  "plan is approved forces a re-plan and a fresh approval.")
+            answer = self._checkpoint(
+                "Prompts ready.\n"
+                "  [enter] Continue to planning  |  edit (opens in Notepad)  |  quit"
+            ).lower()
+            if answer == "edit":
+                subprocess.Popen(["notepad.exe", str(prompts_path)])
+                input("  Press ENTER after editing...")
+            elif answer in ("q", "quit"):
+                raise RuntimeError("Aborted by user after prompt authoring")
+
     def _stage_images(self):
         # The same gate the scripts run themselves. Duplicated deliberately: it
         # fails here before the user is asked to approve a spend, and the scripts
@@ -2129,40 +2155,24 @@ class OrchestratorAgent:
         gen    = PIPELINE_DIR / "generate_images_flux.py"  # used for FAIL regen only
         review = PIPELINE_DIR / "review_images.py"
 
-        # Approval checkpoint before spending AI generation credits. Added after
-        # a session where real defects (stray-title hallucinations, a wrong
-        # landmark) were only discovered AFTER generating a full ~100-shot
-        # batch, requiring a costly full re-audit and re-generation. Prompts
-        # are free and instant to read; xAI Grok generation (CARTOON shots)
-        # is not — catching an obviously wrong prompt here is far cheaper than
-        # catching it after paying to generate it. MAP/CHART/PHOTO are
-        # local/free (geopandas, matplotlib, Pexels) so only CARTOON counts
-        # toward the credit estimate.
-        prompts_path = self.project_dir / "image_prompts_one_line_per_prompt.md"
-        if prompts_path.exists():
-            prompts_text = prompts_path.read_text(encoding="utf-8")
-            type_counts: dict[str, int] = {}
-            for m in re.finditer(r"TYPE:\s*(\w+)", prompts_text):
-                t = m.group(1)
-                type_counts[t] = type_counts.get(t, 0) + 1
-            paid_count = type_counts.get("CARTOON", 0)
-            free_count = sum(c for t, c in type_counts.items() if t != "CARTOON")
-
-            print(f"\n  Image prompts ready: {prompts_path.name}")
-            for t in sorted(type_counts):
-                print(f"    {t:8s}: {type_counts[t]}")
-            print(f"  → {paid_count} shot(s) will call xAI Grok (spends credits); "
-                  f"{free_count} are free/local (MAP/CHART/PHOTO)")
-
-            answer = self._checkpoint(
-                "Ready to generate images.\n"
-                "  [enter] Generate  |  edit (opens prompts file in Notepad)  |  quit"
-            ).lower()
-            if answer == "edit":
-                subprocess.Popen(["notepad.exe", str(prompts_path)])
-                input("  Press ENTER after editing...")
-            elif answer in ("q", "quit"):
-                raise RuntimeError("Aborted by user before image generation")
+        # No prompt editing here. It used to offer one, after the gate had already
+        # passed — so a route and its cost could be changed while the approval
+        # authorising the spend stayed valid. Editing lives in _stage_prompts now,
+        # and the spend the human approved is whatever the approved plan says.
+        approval = json.loads(
+            (self.project_dir / "checkpoint_3_approval.json").read_text(encoding="utf-8"))
+        pg = approval.get("paid_generation", {})
+        print(f"\n  Checkpoint 3 approved by {approval.get('approved_by')} "
+              f"for plan {approval.get('plan_id', '')[:8]}")
+        print(f"    approved paid shots: {pg.get('shots')}"
+              + (f"  (~${pg['estimate_usd']})" if pg.get("estimate_usd") is not None
+                 else ""))
+        answer = self._checkpoint(
+            "Generate against the approved plan?\n"
+            "  [enter] Generate  |  quit"
+        ).lower()
+        if answer in ("q", "quit"):
+            raise RuntimeError("Aborted by user before image generation")
 
         self._run_cmd(
             [sys.executable, str(router), "--project", str(self.project_dir)],

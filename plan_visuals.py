@@ -19,6 +19,7 @@ guessing.
 """
 
 import argparse
+import hashlib
 import json
 import sys
 import uuid
@@ -27,8 +28,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import generation_gate
+import route_failures
 import route_images
-import source_ids
 
 PIPELINE_DIR = Path(__file__).parent
 PLAN_JSON = "visual_plan.json"
@@ -48,6 +49,58 @@ def _pricing(entry: str) -> dict | None:
             .get("image_pricing", {}).get(entry))
 
 
+def _sha(path: Path) -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def reconcile(shots: list[dict], scenes: list[dict]) -> list[dict]:
+    """Attach persistent identity from the manifest to each parsed shot.
+
+    Matched on scene id first, filename second. `visual_asset_id` is the artwork
+    identity and the only thing a failure record or an approved plan entry may key
+    on; `scene_id` is display order and moves on every re-split, so it is carried
+    for readability and never relied upon downstream.
+
+    An unmatched or ambiguous shot gets no identity and is marked for review
+    rather than guessed at — attaching approved artwork to an uncertain match is
+    the failure the whole identity layer exists to prevent.
+    """
+    by_scene, by_file = {}, {}
+    for sc in scenes:
+        by_scene.setdefault(sc.get("id"), []).append(sc)
+        by_file.setdefault(sc.get("image"), []).append(sc)
+
+    out = []
+    for s in shots:
+        rec = dict(s)
+        matches = by_scene.get(s.get("scene_id")) or by_file.get(s.get("file")) or []
+        if len(matches) == 1:
+            sc = matches[0]
+            rec.update({
+                "visual_asset_id": sc.get("visual_asset_id"),
+                "source_ids": sc.get("source_ids", []),
+                "shot_instance_id": sc.get("shot_instance_id"),
+                "scene_id": sc.get("id"),
+            })
+            if not sc.get("visual_asset_id"):
+                rec["needs_review"] = True
+                rec["review_reason"] = (rec.get("review_reason") or
+                                        f"manifest scene {sc.get('id')} has no "
+                                        f"visual_asset_id")
+        else:
+            rec.update({"visual_asset_id": None, "source_ids": [],
+                        "shot_instance_id": None})
+            rec["needs_review"] = True
+            rec["review_reason"] = (
+                rec.get("review_reason") or
+                (f"no manifest scene matches {s.get('scene_id') or s.get('file')!r}"
+                 if not matches else
+                 f"{len(matches)} manifest scenes match "
+                 f"{s.get('scene_id') or s.get('file')!r} — ambiguous"))
+        out.append(rec)
+    return out
+
+
 def build_plan(project_dir: Path) -> dict:
     prompts = project_dir / route_images.PROMPTS_FILE
     shots = route_images.parse_shots(prompts) if prompts.exists() else []
@@ -56,6 +109,7 @@ def build_plan(project_dir: Path) -> dict:
     manifest = (json.loads(manifest_path.read_text(encoding="utf-8"))
                 if manifest_path.exists() else {})
     scenes = manifest.get("scenes", [])
+    shots = reconcile(shots, scenes)
 
     # Identity only. plan_visuals.py produces the artifact a human approves, so
     # it must be runnable before approval exists — and it must never create,
@@ -63,6 +117,12 @@ def build_plan(project_dir: Path) -> dict:
     # human-only command.
     gate = generation_gate.require_identity_ready(
         project_dir, "visual planning", raise_on_block=False)
+
+    # A failure whose route or arguments have actually changed is resolved by
+    # that change; the record is kept and the revision moves, so the approval
+    # granted before the failure cannot come back to life.
+    auto_resolved = route_failures.auto_resolve_changed(project_dir, shots)
+    outstanding = route_failures.unresolved(project_dir)
 
     needs_review = []
     if not prompts.exists():
@@ -75,14 +135,31 @@ def build_plan(project_dir: Path) -> dict:
         # shots the router will then refuse to generate.
         if s.get("needs_review"):
             needs_review.append({"shot": s["shot_num"], "file": s["file"],
+                                 "visual_asset_id": s.get("visual_asset_id"),
                                  "planned_route": s["planned_type"],
+                                 "route_candidates": s.get("route_candidates", []),
                                  "reason": s["review_reason"]})
-            continue
-        if not s["type"]:
-            needs_review.append({"shot": s["shot_num"], "file": s["file"],
-                                 "reason": "no TYPE declared and no keyword match"})
 
-    types = Counter(s["type"] or "UNCLASSIFIED" for s in shots)
+    seen = {}
+    for s in shots:
+        vid = s.get("visual_asset_id")
+        if vid:
+            seen.setdefault(vid, []).append(s["shot_num"])
+    for vid, nums in seen.items():
+        if len(nums) > 1:
+            needs_review.append({"shot": nums[0], "visual_asset_id": vid,
+                                 "reason": f"visual_asset_id {vid} claimed by shots "
+                                           f"{nums} — artwork identity must be unique"})
+
+    for f in outstanding:
+        needs_review.append({
+            "shot": f.get("shot"), "file": f.get("file"),
+            "visual_asset_id": f["visual_asset_id"],
+            "planned_route": f["planned_route"],
+            "reason": f"unresolved route failure from {f['failed_at']}: {f['reason']}",
+        })
+
+    types = Counter(s["type"] or route_images.UNCLASSIFIED for s in shots)
     host_shots = [s for s in shots if s["type"] == "HOST"]
     host_pct = round(100 * len(host_shots) / len(shots), 1) if shots else 0.0
 
@@ -98,6 +175,7 @@ def build_plan(project_dir: Path) -> dict:
                       "here would be invented, so none is given"})
 
     return {
+        "schema_version": generation_gate.PLAN_SCHEMA_VERSION,
         "project": project_dir.name,
         "generated_by": "plan_visuals.py",
         "read_only": True,
@@ -107,6 +185,14 @@ def build_plan(project_dir: Path) -> dict:
         # bytes round-tripped back to the approved ones.
         "plan_id": uuid.uuid4().hex,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        # Dispatch executes this plan, not the prompts file. The hash is what
+        # proves the plan still describes the routing input it was built from.
+        "inputs": {
+            "prompts_sha256": _sha(prompts) if prompts.exists() else None,
+            "manifest_sha256": _sha(manifest_path) if manifest_path.exists() else None,
+        },
+        "failure_revision": route_failures.revision(project_dir),
+        "auto_resolved_failures": [f["visual_asset_id"] for f in auto_resolved],
         "identity": {
             "state": manifest.get("identity_state"),
             "reasons": manifest.get("identity_reasons", []),
@@ -117,10 +203,30 @@ def build_plan(project_dir: Path) -> dict:
             "shot_instance_ids": sorted(s.get("shot_instance_id") for s in scenes),
         },
         "shots": [
-            {"shot": s["shot_num"], "file": s["file"], "visual_type": s["type"],
-             "host_present": s["type"] == "HOST", "pose_id": s.get("pose_id"),
-             "scene_bound": s.get("scene_bound", False),
-             "paid": s["type"] in PAID_TYPES}
+            {
+                # persistent identity first — this is what dispatch and any
+                # failure record key on
+                "visual_asset_id": s.get("visual_asset_id"),
+                "source_ids": s.get("source_ids", []),
+                "shot_instance_id": s.get("shot_instance_id"),
+                "scene_id": s.get("scene_id"),          # display order only
+                "shot": s["shot_num"],                  # readability only
+                "file": s["file"],
+                # executable routing fields
+                "visual_type": s["type"],
+                "planned_type": s["planned_type"],
+                "route_candidates": s.get("route_candidates", []),
+                "map_args": s.get("map_args", ""),
+                "chart_args": s.get("chart_args", ""),
+                "narration": s.get("narration", ""),
+                "pose_id": s.get("pose_id", ""),
+                "scene_bound": s.get("scene_bound", False),
+                "host_present": s["type"] == "HOST",
+                "paid": s["type"] in PAID_TYPES,
+                "needs_review": bool(s.get("needs_review")),
+                "route_args_sha256": route_failures.route_args_digest(
+                    {**s, "visual_type": s["type"]}),
+            }
             for s in shots
         ],
         "mix": dict(sorted(types.items())),
@@ -131,33 +237,52 @@ def build_plan(project_dir: Path) -> dict:
 
 
 def render_md(plan: dict) -> str:
+    """Deterministic render of the plan JSON. The human reads this.
+
+    Deterministic so approve_checkpoint.py can re-render it and refuse unless the
+    file on disk matches byte-for-byte — otherwise a human could review a document
+    that no longer describes the plan the gate will execute.
+    """
     L = [f"# Visual plan — {plan['project']}", ""]
+    L += [f"- **plan id**: `{plan.get('plan_id')}`",
+          f"- **generated**: {plan.get('generated_at')}",
+          f"- **schema**: {plan.get('schema_version')}",
+          f"- **routing input**: `{str(plan.get('inputs', {}).get('prompts_sha256'))[:16]}…`",
+          f"- **failure revision**: {plan.get('failure_revision')}", ""]
     ident = plan["identity"]
     L += [f"**Identity**: `{ident['state']}`"]
     for r in ident["reasons"]:
         L.append(f"- {r}")
     if ident["gate_blockers"]:
-        L += ["", "**Generation gate blockers:**"]
+        L += ["", "**Identity gate blockers:**"]
         L += [f"- {b}" for b in ident["gate_blockers"]]
     L += ["", "## Mix", "", "| visual_type | shots |", "|---|---|"]
-    for t, n in plan["mix"].items():
-        L.append(f"| {t} | {n} |")
+    for ty, n in plan["mix"].items():
+        L.append(f"| {ty} | {n} |")
     L += ["", f"Host presence: **{plan['host_presence_pct']}%** "
               f"(target 25–30%, soft ceiling 35%)", ""]
     c = plan["paid_generation"]
     L += ["## Paid generation", "",
           f"- shots that would spend: **{c['shots']}**",
-          f"- estimate: " + (f"**${c['estimate_usd']}**" if c["estimate_usd"] is not None
-                             else "_not priced_ — " + str(c["basis"])), ""]
+          "- estimate: " + (f"**${c['estimate_usd']}**" if c["estimate_usd"] is not None
+                            else "_not priced_ — " + str(c["basis"])), ""]
+    if plan.get("auto_resolved_failures"):
+        L += ["## Failures resolved by a route change", ""]
+        L += [f"- `{v}`" for v in plan["auto_resolved_failures"]]
+        L += [""]
     L += ["## Needs review", ""]
     if not plan["needs_review"]:
         L.append("_none_")
     for r in plan["needs_review"]:
-        L.append(f"- shot {r.get('shot')}: {r['reason']}")
-    L += ["", "## Shots", "", "| shot | file | type | host | pose |", "|---|---|---|---|---|"]
+        vid = f" `{r['visual_asset_id']}`" if r.get("visual_asset_id") else ""
+        L.append(f"- shot {r.get('shot')}{vid}: {r['reason']}")
+    L += ["", "## Shots", "",
+          "| shot | visual_asset_id | file | type | host | pose |",
+          "|---|---|---|---|---|---|"]
     for s in plan["shots"]:
-        L.append(f"| {s['shot']} | `{s['file']}` | {s['visual_type']} | "
-                 f"{'yes' if s['host_present'] else ''} | {s['pose_id'] or ''} |")
+        L.append(f"| {s['shot']} | `{s['visual_asset_id'] or '—'}` | `{s['file']}` | "
+                 f"{s['visual_type']} | {'yes' if s['host_present'] else ''} | "
+                 f"{s['pose_id'] or ''} |")
     return "\n".join(L) + "\n"
 
 

@@ -41,15 +41,23 @@ from datetime import datetime
 from pathlib import Path
 
 import pose_registry
+import route_failures
 import source_ids
 
 PIPELINE_DIR = Path(__file__).parent
 SPEC_PATH = PIPELINE_DIR / "character" / "character_spec.json"
 VISUAL_PLAN_NAME = "visual_plan.json"
+VISUAL_PLAN_MD_NAME = "visual_plan.md"
+# Bumped whenever the executable plan gains or changes a field that
+# dispatch relies on, so an older plan cannot be executed by newer code.
+PLAN_SCHEMA_VERSION = 1
 APPROVAL_NAME = "checkpoint_3_approval.json"
+PROMPTS_NAME = "image_prompts_one_line_per_prompt.md"
 APPROVAL_SCHEMA_VERSIONS = {1}
-APPROVAL_REQUIRED_FIELDS = ("schema_version", "project", "manifest_sha256",
-                            "visual_plan_sha256", "approved_at", "approved_by",
+APPROVAL_REQUIRED_FIELDS = ("schema_version", "project", "plan_id",
+                            "manifest_sha256", "visual_plan_sha256",
+                            "visual_plan_md_sha256", "prompts_sha256",
+                            "failure_revision", "approved_at", "approved_by",
                             "confirmation", "paid_generation")
 
 # Directories whose contents are, by definition, not approved output. A pose or
@@ -436,10 +444,57 @@ def _check_visual_plan(rep: GateReport, project_dir: Path, manifest: dict | None
         return
     rep.add("visual plan parses", True)
 
+    rep.add("visual plan schema is supported",
+            plan.get("schema_version") == PLAN_SCHEMA_VERSION,
+            f"schema_version={plan.get('schema_version')!r}, expected "
+            f"{PLAN_SCHEMA_VERSION} — re-run plan_visuals.py")
+
     review = plan.get("needs_review", [])
     rep.add("visual plan has no unresolved review items", not review,
             f"{len(review)} item(s): "
             + ", ".join(str(r.get('shot', r)) for r in review[:6]))
+
+    # The plan is derived from the prompts file, and dispatch used to re-read that
+    # file at generation time. Nothing hashed it, so a PHOTO route could be edited
+    # into a paid AI route after approval with both approved hashes untouched.
+    prompts = project_dir / PROMPTS_NAME
+    recorded = plan.get("inputs", {}).get("prompts_sha256")
+    if not rep.add("plan records its routing input", bool(recorded),
+                   "plan has no inputs.prompts_sha256 — re-run plan_visuals.py"):
+        pass
+    elif not prompts.exists():
+        rep.add("routing input still present", False, f"{PROMPTS_NAME} is gone")
+    else:
+        found = _sha(prompts)
+        rep.add("routing input is unchanged since planning", recorded == found,
+                f"{PROMPTS_NAME} has been edited since the plan was built — "
+                f"re-classify, re-plan and approve the new plan "
+                f"(planned {str(recorded)[:12]}…, found {found[:12]}…)")
+
+    # Every shot the plan will execute must be identifiable as artwork, not by a
+    # position that moves whenever the narration is re-split.
+    shots = plan.get("shots", [])
+    ids = [s.get("visual_asset_id") for s in shots]
+    rep.add("every plan entry carries a visual asset id", all(ids),
+            f"{sum(1 for i in ids if not i)} entr(ies) without one")
+    dupes = sorted({i for i in ids if i and ids.count(i) > 1})
+    rep.add("plan visual asset ids are unique", not dupes, f"duplicated: {dupes[:6]}")
+    if manifest is not None:
+        known = {s.get("visual_asset_id") for s in manifest.get("scenes", [])}
+        orphans = [i for i in ids if i and i not in known]
+        rep.add("plan entries reconcile with the manifest", not orphans,
+                f"not in the manifest: {orphans[:6]}")
+
+    # Runtime failures move the revision. A plan built before a failure — or
+    # before its resolution — is no longer the plan that can be executed.
+    try:
+        current = route_failures.revision(project_dir)
+        rep.add("plan is current with the failure record",
+                plan.get("failure_revision") == current,
+                f"plan was built at failure revision "
+                f"{plan.get('failure_revision')!r}, now {current} — re-plan")
+    except route_failures.FailureError as e:
+        rep.add("failure record is readable", False, str(e))
 
     # The plan must describe the manifest that is about to be generated from.
     # A plan built against a previous split would authorise the wrong shots.
@@ -452,6 +507,26 @@ def _check_visual_plan(rep: GateReport, project_dir: Path, manifest: dict | None
                 and planned.get("shot_instance_ids") == want["shot_instance_ids"])
         rep.add("visual plan matches the current manifest", same,
                 "plan was built against a different split — re-run plan_visuals.py")
+
+
+def _check_route_failures(rep: GateReport, project_dir: Path) -> None:
+    """Routes that failed during a previous dispatch, and are still outstanding.
+
+    A failure means the approved plan no longer describes what can be produced.
+    Blocking here is what stops the old approval from authorising another attempt
+    — previously a Pexels failure printed a line, the run carried on into the paid
+    AI batch, and the next plan looked clean.
+    """
+    try:
+        outstanding = route_failures.unresolved(project_dir)
+    except route_failures.FailureError as e:
+        rep.add("route failure record is readable", False, str(e))
+        return
+    rep.add("no unresolved route failures", not outstanding,
+            f"{len(outstanding)}: "
+            + "; ".join(f"{f['visual_asset_id']} ({f['planned_route']}) — {f['reason']}"
+                        for f in outstanding[:4])
+            + ". Resolve with route_failures.py, then re-plan and re-approve.")
 
 
 def _check_approval(rep: GateReport, project_dir: Path, manifest: dict | None) -> None:
@@ -484,14 +559,24 @@ def _check_approval(rep: GateReport, project_dir: Path, manifest: dict | None) -
             f"schema_version={rec.get('schema_version')!r}, "
             f"supported: {sorted(APPROVAL_SCHEMA_VERSIONS)}")
 
-    missing = [f for f in APPROVAL_REQUIRED_FIELDS if not rec.get(f)]
+    # `in (None, "", ...)` rather than falsiness: failure_revision is legitimately
+    # 0 on a project that has never had a route fail.
+    missing = [f for f in APPROVAL_REQUIRED_FIELDS
+               if rec.get(f) in (None, "", [], {})]
     rep.add("approval record is complete", not missing, f"missing/empty: {missing}")
 
     rep.add("approval names this project", rec.get("project") == project_dir.name,
             f"approval is for {rec.get('project')!r}, this is {project_dir.name!r}")
 
-    for label, fname, key in (("manifest", "manifest.json", "manifest_sha256"),
-                              ("visual plan", VISUAL_PLAN_NAME, "visual_plan_sha256")):
+    # Four artifacts, because a human reads the markdown, the gate executes the
+    # JSON, the JSON is derived from the prompts, and all of it describes one
+    # manifest. Leaving any of them unbound leaves a way to change what gets
+    # generated without changing anything that was approved.
+    for label, fname, key in (
+            ("manifest", "manifest.json", "manifest_sha256"),
+            ("visual plan", VISUAL_PLAN_NAME, "visual_plan_sha256"),
+            ("reviewed plan document", VISUAL_PLAN_MD_NAME, "visual_plan_md_sha256"),
+            ("routing input", PROMPTS_NAME, "prompts_sha256")):
         f = project_dir / fname
         if not f.exists():
             rep.add(f"approved {label} still present", False, f"{fname} is gone")
@@ -501,6 +586,28 @@ def _check_approval(rep: GateReport, project_dir: Path, manifest: dict | None) -
                 f"{fname} has been edited since approval — re-run plan_visuals.py "
                 f"and approve the new plan (approved {str(rec.get(key))[:12]}…, "
                 f"found {found[:12]}…)")
+
+    # The approval names the plan a human actually read. A plan regenerated
+    # between review and approval gets a new id, so the old confirmation cannot
+    # carry over to it.
+    plan_path = project_dir / VISUAL_PLAN_NAME
+    if plan_path.exists():
+        try:
+            plan_id = json.loads(plan_path.read_text(encoding="utf-8")).get("plan_id")
+            rep.add("approval names the current plan", rec.get("plan_id") == plan_id,
+                    f"approval is for plan {str(rec.get('plan_id'))[:8]}, current "
+                    f"plan is {str(plan_id)[:8]}")
+        except json.JSONDecodeError:
+            pass
+
+    try:
+        rep.add("approval is current with the failure record",
+                rec.get("failure_revision") == route_failures.revision(project_dir),
+                f"approved at failure revision {rec.get('failure_revision')!r}, now "
+                f"{route_failures.revision(project_dir)} — a route failed or was "
+                f"resolved since approval; re-plan and re-approve")
+    except route_failures.FailureError as e:
+        rep.add("failure record is readable", False, str(e))
 
     if rec.get("approved_at"):
         try:
@@ -601,6 +708,7 @@ def require_generation_ready(project,
     if rep.add("project directory exists", project_dir.is_dir(), str(project_dir)):
         manifest = _check_manifest_identity(rep, project_dir, operation)
         _check_sidecar_currency(rep, project_dir)
+        _check_route_failures(rep, project_dir)
         _check_visual_plan(rep, project_dir, manifest)
         _check_approval(rep, project_dir, manifest)
     _check_masters(rep)

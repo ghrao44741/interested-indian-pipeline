@@ -39,11 +39,28 @@ from pathlib import Path
 
 import composite_character
 import pose_registry
-from generation_gate import (GateBlocked, require_generation_ready,
+import route_failures
+from generation_gate import (GateBlocked, VISUAL_PLAN_NAME,
+                             PLAN_SCHEMA_VERSION,
+                             require_generation_ready,
                              require_identity_ready)
 
 PIPELINE_DIR = Path(__file__).parent
 PROMPTS_FILE = "image_prompts_one_line_per_prompt.md"
+
+# The complete set of routes this code knows how to execute. Anything else —
+# missing, misspelled, or introduced by a newer prompt writer — is UNCLASSIFIED
+# and needs a human. There is deliberately no "everything else" route: that is
+# what turned unknown types into paid AI generations.
+SUPPORTED_TYPES = frozenset({"CARTOON", "MAP", "CHART", "PHOTO", "HOST"})
+UNCLASSIFIED = "UNCLASSIFIED"
+
+# Only these may reach the AI generator, and only by name.
+AI_TYPES = frozenset({"CARTOON"})
+
+
+class RouteError(RuntimeError):
+    """A plan entry cannot be executed. Raised before any generator runs."""
 
 # Keywords for legacy prompts that don't have a TYPE field
 _MAP_KEYWORDS = [
@@ -70,22 +87,26 @@ def _field(line: str, name: str, until: list[str] | None = None) -> str:
     return m.group(1).strip() if m else ""
 
 
-def _classify_by_keywords(line: str) -> str:
-    """Fallback classification for prompts without a TYPE field.
+def _keyword_candidates(line: str) -> list[str]:
+    """Route *suggestions* for a prompt with no usable TYPE. Never a decision.
 
-    Only searches the PROMPT field, NOT the full line.  Narration text frequently
-    mentions 'union territory', 'India map', etc. — searching the whole line causes
-    cartoon scenes to be mis-classified as MAP, generating generic geography images
-    with no highlights instead of the intended illustration.
+    Only searches the PROMPT field, NOT the full line. Narration frequently
+    mentions 'union territory', 'India map' and the like — searching the whole
+    line mis-classified cartoon scenes as MAP.
+
+    This used to return "CARTOON" when nothing matched, which meant a missing,
+    misspelled or simply newer TYPE silently became a paid AI generation. It now
+    returns candidates for a human to choose between, and the caller marks the
+    shot NEEDS_REVIEW regardless of what comes back.
     """
-    # Extract only the PROMPT field (between PROMPT: and OVERLAY: / CUE: / end)
     m = re.search(r'\bPROMPT:\s*(.+?)(?:\s+OVERLAY:|\s+CUE:|$)', line, re.IGNORECASE)
     text = (m.group(1) if m else line).lower()
+    out = []
     if any(re.search(kw, text) for kw in _MAP_KEYWORDS):
-        return "MAP"
+        out.append("MAP")
     if any(re.search(kw, text) for kw in _CHART_KEYWORDS):
-        return "CHART"
-    return "CARTOON"
+        out.append("CHART")
+    return out
 
 
 def _validate_chart_args(chart_args: str) -> bool:
@@ -126,14 +147,23 @@ def parse_shots(prompts_path: Path) -> list[dict]:
         m_file = re.search(r"`([^`]+\.png)`", line)
         if not m_shot or not m_file:
             continue
+        m_scene = re.search(r"·\s*(SCENE-\d+)\s*·", line)
 
         # TYPE field (new prompts)
         raw_type = _field(line, "TYPE", ["MAP_ARGS", "CHART_ARGS", "HOST_POSE",
                                          "SCENE_BOUND", "NARRATION", "PROMPT",
                                          "OVERLAY", "CUE"])
         raw_type = raw_type.upper() if raw_type else ""
-        if raw_type not in ("CARTOON", "MAP", "CHART", "PHOTO", "HOST"):
-            raw_type = _classify_by_keywords(line)
+        candidates = []
+        unsupported = ""
+        if raw_type not in SUPPORTED_TYPES:
+            # Missing, misspelled, or a type from a future version of the prompt
+            # writer. All three are the same situation: this code cannot say what
+            # the shot should be, so a human must. Keyword matching contributes
+            # suggestions and nothing more.
+            unsupported = raw_type or "(none)"
+            candidates = _keyword_candidates(line)
+            raw_type = UNCLASSIFIED
 
         # A route that cannot be executed becomes NEEDS_REVIEW, keeping the route
         # that was planned and why it failed. It never silently becomes something
@@ -150,6 +180,11 @@ def parse_shots(prompts_path: Path) -> list[dict]:
             needs_review, review_reason = True, reason
             print(f"  !  SHOT {m_shot.group(1)}: {planned_type} — {reason}. "
                   f"NEEDS_REVIEW, not rerouted.")
+
+        if unsupported:
+            flag(f"TYPE {unsupported!r} is not one of {sorted(SUPPORTED_TYPES)}"
+                 + (f"; keyword suggestions: {candidates}" if candidates
+                    else "; no keyword suggestion either"))
 
         map_args = ""
         if raw_type == "MAP":
@@ -191,8 +226,10 @@ def parse_shots(prompts_path: Path) -> list[dict]:
         shots.append({
             "shot_num": int(m_shot.group(1)),
             "file":     m_file.group(1),
+            "scene_id": m_scene.group(1) if m_scene else "",   # display order only
             "type":     raw_type,
             "planned_type": planned_type,
+            "route_candidates": candidates,
             "needs_review": needs_review,
             "review_reason": review_reason,
             "map_args": map_args,
@@ -345,106 +382,164 @@ def classify(project_dir: Path) -> tuple[list[dict], list[dict]]:
     return shots, review
 
 
-def dispatch_routes(project_dir: Path, script_dir: Path, shots: list[dict],
+def validate_plan(project_dir: Path, plan: dict) -> list[dict]:
+    """Check the WHOLE approved plan before anything is created or generated.
+
+    Raises RouteError on the first problem found, having written nothing. This is
+    deliberately not per-shot-as-we-go: validating lazily means an invalid entry
+    halfway down the plan is discovered only after the shots above it have already
+    been paid for and written.
+    """
+    if plan.get("schema_version") != PLAN_SCHEMA_VERSION:
+        raise RouteError(f"visual plan schema_version is "
+                         f"{plan.get('schema_version')!r}, expected "
+                         f"{PLAN_SCHEMA_VERSION} — re-run plan_visuals.py")
+
+    shots = plan.get("shots", [])
+    if not shots:
+        raise RouteError("the approved plan contains no shots")
+
+    if plan.get("needs_review"):
+        raise RouteError(f"the plan carries {len(plan['needs_review'])} unresolved "
+                         f"review item(s); it should never have been approved")
+
+    outstanding = route_failures.unresolved(project_dir)
+    if outstanding:
+        raise RouteError(
+            f"{len(outstanding)} unresolved route failure(s): "
+            + ", ".join(f["visual_asset_id"] for f in outstanding[:6])
+            + ". Resolve them with route_failures.py, re-plan and re-approve.")
+
+    seen = set()
+    manifest = json.loads((project_dir / "manifest.json").read_text(encoding="utf-8"))
+    known_ids = {s.get("visual_asset_id") for s in manifest.get("scenes", [])}
+    images_dir = (project_dir / "images").resolve()
+    approved_poses = approved_pose_ids()
+
+    for s in shots:
+        where = f"shot {s.get('shot')} ({s.get('file')})"
+        vid = s.get("visual_asset_id")
+        if not vid:
+            raise RouteError(f"{where} has no visual_asset_id — approved work must "
+                             f"be identified by persistent artwork identity, not by "
+                             f"shot number or filename")
+        if vid in seen:
+            raise RouteError(f"{where}: duplicate visual_asset_id {vid!r} — two plan "
+                             f"entries claim the same artwork")
+        seen.add(vid)
+        if vid not in known_ids:
+            raise RouteError(f"{where}: visual_asset_id {vid!r} is not in the "
+                             f"manifest — the plan and the manifest disagree")
+
+        route = s.get("visual_type")
+        if route not in SUPPORTED_TYPES:
+            raise RouteError(f"{where}: route {route!r} is not one of "
+                             f"{sorted(SUPPORTED_TYPES)}. Nothing may be inferred "
+                             f"from an unrecognised route.")
+        if route == "MAP" and not s.get("map_args"):
+            raise RouteError(f"{where}: MAP with no map_args")
+        if route == "CHART" and not _validate_chart_args(s.get("chart_args", "")):
+            raise RouteError(f"{where}: CHART arguments do not validate")
+        if route == "HOST":
+            pid = s.get("pose_id")
+            if pid not in approved_poses:
+                raise RouteError(f"{where}: HOST pose {pid!r} is not approved")
+            meta = pose_registry.metadata(pid)
+            if meta.get("includes_geometry") and not s.get("scene_bound"):
+                raise RouteError(f"{where}: {pid!r} is a scene-bound tableau and the "
+                                 f"plan does not grant scene_bound permission")
+            # Resolving here proves the bytes exist and still hash correctly,
+            # before any of the cheaper routes have written anything.
+            pose_registry.resolve(pid, scene_bound=bool(s.get("scene_bound")))
+
+        out = (images_dir / s["file"]).resolve()
+        if not out.is_relative_to(images_dir):
+            raise RouteError(f"{where}: output {s['file']!r} escapes the project's "
+                             f"images directory")
+    return shots
+
+
+def dispatch_routes(project_dir: Path, script_dir: Path, plan: dict,
                     overwrite: bool) -> int:
     """Generation-gated. The first thing that can spend or write episode artwork.
 
-    The gate runs before the images directory is created and before any generator
-    is invoked, so a project without approval leaves no trace of having tried.
+    Executes the APPROVED PLAN, not the prompts file. The prompts markdown is
+    mutable and is re-read on every run; dispatching from it meant an edit made
+    after approval changed what got generated while both approved hashes stayed
+    intact. The plan is the contract, and the gate has already verified it is the
+    one that was approved.
     """
     require_generation_ready(project_dir, "route dispatch")
-
-    review = [s for s in shots if s["needs_review"]]
-    if review:
-        # Reaching here would mean a plan was approved and then a shot went bad,
-        # or that classification was re-run against edited prompts. Either way the
-        # approved plan no longer describes what is about to be generated.
-        print(f"\n{len(review)} shot(s) need review - routing stops. The approved "
-              f"plan does not cover them:")
-        for s in review:
-            print(f"    SHOT {s['shot_num']:02d} ({s['planned_type']}): {s['review_reason']}")
-        print("\nRe-plan with plan_visuals.py and approve the new plan.")
-        return 1
+    shots = validate_plan(project_dir, plan)
 
     images_dir = project_dir / "images"
     images_dir.mkdir(exist_ok=True)
 
-    map_shots, chart_shots, photo_shots, host_shots, ai_shots = [], [], [], [], []
-    buckets = {"MAP": map_shots, "CHART": chart_shots,
-               "PHOTO": photo_shots, "HOST": host_shots}
-    skipped = 0
-    for shot in shots:
-        already = any((images_dir / f"{Path(shot['file']).stem}{ext}").exists()
-                      for ext in (".png", ".jpg", ".jpeg", ".webp"))
-        # A HOST shot composites onto its own background, so an existing file is
-        # the input, not a reason to skip.
-        if already and not overwrite and shot["type"] != "HOST":
+    runners = {"MAP": run_map, "CHART": run_chart, "PHOTO": run_pexels}
+    done = skipped = 0
+
+    # Non-AI routes first, one at a time, stopping at the first failure. A failure
+    # means the approved plan no longer describes what can be produced, so nothing
+    # further may be spent under that approval.
+    for s in shots:
+        route = s["visual_type"]
+        if route in AI_TYPES:
+            continue
+        target = images_dir / s["file"]
+        if target.exists() and not overwrite and route != "HOST":
             skipped += 1
             continue
-        buckets.get(shot["type"], ai_shots).append(shot)
+
+        print(f"  {route:6s} [{s['shot']:02d}] {s['file']}", end="  ", flush=True)
+        if route == "HOST":
+            ok = run_host(s, project_dir, images_dir)
+            reason = "pose refused by the registry, or no background rendered yet"
+        else:
+            ok = runners[route](s, images_dir, script_dir)
+            reason = {"MAP": "map render failed - check GeoJSON state names",
+                      "CHART": "chart render failed - check --type/--data",
+                      "PHOTO": "Pexels returned nothing usable - a PHOTO shot must "
+                               "not be replaced by a generated image"}[route]
+        if not ok:
+            print("FAILED")
+            rec = route_failures.record_failure(project_dir, s, reason)
+            print(f"\n  Dispatch stopped at {rec['visual_asset_id']} ({route}).")
+            print(f"  {reason}")
+            print(f"\n  Recorded in {route_failures.FAILURES_NAME}. Nothing further "
+                  f"was generated, and this approval no longer permits a retry:")
+            print(f"    1. python route_failures.py --project {project_dir.name}")
+            print(f"    2. fix the route, or resolve it explicitly")
+            print(f"    3. python plan_visuals.py --project {project_dir.name}")
+            print(f"    4. review, then approve_checkpoint.py")
+            return 1
+        side = (s.get("placement") or {}).get("side", "")
+        print("ok" + (f" ({side})" if side else ""))
+        done += 1
+
+    # AI last: it is the only paid-per-shot route, so every free route that could
+    # have invalidated the plan has already been proven to work.
+    ai = [s for s in shots if s["visual_type"] in AI_TYPES]
+    if ai:
+        pending = [s for s in ai
+                   if overwrite or not (images_dir / s["file"]).exists()]
+        if pending:
+            print(f"\n  AI batch: {len(pending)} shot(s) via generate_images_flux.py\n")
+            if not run_ai_batch(project_dir, script_dir, overwrite):
+                for s in pending:
+                    route_failures.record_failure(project_dir, s,
+                                                  "AI image batch did not complete")
+                print(f"\n  AI batch failed; recorded in "
+                      f"{route_failures.FAILURES_NAME}. Re-plan and re-approve.")
+                return 1
+            done += len(pending)
+        else:
+            skipped += len(ai)
 
     print(f"\n{'=' * 58}")
-    print(f"Dispatch - {project_dir.name}   (Checkpoint 3 approved)")
-    print(f"  Skipped : {skipped} (already exist)")
-    print(f"  MAP {len(map_shots)} - CHART {len(chart_shots)} - PHOTO {len(photo_shots)}"
-          f" - HOST {len(host_shots)} - AI {len(ai_shots)}")
+    print(f"  Routing complete - {done} produced, {skipped} already present.")
+    print(f"\n  Next: python add_text_overlays.py --project {project_dir.name}")
     print(f"{'=' * 58}\n")
-
-    failures = []
-
-    for shot in map_shots:
-        print(f"  MAP   [{shot['shot_num']:02d}] {shot['file']}", end="  ", flush=True)
-        ok = run_map(shot, images_dir, script_dir)
-        print("ok" if ok else "FAILED")
-        if not ok:
-            failures.append((shot, "map render failed - check GeoJSON state names"))
-
-    for shot in chart_shots:
-        print(f"  CHART [{shot['shot_num']:02d}] {shot['file']}", end="  ", flush=True)
-        ok = run_chart(shot, images_dir, script_dir)
-        print("ok" if ok else "FAILED")
-        if not ok:
-            failures.append((shot, "chart render failed - check --type/--data"))
-
-    for shot in photo_shots:
-        print(f"  PHOTO [{shot['shot_num']:02d}] {shot['file']}", end="  ", flush=True)
-        ok = run_pexels(shot, images_dir, script_dir)
-        print("ok" if ok else "FAILED")
-        if not ok:
-            # No AI fallback. A PHOTO shot asks for a real photograph of a real
-            # place; substituting a generated illustration answers a different
-            # question, costs money, and changes the approved cost profile -
-            # silently, at the moment of failure, with nobody watching.
-            failures.append((shot, "Pexels returned nothing usable - a PHOTO shot "
-                                   "must not be replaced by a generated image"))
-
-    for shot in host_shots:
-        print(f"  HOST  [{shot['shot_num']:02d}] {shot['file']} pose={shot['pose_id']}",
-              end="  ", flush=True)
-        ok = run_host(shot, project_dir, images_dir)
-        print(f"ok ({shot['placement']['side']})" if ok else "FAILED")
-        if not ok:
-            failures.append((shot, "pose refused by the registry, or no background"))
-
-    ai_ok = True
-    if ai_shots:
-        print(f"\n  AI batch: {len(ai_shots)} shot(s) via generate_images_flux.py\n")
-        ai_ok = run_ai_batch(project_dir, script_dir, overwrite)
-
-    print(f"\n{'=' * 58}")
-    if failures:
-        print(f"  {len(failures)} shot(s) FAILED and were not rerouted:")
-        for shot, why in failures:
-            print(f"    SHOT {shot['shot_num']:02d} ({shot['type']}) {shot['file']}: {why}")
-        print("\n  These are NEEDS_REVIEW. Fix the route or its arguments, re-plan, "
-              "and approve the new plan.")
-    if not ai_ok:
-        print("  AI batch failed - none of those images were generated.")
-    if not failures and ai_ok:
-        print("  Routing complete.")
-        print(f"\n  Next: python add_text_overlays.py --project {project_dir.name}")
-    print(f"{'=' * 58}\n")
-    return 0 if (not failures and ai_ok) else 1
+    return 0
 
 
 def main():
@@ -507,13 +602,35 @@ def main():
         return 1
 
     # -- phase 2: dispatch (requires Checkpoint 3) ----------------------------
+    #
+    # The approved PLAN is the input here, not the shots just parsed. The prompts
+    # file is mutable; the plan is what a human read and approved, and the gate
+    # has already proven the prompts file has not changed since it was built.
+    plan_path = project_dir / VISUAL_PLAN_NAME
+    if not plan_path.exists():
+        print(f"\nNo {VISUAL_PLAN_NAME}. Run plan_visuals.py, review it, then "
+              f"approve_checkpoint.py before generating.")
+        return 1
     try:
-        return dispatch_routes(project_dir, script_dir, shots, args.overwrite)
+        plan = json.loads(plan_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        print(f"\n{VISUAL_PLAN_NAME} is unreadable: {e}")
+        return 1
+
+    try:
+        return dispatch_routes(project_dir, script_dir, plan, args.overwrite)
     except GateBlocked as e:
         print(f"\n{e}")
+        print("\nNothing was generated, downloaded or written.")
+        return 1
+    except RouteError as e:
+        print(f"\nThe approved plan cannot be executed: {e}")
         print("\nNothing was generated, downloaded or written.")
         return 1
 
 
 if __name__ == "__main__":
-    main()
+    # The return value used to be discarded, so a dispatch failure or an
+    # unresolved review item exited 0 and any caller — a shell script, CI, the
+    # orchestrator — read it as success.
+    sys.exit(main())

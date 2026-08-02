@@ -1,9 +1,16 @@
 {
+  "schema_version": 1,
   "project": "pilot_neet_scandal",
   "generated_by": "plan_visuals.py",
   "read_only": true,
-  "plan_id": "6ae623b60944423db1b97dfaaf0517d6",
-  "generated_at": "2026-08-02T16:35:18+00:00",
+  "plan_id": "80231e97d2b64d858f5da33e449783a1",
+  "generated_at": "2026-08-02T17:42:24+00:00",
+  "inputs": {
+    "prompts_sha256": "df8a86a7c909613dfc65ae366c29c5afa5ba0ba92a97ab4fbde80230769a3fd0",
+    "manifest_sha256": "9b6befb8529b32683d8587b25652b1eda453a0e921f8723fbec883805a89822b"
+  },
+  "failure_revision": 0,
+  "auto_resolved_failures": [],
   "identity": {
     "state": "blocked",
     "reasons": [
@@ -156,1048 +163,2558 @@
   },
   "shots": [
     {
+      "visual_asset_id": "VIS-001-A",
+      "source_ids": [
+        "SRC-001"
+      ],
+      "shot_instance_id": "SRC-001-I01",
+      "scene_id": "SCENE-001",
       "shot": 1,
       "file": "SCENE-001.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "In July 2026, India's education minister resigned.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "910126f670036871e5c3a85e8a53c4cfb4b8ffd327c4f737c81228dc21b9c846"
     },
     {
+      "visual_asset_id": "VIS-002-A",
+      "source_ids": [
+        "SRC-002"
+      ],
+      "shot_instance_id": "SRC-002-I01",
+      "scene_id": "SCENE-002",
       "shot": 2,
       "file": "SCENE-002.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Not over money, not over an affair, not over a leaked recording.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "3a7948478a9fbfa187edbd3b93b0816b414fda35253b7aa7a8a6cc8f18ec3bf2"
     },
     {
+      "visual_asset_id": "VIS-003-A",
+      "source_ids": [
+        "SRC-003"
+      ],
+      "shot_instance_id": "SRC-003-I01",
+      "scene_id": "SCENE-003",
       "shot": 3,
       "file": "SCENE-003.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "He resigned because a political party that does not legally exist has never run a",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "cb2cfcdfd6ec44d6893b5f0f65872b2c5c344f3128c0330cbe75948f16f59c77"
     },
     {
+      "visual_asset_id": "VIS-003-B",
+      "source_ids": [
+        "SRC-003"
+      ],
+      "shot_instance_id": "SRC-003-I02",
+      "scene_id": "SCENE-004",
       "shot": 4,
       "file": "SCENE-004.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "candidate and is named entirely after a household pest spent 50 days telling him to.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "84aa73097fbdc528552cc17c2029e084adff4cc1bc12c2e0a1595361bc3c8a7d"
     },
     {
+      "visual_asset_id": "VIS-004-A",
+      "source_ids": [
+        "SRC-004"
+      ],
+      "shot_instance_id": "SRC-004-I01",
+      "scene_id": "SCENE-005",
       "shot": 5,
       "file": "SCENE-005.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "I've read that sentence back to myself three times and it still doesn't sound real.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "bd911d3a62b6b348c303d2a6b52deecebe686ce60f68bb81d55d8ffaccf9f5dc"
     },
     {
+      "visual_asset_id": "VIS-005-A",
+      "source_ids": [
+        "SRC-005"
+      ],
+      "shot_instance_id": "SRC-005-I01",
+      "scene_id": "SCENE-006",
       "shot": 6,
       "file": "SCENE-006.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Here's how a government loses a fight to cockroaches.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "f70c2bf81fd8411eb25ec475de6a76f3b64c8beed90ebab83479102ce4bc2e5f"
     },
     {
+      "visual_asset_id": "VIS-006-A",
+      "source_ids": [
+        "SRC-006"
+      ],
+      "shot_instance_id": "SRC-006-I01",
+      "scene_id": "SCENE-007",
       "shot": 7,
       "file": "SCENE-007.png",
       "visual_type": "CHART",
-      "host_present": false,
+      "planned_type": "CHART",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "--type stat --data '[{\"stat\":\"22.7 lakh\",\"label\":\"students appeared — May 3, 2026\",\"color\":\"#1A2B4C\"}]'",
+      "narration": "On 3rd May 2026, 22.7 lakh students, roughly the population of a mid-sized European country,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": false
+      "host_present": false,
+      "paid": false,
+      "needs_review": false,
+      "route_args_sha256": "4ea96562c710ce96cefd7da80ac2f6b0a6c661e8995412a9b935da6386428682"
     },
     {
+      "visual_asset_id": "VIS-006-B",
+      "source_ids": [
+        "SRC-006"
+      ],
+      "shot_instance_id": "SRC-006-I02",
+      "scene_id": "SCENE-008",
       "shot": 8,
       "file": "SCENE-008.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "sat down for NETUG, India's single entrance exam for every medical and dental seat in the country.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "88c3f9d58dc4e6f4b3d2c90689454fcf0a3bb8cb96b122502103aa238a5719b7"
     },
     {
+      "visual_asset_id": "VIS-007-A",
+      "source_ids": [
+        "SRC-007"
+      ],
+      "shot_instance_id": "SRC-007-I01",
+      "scene_id": "SCENE-009",
       "shot": 9,
       "file": "SCENE-009.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Ask it, become a doctor. Miss it, wait a full year and try again. No second sitting, no partial credit, no alternate path if your family doesn't have the money for a second attempt at a coaching institute.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "9263f3066d209f1cf4686045e911b53c3bb88752a338fe345bf1bc77c656dbf7"
     },
     {
+      "visual_asset_id": "VIS-010-A",
+      "source_ids": [
+        "SRC-010"
+      ],
+      "shot_instance_id": "SRC-010-I01",
+      "scene_id": "SCENE-012",
       "shot": 10,
       "file": "SCENE-012.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "That's the whole system riding on one 3-hour test once a year for every single one of those 22.7 lakh teenagers.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "3e00b16a147bd448bef15d42c37ae297a7bc8dfa1860e2898d91cc408e5ba873"
     },
     {
+      "visual_asset_id": "VIS-011-A",
+      "source_ids": [
+        "SRC-011"
+      ],
+      "shot_instance_id": "SRC-011-I01",
+      "scene_id": "SCENE-013",
       "shot": 11,
       "file": "SCENE-013.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "And the math on the other side of that test is brutal.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "4a390e70e03ec88d8438d062890c46f8e0cff4bd871ab0c9be0a17829a2f54bb"
     },
     {
+      "visual_asset_id": "VIS-012-A",
+      "source_ids": [
+        "SRC-012"
+      ],
+      "shot_instance_id": "SRC-012-I01",
+      "scene_id": "SCENE-014",
       "shot": 12,
       "file": "SCENE-014.png",
       "visual_type": "CHART",
-      "host_present": false,
+      "planned_type": "CHART",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "--type stat --data '[{\"stat\":\"1.3 lakh\",\"label\":\"Total MBBS seats nationwide (govt + private)\",\"color\":\"#1A2B4C\"}]'",
+      "narration": "India has roughly 1.3 lakh MBBS seats nationwide, government and private combined.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": false
+      "host_present": false,
+      "paid": false,
+      "needs_review": false,
+      "route_args_sha256": "c9999009374eb44b7d22e55eec622c29daf8f125b1d78b0ce51e6817356d9561"
     },
     {
+      "visual_asset_id": "VIS-013-A",
+      "source_ids": [
+        "SRC-013"
+      ],
+      "shot_instance_id": "SRC-013-I01",
+      "scene_id": "SCENE-015",
       "shot": 13,
       "file": "SCENE-015.png",
       "visual_type": "CHART",
-      "host_present": false,
+      "planned_type": "CHART",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "--type stat --data '[{\"stat\":\"<6%\",\"label\":\"NEET-UG acceptance rate nationwide\",\"color\":\"#C0392B\"}]'",
+      "narration": "do the division and you get an acceptance rate under 6%,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": false
+      "host_present": false,
+      "paid": false,
+      "needs_review": false,
+      "route_args_sha256": "054c4f2f0e74ac54bcc38b66af9c3a1cbfc541ed0e0a3390d522d0d88ef91ac6"
     },
     {
+      "visual_asset_id": "VIS-013-B",
+      "source_ids": [
+        "SRC-013"
+      ],
+      "shot_instance_id": "SRC-013-I02",
+      "scene_id": "SCENE-016",
       "shot": 14,
       "file": "SCENE-016.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "meaning more than 19 out of every 20 students who sat that exam were always going to walk away disappointed before anyone leaked anything.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "66ee6bf929448a2326cf881bc14cabd880f140db7217a48781fd80952c37b6bc"
     },
     {
+      "visual_asset_id": "VIS-014-A",
+      "source_ids": [
+        "SRC-014"
+      ],
+      "shot_instance_id": "SRC-014-I01",
+      "scene_id": "SCENE-017",
       "shot": 15,
       "file": "SCENE-017.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "I did that division twice because I assumed I'd made an error.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "a4d4894dd58899bbbac08c02f0f92321081a0600c0d2f01b41f7795e4fd8e6c1"
     },
     {
+      "visual_asset_id": "VIS-015-A",
+      "source_ids": [
+        "SRC-015"
+      ],
+      "shot_instance_id": "SRC-015-I01",
+      "scene_id": "SCENE-018",
       "shot": 16,
       "file": "SCENE-018.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "I hadn't. Which is less competitive exam and more organic chemistry's answer to the Hunger Games?",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "f4660825eef73afbf4dcd293ab0897395a95f65fc543d05adeb9a38313c4b99a"
     },
     {
+      "visual_asset_id": "VIS-017-A",
+      "source_ids": [
+        "SRC-017"
+      ],
+      "shot_instance_id": "SRC-017-I01",
+      "scene_id": "SCENE-020",
       "shot": 17,
       "file": "SCENE-020.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "When a system is already that unforgiving, it doesn't take much to tip it from extremely hard into people will pay anything to cheat it.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "9def13072f16739bd618f83f6ceb261a2189c882ba1f99d2f6e23844f6c29a87"
     },
     {
+      "visual_asset_id": "VIS-018-A",
+      "source_ids": [
+        "SRC-018"
+      ],
+      "shot_instance_id": "SRC-018-I01",
+      "scene_id": "SCENE-021",
       "shot": 18,
       "file": "SCENE-021.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Nine days later, the guessing game caught up with the exam itself.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "656c69024b833850880a332b1333bb52f0635932ef1212733bf48034d4ab9d5b"
     },
     {
+      "visual_asset_id": "VIS-019-A",
+      "source_ids": [
+        "SRC-019"
+      ],
+      "shot_instance_id": "SRC-019-I01",
+      "scene_id": "SCENE-022",
       "shot": 19,
       "file": "SCENE-022.png",
       "visual_type": "PHOTO",
-      "host_present": false,
+      "planned_type": "PHOTO",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Investigators in Rajasthan had found guess papers,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": false
+      "host_present": false,
+      "paid": false,
+      "needs_review": false,
+      "route_args_sha256": "0d223cfcc0d4be44d388ac08a6636e08edf82de466a138de14fe9704d45547b1"
     },
     {
+      "visual_asset_id": "VIS-019-B",
+      "source_ids": [
+        "SRC-019"
+      ],
+      "shot_instance_id": "SRC-019-I02",
+      "scene_id": "SCENE-023",
       "shot": 20,
       "file": "SCENE-023.png",
       "visual_type": "CHART",
-      "host_present": false,
+      "planned_type": "CHART",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "--type stat --data '[{\"stat\":\"60-70%\",\"label\":\"Actual exam questions matched pre-sold papers\",\"color\":\"#C0392B\"}]'",
+      "narration": "pre-circulated question banks being sold for up to 5 lakh rupees each and somewhere between 60 and 70 percent of the actual paper matched them.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": false
+      "host_present": false,
+      "paid": false,
+      "needs_review": false,
+      "route_args_sha256": "60c75606e1dfadcdfdec8cfce2450145d465b8124ffba757165aba13b74401e8"
     },
     {
+      "visual_asset_id": "VIS-020-A",
+      "source_ids": [
+        "SRC-020"
+      ],
+      "shot_instance_id": "SRC-020-I01",
+      "scene_id": "SCENE-024",
       "shot": 21,
       "file": "SCENE-024.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Not vaguely similar. matched. So the National Testing Agency did the only thing left to do, cancelled the whole exam, opened a CBI probe, eventually detained 13 people,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "0d00379c3fc1a1cd6a0398e3d25621f22c4c747d50829766f6d376d8b7225517"
     },
     {
+      "visual_asset_id": "VIS-023-A",
+      "source_ids": [
+        "SRC-023"
+      ],
+      "shot_instance_id": "SRC-023-I01",
+      "scene_id": "SCENE-027",
       "shot": 22,
       "file": "SCENE-027.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "and told 22.7 lakh 18-year-olds who would spend two years of their lives preparing to sit tight, they'd get back to them.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "dee24e51f105046c6cd7251613c529ab4dea3f09d2ac7003e6a48bf86650e74e"
     },
     {
+      "visual_asset_id": "VIS-024-A",
+      "source_ids": [
+        "SRC-024"
+      ],
+      "shot_instance_id": "SRC-024-I01",
+      "scene_id": "SCENE-028",
       "shot": 23,
       "file": "SCENE-028.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Imagine training for months, running your race, finishing strong and then being told someone else on the track may have worn rocket shoes,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "dbc8e99848c1f59abcb7dd52c34a5eb514067c1742c16afe2dfedeb840679a72"
     },
     {
+      "visual_asset_id": "VIS-025-A",
+      "source_ids": [
+        "SRC-025"
+      ],
+      "shot_instance_id": "SRC-025-I01",
+      "scene_id": "SCENE-029",
       "shot": 24,
       "file": "SCENE-029.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "so could everyone please just line up and run it again next month.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "351a5c0eb3efcec2aa4347ab6b51f58375e98d4ec102131f61cf19cc8f79912d"
     },
     {
+      "visual_asset_id": "VIS-026-A",
+      "source_ids": [
+        "SRC-026"
+      ],
+      "shot_instance_id": "SRC-026-I01",
+      "scene_id": "SCENE-030",
       "shot": 25,
       "file": "SCENE-030.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "A re-exam was scheduled for 21st June. The kind of person who pays 5 lakh rupees for a leaked paper is someone who understands exactly what an ETUG is worth to a family.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "5f51722acbc8d36368dab7e64c9814bd8befe1055befca390ef5c414ed8fb6c3"
     },
     {
+      "visual_asset_id": "VIS-027-A",
+      "source_ids": [
+        "SRC-027"
+      ],
+      "shot_instance_id": "SRC-027-I01",
+      "scene_id": "SCENE-032",
       "shot": 26,
       "file": "SCENE-032.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Whole towns in India, Kota in Rajasthan,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "4492f3dac3cddfab11b2177007be55363013c7858d5dc7bef7b96a13e313fdf4"
     },
     {
+      "visual_asset_id": "VIS-028-A",
+      "source_ids": [
+        "SRC-028",
+        "SRC-029"
+      ],
+      "shot_instance_id": "SRC-028-I01",
+      "scene_id": "SCENE-033",
       "shot": 27,
       "file": "SCENE-033.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "is the famous one exist almost entirely as coaching industry economies where parents relocate their teenagers for a year or",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "a8c0be88f8915103b329de9a73b512a0bc0f08d5edeb060130d8ee361ba8fd76"
     },
     {
+      "visual_asset_id": "VIS-030-A",
+      "source_ids": [
+        "SRC-030"
+      ],
+      "shot_instance_id": "SRC-030-I01",
+      "scene_id": "SCENE-034",
       "shot": 28,
       "file": "SCENE-034.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "two and pay a serious chunk of household savings on the promise of a medical seat at the end of it.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "5c92bc8ebe6483d42f70f640efd55efd6f3bdc53c6eafa4d833a82a233fc3d32"
     },
     {
+      "visual_asset_id": "VIS-030-B",
+      "source_ids": [
+        "SRC-030"
+      ],
+      "shot_instance_id": "SRC-030-I02",
+      "scene_id": "SCENE-035",
       "shot": 29,
       "file": "SCENE-035.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "When the price is that large and that binary, someone is always going to try selling a shortcut and someone desperate enough is always going to buy it.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "df83fd3aea5291fb52992268d7d0d9992066614e22a601a3ee874afc98355396"
     },
     {
+      "visual_asset_id": "VIS-030-C",
+      "source_ids": [
+        "SRC-030"
+      ],
+      "shot_instance_id": "SRC-030-I03",
+      "scene_id": "SCENE-036",
       "shot": 30,
       "file": "SCENE-036.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "The leak wasn't a random glitch in the system. It was the system's own economics working exactly as you'd expect.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "1c1b4f6b21d42208ba9e064c9ffee6bdcdc3672128b330d99665592fe656ebc6"
     },
     {
+      "visual_asset_id": "VIS-032-A",
+      "source_ids": [
+        "SRC-032"
+      ],
+      "shot_instance_id": "SRC-032-I01",
+      "scene_id": "SCENE-038",
       "shot": 31,
       "file": "SCENE-038.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Here's the part that makes this properly absurd, though the National Testing Agency exists specifically to prevent this.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "5df0e4b716209cda7491f63be48966e8a3120017238106e43752da2aae56a731"
     },
     {
+      "visual_asset_id": "VIS-033-A",
+      "source_ids": [
+        "SRC-033"
+      ],
+      "shot_instance_id": "SRC-033-I01",
+      "scene_id": "SCENE-039",
       "shot": 32,
       "file": "SCENE-039.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "It was created in November 2017, pulled out from under India's Central School Board,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "c888bf57505285298d27301a10d8192773e72193291de075025b35af7261e687"
     },
     {
+      "visual_asset_id": "VIS-034-A",
+      "source_ids": [
+        "SRC-034"
+      ],
+      "shot_instance_id": "SRC-034-I01",
+      "scene_id": "SCENE-040",
       "shot": 33,
       "file": "SCENE-040.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "with one pitch – take exam administration away from an overloaded education bureaucracy and hand it to a dedicated,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "f41acb02d798c4804c0c8210fd1fad32f1ab6d7235d7dbd701afcbaa31ce413c"
     },
     {
+      "visual_asset_id": "VIS-035-A",
+      "source_ids": [
+        "SRC-035"
+      ],
+      "shot_instance_id": "SRC-035-I01",
+      "scene_id": "SCENE-041",
       "shot": 34,
       "file": "SCENE-041.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "modern, professional agency that could run tests at international standard.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "71fc1e8b7705e377bf66b38f6fbfdeda155dc084c751f30b644d81a5a7e4279f"
     },
     {
+      "visual_asset_id": "VIS-035-B",
+      "source_ids": [
+        "SRC-035"
+      ],
+      "shot_instance_id": "SRC-035-I02",
+      "scene_id": "SCENE-042",
       "shot": 35,
       "file": "SCENE-042.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "That was the actual sales pitch, word for word,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "c5f2fd773c87a0b27ed2c043977dfb93490bf8d3832891b9c67327560382701d"
     },
     {
+      "visual_asset_id": "VIS-035-C",
+      "source_ids": [
+        "SRC-035"
+      ],
+      "shot_instance_id": "SRC-035-I03",
+      "scene_id": "SCENE-043",
       "shot": 36,
       "file": "SCENE-043.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "back when it launched like hiring a professional organizer to sort out your messy closet and",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "72ebd2078673758d5f32fcbae8b9642b3343731b4394506246ae36ae3f54c581"
     },
     {
+      "visual_asset_id": "VIS-035-D",
+      "source_ids": [
+        "SRC-035"
+      ],
+      "shot_instance_id": "SRC-035-I04",
+      "scene_id": "SCENE-044",
       "shot": 37,
       "file": "SCENE-044.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "nine years later your clothes are on fire and the organizer is the one holding the matches.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "5f07fb491b53948827ba739ac2e36c26d5433b1f6da0047b9884790fab38b6bf"
     },
     {
+      "visual_asset_id": "VIS-035-E",
+      "source_ids": [
+        "SRC-035"
+      ],
+      "shot_instance_id": "SRC-035-I05",
+      "scene_id": "SCENE-045",
       "shot": 38,
       "file": "SCENE-045.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "The specialist agency built to fix exam integrity is the one whose integrity is now the actual news story.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "cca3ad05660153b1feb67503c93c84c7d6c3611a4d7daeebac9686dd71304dbc"
     },
     {
+      "visual_asset_id": "VIS-035-F",
+      "source_ids": [
+        "SRC-035"
+      ],
+      "shot_instance_id": "SRC-035-I06",
+      "scene_id": "SCENE-046",
       "shot": 39,
       "file": "SCENE-046.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "I keep waiting for the twist where this turns out to be a different agency.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "fcacfde77330852997afc88fd677d5c7da72d848aa4afd202242ba2201907030"
     },
     {
+      "visual_asset_id": "VIS-036-A",
+      "source_ids": [
+        "SRC-036"
+      ],
+      "shot_instance_id": "SRC-036-I01",
+      "scene_id": "SCENE-047",
       "shot": 40,
       "file": "SCENE-047.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "It never comes. If this sounds familiar, that's because it already happened.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "d67df5bfc696c1de33b2ce3aef70dbd22401d093b02382c3a56424abea920d7a"
     },
     {
+      "visual_asset_id": "VIS-038-A",
+      "source_ids": [
+        "SRC-038"
+      ],
+      "shot_instance_id": "SRC-038-I01",
+      "scene_id": "SCENE-049",
       "shot": 41,
       "file": "SCENE-049.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "In 2024, the exact same exam leaked,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "11400930e69eab9a85d163296b4af4defc82d23daadcd77c35b5c554a24ddb36"
     },
     {
+      "visual_asset_id": "VIS-039-A",
+      "source_ids": [
+        "SRC-039"
+      ],
+      "shot_instance_id": "SRC-039-I01",
+      "scene_id": "SCENE-050",
       "shot": 42,
       "file": "SCENE-050.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "and the fallout was bad enough that the government formed a high-level committee led by a former ISRO chairman with one job – fix the National Testing Agency for good.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "cf3cc856938b25f93f685c754091afc5d629f8a686a3a496edfeefdca8ffeaff"
     },
     {
+      "visual_asset_id": "VIS-040-A",
+      "source_ids": [
+        "SRC-040"
+      ],
+      "shot_instance_id": "SRC-040-I01",
+      "scene_id": "SCENE-051",
       "shot": 43,
       "file": "SCENE-051.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "That committee didn't hold back. It filed a 101 recommendations, online testing, better candidate authentication using government schools as secure exam centres.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "37f692ca49387d9c6d47e951436d0393e04ddb5089f83c591200550b19c8ed93"
     },
     {
+      "visual_asset_id": "VIS-041-A",
+      "source_ids": [
+        "SRC-041"
+      ],
+      "shot_instance_id": "SRC-041-I01",
+      "scene_id": "SCENE-053",
       "shot": 44,
       "file": "SCENE-053.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "A 101 is an oddly specific number for a to-do list and by this May,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "c3d26a0ce839ca135a6ae2647b452b1734d9a5c6108dd0f570e38c07f27ed203"
     },
     {
+      "visual_asset_id": "VIS-042-A",
+      "source_ids": [
+        "SRC-042"
+      ],
+      "shot_instance_id": "SRC-042-I01",
+      "scene_id": "SCENE-054",
       "shot": 45,
       "file": "SCENE-054.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "the man who chaired it told the Supreme Court that most of them were done or actively underway and in Indian bureaucracy,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "21c525983c83522fbd25040b4199a7ed600c1a3d2e8bf4c1049e0e5ddb102c4f"
     },
     {
+      "visual_asset_id": "VIS-042-B",
+      "source_ids": [
+        "SRC-042"
+      ],
+      "shot_instance_id": "SRC-042-I02",
+      "scene_id": "SCENE-055",
       "shot": 46,
       "file": "SCENE-055.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "actively underway carries roughly the same weight as I'll text you back does in a relationship that's already over.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "223641addd55814313b82c1b8e09708d43d47c341f4374995973b0e8d1e86f0b"
     },
     {
+      "visual_asset_id": "VIS-043-A",
+      "source_ids": [
+        "SRC-043"
+      ],
+      "shot_instance_id": "SRC-043-I01",
+      "scene_id": "SCENE-056",
       "shot": 47,
       "file": "SCENE-056.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "And then, two years after that report landed, the same exam leaked again anyway through more or less the same hole.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "a1a5cc512a3e6b350d539a98e35a901b1d27df682104e4d394544850cf6d3812"
     },
     {
+      "visual_asset_id": "VIS-043-B",
+      "source_ids": [
+        "SRC-043"
+      ],
+      "shot_instance_id": "SRC-043-I02",
+      "scene_id": "SCENE-057",
       "shot": 48,
       "file": "SCENE-057.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "In 2024, it was pen and paper question sets moving through an offline network of coaching agents before exam day.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "fde8e846a3e5dddf5aadcaf283f5116b38cd6c865e3d9adec5616f50ae837909"
     },
     {
+      "visual_asset_id": "VIS-043-C",
+      "source_ids": [
+        "SRC-043"
+      ],
+      "shot_instance_id": "SRC-043-I03",
+      "scene_id": "SCENE-058",
       "shot": 49,
       "file": "SCENE-058.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "In 2026, it was guess papers built of leaked question banks, sold for cash, matched against the real thing at 60-70% overlap.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "08c3a375cc193600b3e416f52c5777eb79819c0482dd8c821c5063eddc66e5cf"
     },
     {
+      "visual_asset_id": "VIS-044-A",
+      "source_ids": [
+        "SRC-044"
+      ],
+      "shot_instance_id": "SRC-044-I01",
+      "scene_id": "SCENE-059",
       "shot": 50,
       "file": "SCENE-059.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Different vocabulary, same underlying failure, a paper-based, once-a-year,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "8a598c99030abdf91244e196364cb051ef98ba6d4a836c03caf124f2f3c6296b"
     },
     {
+      "visual_asset_id": "VIS-045-A",
+      "source_ids": [
+        "SRC-045"
+      ],
+      "shot_instance_id": "SRC-045-I01",
+      "scene_id": "SCENE-060",
       "shot": 51,
       "file": "SCENE-060.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "winner-takes-almost-nothing exam that has to stay secret for months while it moves through printing presses,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "cd4963ddb9fc6787c9420ba960f0e5482d18575aa316ed5a1363cca514c35ae2"
     },
     {
+      "visual_asset_id": "VIS-046-A",
+      "source_ids": [
+        "SRC-046"
+      ],
+      "shot_instance_id": "SRC-046-I01",
+      "scene_id": "SCENE-061",
       "shot": 52,
       "file": "SCENE-061.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "transport routes, and exam centers in every state, handled by thousands of people along the way.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "3d5ffad8026faef89a3b47c009a54befa3806758a2e753252f122bf6ecf4375d"
     },
     {
+      "visual_asset_id": "VIS-047-A",
+      "source_ids": [
+        "SRC-047"
+      ],
+      "shot_instance_id": "SRC-047-I01",
+      "scene_id": "SCENE-062",
       "shot": 53,
       "file": "SCENE-062.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "You only need one weak link in that chain, and apparently, every couple of years, there is one.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "11fc99e64644d0d1bc9e0753aa03e5c06958600ce8466059a44658b4743eb49f"
     },
     {
+      "visual_asset_id": "VIS-047-B",
+      "source_ids": [
+        "SRC-047"
+      ],
+      "shot_instance_id": "SRC-047-I02",
+      "scene_id": "SCENE-063",
       "shot": 54,
       "file": "SCENE-063.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Which raises an obvious problem with the whole reform effort,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "b39a599579d230cfe36648521a6f27119a69e795964f715325e8625a7e2710ed"
     },
     {
+      "visual_asset_id": "VIS-047-C",
+      "source_ids": [
+        "SRC-047"
+      ],
+      "shot_instance_id": "SRC-047-I03",
+      "scene_id": "SCENE-064",
       "shot": 55,
       "file": "SCENE-064.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "a 101-point plan clearly wasn't enough if the thing it was built to stop just happened again anyway.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "e0773869b79e545b30d77fb36ef4151ce5980dd0f0eb72e6c851f57c7cd92f6e"
     },
     {
+      "visual_asset_id": "VIS-048-A",
+      "source_ids": [
+        "SRC-048"
+      ],
+      "shot_instance_id": "SRC-048-I01",
+      "scene_id": "SCENE-065",
       "shot": 56,
       "file": "SCENE-065.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "I don't have a good answer for that one, and I've been sitting with it for a while.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "b1bc055a21000168618855746e44113d15b03337eb3fc7fa0d4b59a07722c233"
     },
     {
+      "visual_asset_id": null,
+      "source_ids": [
+        "SRC-049"
+      ],
+      "shot_instance_id": "SRC-049-I01",
+      "scene_id": "SCENE-066",
       "shot": 57,
       "file": "SCENE-066.png",
       "visual_type": "PHOTO",
-      "host_present": false,
+      "planned_type": "PHOTO",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "While all of this was working its way through the courts, the Chief Justice of India said something he probably wishes he could take back.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": false
+      "host_present": false,
+      "paid": false,
+      "needs_review": true,
+      "route_args_sha256": "d2da2d5af47a63811f5cf5f87389c934295c2c553d52830625cd0127b4e89837"
     },
     {
+      "visual_asset_id": "VIS-049-A",
+      "source_ids": [
+        "SRC-049"
+      ],
+      "shot_instance_id": "SRC-049-I02",
+      "scene_id": "SCENE-067",
       "shot": 58,
       "file": "SCENE-067.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "He'd spent months fielding urgent petition after urgent petition over the NET mess and during one hearing, talking about young, unemployed activists,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "658faf85aade97af3a763862fd3991561a0bcf9f9eb8ff054848a05f05bb5f87"
     },
     {
+      "visual_asset_id": "VIS-050-A",
+      "source_ids": [
+        "SRC-050"
+      ],
+      "shot_instance_id": "SRC-050-I01",
+      "scene_id": "SCENE-068",
       "shot": 59,
       "file": "SCENE-068.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "he compared them to cockroaches, people who, in his words, don't get jobs, so some of them become RTI activists and start attacking everyone.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "16338670a5760febbebc324f4b6ab94d940576918ba7280dc902c60ab30b68c3"
     },
     {
+      "visual_asset_id": "VIS-051-A",
+      "source_ids": [
+        "SRC-051"
+      ],
+      "shot_instance_id": "SRC-051-I01",
+      "scene_id": "SCENE-069",
       "shot": 60,
       "file": "SCENE-069.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "You can hear the frustration in that line. A judge tired of being everyone's last resort.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "b9d123a03b4c02aa92bea4b055ba1321236c18e40c933ad6596832a5729230ff"
     },
     {
+      "visual_asset_id": "VIS-052-B",
+      "source_ids": [
+        "SRC-052"
+      ],
+      "shot_instance_id": "SRC-052-I02",
+      "scene_id": "SCENE-071",
       "shot": 61,
       "file": "SCENE-071.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "But frustration doesn't always translate well into a soundbite, and this one didn't.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "7ee457631664c665bf49cf8336804e2252c538fe1a3a606a23b60e66bff3cf6d"
     },
     {
+      "visual_asset_id": "VIS-052-C",
+      "source_ids": [
+        "SRC-052"
+      ],
+      "shot_instance_id": "SRC-052-I03",
+      "scene_id": "SCENE-072",
       "shot": 62,
       "file": "SCENE-072.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "It was meant as a dismissal. It landed as a gift. Within 78 hours, a college student named Abhijeet Dipke had turned that one sentence into a satirical social media page called the Cockroach Janta Party,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "0785bb07b59fa8c17f3a96b7b9921bcb5cb661fd4c438f6e462fe81f1ed0de88"
     },
     {
+      "visual_asset_id": "VIS-055-A",
+      "source_ids": [
+        "SRC-055"
+      ],
+      "shot_instance_id": "SRC-055-I01",
+      "scene_id": "SCENE-075",
       "shot": 63,
       "file": "SCENE-075.png",
       "visual_type": "CHART",
-      "host_present": false,
+      "planned_type": "CHART",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "--type stat --data '[{\"stat\":\"30 LAKH\",\"label\":\"Followers in 78 hours\",\"color\":\"#8B0000\"}]' --title \"Cockroach Janta Party Growth\"",
+      "narration": "Cockroach, People's Party, and it had 30 lakh followers.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": false
+      "host_present": false,
+      "paid": false,
+      "needs_review": false,
+      "route_args_sha256": "2d3c82030b8188823c62d643ec30f132b7ddbd3912891bfde6f0f6a362b0b36e"
     },
     {
+      "visual_asset_id": "VIS-056-A",
+      "source_ids": [
+        "SRC-056"
+      ],
+      "shot_instance_id": "SRC-056-I01",
+      "scene_id": "SCENE-076",
       "shot": 64,
       "file": "SCENE-076.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Not a real political party. No candidates, no manifesto beyond the exam system is broken and somebody in a suit should say so.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "b488c5c24c0a095e7c71abeba7c337387c65414a9ba0a62dbb4ec16d3250ae2a"
     },
     {
+      "visual_asset_id": "VIS-057-B",
+      "source_ids": [
+        "SRC-057"
+      ],
+      "shot_instance_id": "SRC-057-I02",
+      "scene_id": "SCENE-078",
       "shot": 65,
       "file": "SCENE-078.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Just a joke account that decided to become the loudest voice in the room.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "80a4612f74835d5698d61710cbc65774a0ed0801c8a67e160ded02ce9a37c5f2"
     },
     {
+      "visual_asset_id": "VIS-058-A",
+      "source_ids": [
+        "SRC-058"
+      ],
+      "shot_instance_id": "SRC-058-I01",
+      "scene_id": "SCENE-079",
       "shot": 66,
       "file": "SCENE-079.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "You've probably seen a group chat rename itself something ridiculous after one bad meeting and then watched that ridiculous name somehow become the entire group's personality.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "2a40a5da366cfe8bf7468ddeec9c48e5497ac6f0038f2168f6b321d892b70abc"
     },
     {
+      "visual_asset_id": "VIS-059-A",
+      "source_ids": [
+        "SRC-059"
+      ],
+      "shot_instance_id": "SRC-059-I01",
+      "scene_id": "SCENE-080",
       "shot": 67,
       "file": "SCENE-080.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "That's this, at national scale, except the group chat, in this case, has 30 lakh members and a logo.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "b1762deffaea719eefd0e0d68141c8056058fb23a2621f4c41fb0738c609c250"
     },
     {
+      "visual_asset_id": "VIS-059-B",
+      "source_ids": [
+        "SRC-059"
+      ],
+      "shot_instance_id": "SRC-059-I02",
+      "scene_id": "SCENE-081",
       "shot": 68,
       "file": "SCENE-081.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "I would like it on record that I did not see this coming.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "ad3cc23ecc7ea770644972b58c42a203f97bd2c61af479ceed60a1284171ef1e"
     },
     {
+      "visual_asset_id": "VIS-060-A",
+      "source_ids": [
+        "SRC-060"
+      ],
+      "shot_instance_id": "SRC-060-I01",
+      "scene_id": "SCENE-082",
       "shot": 69,
       "file": "SCENE-082.png",
       "visual_type": "PHOTO",
-      "host_present": false,
+      "planned_type": "PHOTO",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "The joke did not stay a joke for long. Protesters started carrying actual cockroach signs to Jantar Mantar, Delhi's designated protest lawn, and the movement spread outward to Pune, Bengaluru, and Lucknow.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": false
+      "host_present": false,
+      "paid": false,
+      "needs_review": false,
+      "route_args_sha256": "b1833f9460f2ce2547487933f3a0a78228696f923e0280bb07beee19c2ed6f45"
     },
     {
+      "visual_asset_id": "VIS-062-A",
+      "source_ids": [
+        "SRC-062",
+        "SRC-063"
+      ],
+      "shot_instance_id": "SRC-062-I01",
+      "scene_id": "SCENE-084",
       "shot": 70,
       "file": "SCENE-084.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "A well-known activist, Sonam Wangachuk, joined in with a 26-day hunger strike.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "03ed1690b84b7a0fdc881d961b3db6d5a2c17fa5e2e0807609bbc6efc08c47ae"
     },
     {
+      "visual_asset_id": "VIS-064-A",
+      "source_ids": [
+        "SRC-064"
+      ],
+      "shot_instance_id": "SRC-064-I01",
+      "scene_id": "SCENE-085",
       "shot": 71,
       "file": "SCENE-085.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Wangachuk wasn't some random celebrity endorsement.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "49d5af737bc119221e4ca26989506b480b6fed92571a8456153f5a42e1c3d2db"
     },
     {
+      "visual_asset_id": "VIS-065-A",
+      "source_ids": [
+        "SRC-065"
+      ],
+      "shot_instance_id": "SRC-065-I01",
+      "scene_id": "SCENE-086",
       "shot": 72,
       "file": "SCENE-086.png",
       "visual_type": "PHOTO",
-      "host_present": false,
+      "planned_type": "PHOTO",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "He'd already built a real reputation from education and climate protests in Ladakh, the kind of credibility that doesn't come from a verified badge.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": false
+      "host_present": false,
+      "paid": false,
+      "needs_review": false,
+      "route_args_sha256": "dcee52367d361cb239ba63484efdc74502ebdd7d155de5f739acfb7e6d277ff2"
     },
     {
+      "visual_asset_id": "VIS-066-A",
+      "source_ids": [
+        "SRC-066"
+      ],
+      "shot_instance_id": "SRC-066-I01",
+      "scene_id": "SCENE-087",
       "shot": 73,
       "file": "SCENE-087.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "His involvement is what turned an internet joke into something newsrooms could no longer file under student memes and move on from.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "e3a1d84e2086f81efee8dc898ab4f7c36461659c171a324618890983848afe10"
     },
     {
+      "visual_asset_id": "VIS-066-B",
+      "source_ids": [
+        "SRC-066"
+      ],
+      "shot_instance_id": "SRC-066-I02",
+      "scene_id": "SCENE-088",
       "shot": 74,
       "file": "SCENE-088.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "And that's really the story of this whole movement.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "fd55dc32f25a739b9722a4f8f1b35065f32c7e43bb146546e0af5acaec99cc6b"
     },
     {
+      "visual_asset_id": "VIS-067-A",
+      "source_ids": [
+        "SRC-067"
+      ],
+      "shot_instance_id": "SRC-067-I01",
+      "scene_id": "SCENE-089",
       "shot": 75,
       "file": "SCENE-089.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "It started as a punchline, built its audience like a meme page, and only afterward picked up the institutional weight a hunger strike,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "3f3fdd9548647033212b7d32f72b3da2070122054d0aa5b5c444385ba02e7ffc"
     },
     {
+      "visual_asset_id": "VIS-068-A",
+      "source_ids": [
+        "SRC-068"
+      ],
+      "shot_instance_id": "SRC-068-I01",
+      "scene_id": "SCENE-090",
       "shot": 76,
       "file": "SCENE-090.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "national headlines, a resignation that traditional protest movements usually need years to earn.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "026899f659d8ee039f5b307278e9f17857d73763e5f9cb4f64ceef8fbc1114bb"
     },
     {
+      "visual_asset_id": "VIS-068-B",
+      "source_ids": [
+        "SRC-068"
+      ],
+      "shot_instance_id": "SRC-068-I02",
+      "scene_id": "SCENE-091",
       "shot": 77,
       "file": "SCENE-091.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "For a while, the government's response was to call the whole thing anti-national.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "a2b9bade1c16d9d6348baf2db10cc1c20a1aab2dc83ba04151c8da00d516dd7d"
     },
     {
+      "visual_asset_id": "VIS-068-C",
+      "source_ids": [
+        "SRC-068"
+      ],
+      "shot_instance_id": "SRC-068-I03",
+      "scene_id": "SCENE-092",
       "shot": 78,
       "file": "SCENE-092.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Yes, firing one minister doesn't install biometric scanners or rewrite how the National Testing Agency hires people, fix the system.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "133e12d0110fe53029f7909f152b3d41e08c2be357d72ed0b6a843586d15dfa9"
     },
     {
+      "visual_asset_id": "VIS-069-A",
+      "source_ids": [
+        "SRC-069"
+      ],
+      "shot_instance_id": "SRC-069-I01",
+      "scene_id": "SCENE-093",
       "shot": 79,
       "file": "SCENE-093.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Not just the man standing near it is not an unreasonable position on its own.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "a5085da7a2900fee3ed18777e8d3b6b6a6a8c86510867626652c24eaab2a9d53"
     },
     {
+      "visual_asset_id": "VIS-069-B",
+      "source_ids": [
+        "SRC-069"
+      ],
+      "shot_instance_id": "SRC-069-I02",
+      "scene_id": "SCENE-094",
       "shot": 80,
       "file": "SCENE-094.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "But you can be technically right and still lose the room completely.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "ef8e1a59b384c372a610a780115dc39dd096c98397a85024f196f5fca704676d"
     },
     {
+      "visual_asset_id": "VIS-069-C",
+      "source_ids": [
+        "SRC-069"
+      ],
+      "shot_instance_id": "SRC-069-I03",
+      "scene_id": "SCENE-095",
       "shot": 81,
       "file": "SCENE-095.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "I've been technically right about plenty of arguments I still lost, so I sympathise a little.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "30c73b5b83544a16fc5a514cd399cdb6c819efc4d20766aed9639c71dbe24402"
     },
     {
+      "visual_asset_id": "VIS-070-A",
+      "source_ids": [
+        "SRC-070"
+      ],
+      "shot_instance_id": "SRC-070-I01",
+      "scene_id": "SCENE-096",
       "shot": 82,
       "file": "SCENE-096.png",
       "visual_type": "PHOTO",
-      "host_present": false,
+      "planned_type": "PHOTO",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Then, on 20th July and 21st, police used lathi charges,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": false
+      "host_present": false,
+      "paid": false,
+      "needs_review": false,
+      "route_args_sha256": "bf4b96c84e3ce8b89a0193770377077cf2690c427cd5fb1c1036a2751c647930"
     },
     {
+      "visual_asset_id": "VIS-071-A",
+      "source_ids": [
+        "SRC-071"
+      ],
+      "shot_instance_id": "SRC-071-I01",
+      "scene_id": "SCENE-097",
       "shot": 83,
       "file": "SCENE-097.png",
       "visual_type": "PHOTO",
-      "host_present": false,
+      "planned_type": "PHOTO",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "the baton crackdowns you've almost certainly seen in a dozen other Indian protest videos.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": false
+      "host_present": false,
+      "paid": false,
+      "needs_review": false,
+      "route_args_sha256": "6c7c5c6c7e6f47d3b81e7a84731c0431238fe885fc4d691c4ffe77be990b337d"
     },
     {
+      "visual_asset_id": "VIS-072-A",
+      "source_ids": [
+        "SRC-072"
+      ],
+      "shot_instance_id": "SRC-072-I01",
+      "scene_id": "SCENE-098",
       "shot": 84,
       "file": "SCENE-098.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "The government said protesters had blocked roads and ignored repeated orders to disperse.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "65fe610cccd2e46979f0d9b6a4a55a9df71b9befffe0920a0344225957523f46"
     },
     {
+      "visual_asset_id": "VIS-072-B",
+      "source_ids": [
+        "SRC-072"
+      ],
+      "shot_instance_id": "SRC-072-I02",
+      "scene_id": "SCENE-099",
       "shot": 85,
       "file": "SCENE-099.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Protesters said they were standing with placards and got charged anyway.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "3526edcf51f1be8306dc85f50c5815c059713a61478516feb36319be23585520"
     },
     {
+      "visual_asset_id": "VIS-073-A",
+      "source_ids": [
+        "SRC-073"
+      ],
+      "shot_instance_id": "SRC-073-I01",
+      "scene_id": "SCENE-100",
       "shot": 86,
       "file": "SCENE-100.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Both things can be true in different corners of the same crowd.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "ed376bd3ec5a675002e3f2178bc2df1ee568a9cf6833a66c9e40a8920f49136d"
     },
     {
+      "visual_asset_id": "VIS-073-B",
+      "source_ids": [
+        "SRC-073"
+      ],
+      "shot_instance_id": "SRC-073-I02",
+      "scene_id": "SCENE-101",
       "shot": 87,
       "file": "SCENE-101.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "What isn't in dispute is what the footage that actually went viral showed.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "f9b14680cc3e096b01e9b04ec8bea36935018bb27d189cdcee2b20e3df64b48c"
     },
     {
+      "visual_asset_id": "VIS-074-A",
+      "source_ids": [
+        "SRC-074"
+      ],
+      "shot_instance_id": "SRC-074-I01",
+      "scene_id": "SCENE-102",
       "shot": 88,
       "file": "SCENE-102.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Mostly college students, holding insect-themed placards, getting hit with batons.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "5167e2d3d6602d49f8712cf0f0b986eec0c97d0486ad533c1fe7fa881e5e7bc6"
     },
     {
+      "visual_asset_id": "VIS-075-A",
+      "source_ids": [
+        "SRC-075"
+      ],
+      "shot_instance_id": "SRC-075-I01",
+      "scene_id": "SCENE-103",
       "shot": 89,
       "file": "SCENE-103.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Which, whether or not someone 20 minutes earlier had blocked a road, is not the optics you want if you're trying to argue the crackdown was proportionate.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "f37c4e10d5af261ffeb0042df4f2072a9b52e221b83b4624360b5c0c7cdea6db"
     },
     {
+      "visual_asset_id": "VIS-075-B",
+      "source_ids": [
+        "SRC-075"
+      ],
+      "shot_instance_id": "SRC-075-I02",
+      "scene_id": "SCENE-104",
       "shot": 90,
       "file": "SCENE-104.png",
       "visual_type": "CHART",
-      "host_present": false,
+      "planned_type": "CHART",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "--type timeline --data '[{\"year\":\"May-Jun\",\"event\":\"Minister staying rumors\"},{\"year\":\"July 20-21\",\"event\":\"Lathi charges\"},{\"year\":\"July 23\",\"event\":\"Minister not staying\"}]' --title \"48-Hour Window\"",
+      "narration": "Two months off the minister is staying followed by roughly 48 hours, in late July, where he wasn't.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": false
+      "host_present": false,
+      "paid": false,
+      "needs_review": false,
+      "route_args_sha256": "a0d6b433ee63dd92add08c2d88645f01a9ae58b76c20662caac7736fd132f472"
     },
     {
+      "visual_asset_id": "VIS-075-C",
+      "source_ids": [
+        "SRC-075"
+      ],
+      "shot_instance_id": "SRC-075-I03",
+      "scene_id": "SCENE-105",
       "shot": 91,
       "file": "SCENE-105.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "On 25th July, Dharmendra Pradhan resigned as Union Education Minister, writing that he didn't want the country's students left trapped in a web of confusion.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "7efdf41e2866e87304efaa7761847dab4b1bac1069fb36d0873d5f1dd8946ee5"
     },
     {
+      "visual_asset_id": "VIS-076-A",
+      "source_ids": [
+        "SRC-076"
+      ],
+      "shot_instance_id": "SRC-076-I01",
+      "scene_id": "SCENE-106",
       "shot": 92,
       "file": "SCENE-106.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "The President accepted it the same day, and Cabinet Minister Prahlad Joshi picked up the education portfolio on top of the one he already had one person to cabinet-level jobs,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "3c305d32d802a0ff3e647b9b5694feb8193fe37976b2db6f003911ea1eeadb8e"
     },
     {
+      "visual_asset_id": "VIS-077-B",
+      "source_ids": [
+        "SRC-077"
+      ],
+      "shot_instance_id": "SRC-077-I02",
+      "scene_id": "SCENE-108",
       "shot": 93,
       "file": "SCENE-108.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "not because he is uniquely qualified for both but because the desk needed a name on it by evening.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "75599eda0ea062995851eb2f9ffd3103163c13feccce2071a2dbef0f37654118"
     },
     {
+      "visual_asset_id": "VIS-077-C",
+      "source_ids": [
+        "SRC-077"
+      ],
+      "shot_instance_id": "SRC-077-I03",
+      "scene_id": "SCENE-109",
       "shot": 94,
       "file": "SCENE-109.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Indian cabinets do this constantly, and the spare ministry to whoever has room that week, like a portfolio is a task you assign rather than a job someone trains for.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "0f59fed6a3c579561bac21587a7674c8fe74b20db64cc0adf34f0bc10d673e93"
     },
     {
+      "visual_asset_id": "VIS-077-D",
+      "source_ids": [
+        "SRC-077"
+      ],
+      "shot_instance_id": "SRC-077-I04",
+      "scene_id": "SCENE-110",
       "shot": 95,
       "file": "SCENE-110.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "The cockroach Janata Party announced it was ending its Jantar Mantar protest in good faith that same week.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "d4edba915a64bd90bcda9ab8887d3094700353ac1cef82706286b1e2cb7216b1"
     },
     {
+      "visual_asset_id": "VIS-078-A",
+      "source_ids": [
+        "SRC-078"
+      ],
+      "shot_instance_id": "SRC-078-I01",
+      "scene_id": "SCENE-111",
       "shot": 96,
       "file": "SCENE-111.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Sit with that for a second, a mem account had outlasted a sitting cabinet minister.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "75d7293cf2695606316045df68ab93f75ac9ed378d395c2fcf2a022c8dd40f48"
     },
     {
+      "visual_asset_id": "VIS-079-A",
+      "source_ids": [
+        "SRC-079"
+      ],
+      "shot_instance_id": "SRC-079-I01",
+      "scene_id": "SCENE-112",
       "shot": 97,
       "file": "SCENE-112.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "I don't know what I expected from 2026, but it wasn't that.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "d62b26ff60fbf84f3d3ee847a3da656c1ba338ccde2ca7f623501ab2366b4c88"
     },
     {
+      "visual_asset_id": "VIS-080-A",
+      "source_ids": [
+        "SRC-080"
+      ],
+      "shot_instance_id": "SRC-080-I01",
+      "scene_id": "SCENE-113",
       "shot": 98,
       "file": "SCENE-113.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "And then, because this is how Indian bureaucracy always closes a loop, the government announced its response.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "5caa025313ba44348f7e01d824fbf5e1d264de1cd56f5adb4cbd1c2916152222"
     },
     {
+      "visual_asset_id": "VIS-081-A",
+      "source_ids": [
+        "SRC-081"
+      ],
+      "shot_instance_id": "SRC-081-I01",
+      "scene_id": "SCENE-114",
       "shot": 99,
       "file": "SCENE-114.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "A new expert committee, pulling from technology, education and administration, to recommend long-term reforms.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "0dda22acf0084f059075090584886fbe33e2774b2ae9e11ee35e8a1d8b7c5111"
     },
     {
+      "visual_asset_id": "VIS-082-A",
+      "source_ids": [
+        "SRC-082"
+      ],
+      "shot_instance_id": "SRC-082-I01",
+      "scene_id": "SCENE-115",
       "shot": 100,
       "file": "SCENE-115.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "NETUG is reportedly moving to computer-based testing next year.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "c7dcbfff88c0efc2dd6e60ac279f303ea26f3125f82292a5a2987afa5b46e25e"
     },
     {
+      "visual_asset_id": "VIS-082-B",
+      "source_ids": [
+        "SRC-082"
+      ],
+      "shot_instance_id": "SRC-082-I02",
+      "scene_id": "SCENE-116",
       "shot": 101,
       "file": "SCENE-116.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "biometric checks, tighter paper security, more digital surveillance all promised, again,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "23c03ca1277f4a97d3a361f54386e76d880fc72bef8fb24df24297740b65240e"
     },
     {
+      "visual_asset_id": "VIS-083-A",
+      "source_ids": [
+        "SRC-083"
+      ],
+      "shot_instance_id": "SRC-083-I01",
+      "scene_id": "SCENE-117",
       "shot": 102,
       "file": "SCENE-117.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "on top of the 101 promises already sitting in a file somewhere from the last time.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "21517b62d55160a8adfef2c3f75787a01f62e1583d5fc64e2aa8bd2b185ae624"
     },
     {
+      "visual_asset_id": "VIS-084-A",
+      "source_ids": [
+        "SRC-084"
+      ],
+      "shot_instance_id": "SRC-084-I01",
+      "scene_id": "SCENE-118",
       "shot": 103,
       "file": "SCENE-118.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "If you've lost count of how many committees I've mentioned in the last 2 minutes, congratulations, you're feeling roughly 1% of the exhaustion the actual students feel.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "0db7af5f165a9b0430715e76484dbe4c79cade77123cd32da3bbafbbe94d60ea"
     },
     {
+      "visual_asset_id": "VIS-084-B",
+      "source_ids": [
+        "SRC-084"
+      ],
+      "shot_instance_id": "SRC-084-I02",
+      "scene_id": "SCENE-119",
       "shot": 104,
       "file": "SCENE-119.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "And while the government was scheduling this one, the cockroaches, somewhere, were presumably already scheduling the next protest.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "6727ce6af2624775be520df04ba91bdf901891b3b6d81f3cad47ce9c70bb5870"
     },
     {
+      "visual_asset_id": "VIS-085-A",
+      "source_ids": [
+        "SRC-085"
+      ],
+      "shot_instance_id": "SRC-085-I01",
+      "scene_id": "SCENE-120",
       "shot": 105,
       "file": "SCENE-120.png",
       "visual_type": "CHART",
-      "host_present": false,
+      "planned_type": "CHART",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "--type stat --data '[{\"stat\":\"22.7L\",\"label\":\"Students sat the May exam\",\"color\":\"#1A2B4C\"}]'",
+      "narration": "For the 22.7 lakh students who actually sat that May exam, none of this committee top changes what the last few months cost them.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": false
+      "host_present": false,
+      "paid": false,
+      "needs_review": false,
+      "route_args_sha256": "b8a02311835c59d3cc03bd7a0e6998062b926aef1162b4777221948b5fd8b7f6"
     },
     {
+      "visual_asset_id": "VIS-086-A",
+      "source_ids": [
+        "SRC-086"
+      ],
+      "shot_instance_id": "SRC-086-I01",
+      "scene_id": "SCENE-121",
       "shot": 106,
       "file": "SCENE-121.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "A re-exam 8 weeks later than planned. A summer spent not knowing whether the score they'd earned would even count.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "ccc3ded1b90bbcaf3bfda7599123ab4cdd6903e24d45159abb4928b1eb46152c"
     },
     {
+      "visual_asset_id": "VIS-088-A",
+      "source_ids": [
+        "SRC-088"
+      ],
+      "shot_instance_id": "SRC-088-I01",
+      "scene_id": "SCENE-123",
       "shot": 107,
       "file": "SCENE-123.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Coaching Institute deadlines and hostel leases that don't pause for a CBI probe.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "71956cc14bb0430b2fab2c9638985d510378961675d11770b9b642674355f4ad"
     },
     {
+      "visual_asset_id": "VIS-089-A",
+      "source_ids": [
+        "SRC-089"
+      ],
+      "shot_instance_id": "SRC-089-I01",
+      "scene_id": "SCENE-124",
       "shot": 108,
       "file": "SCENE-124.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Whatever the next reform report recommends, it arrives too late for the specific batch of 18-year-olds who lived through this particular version of the story, which is,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "86b76c7a7be6430255a53002560df74687221d279f5d9ee7dfb9e0722134f965"
     },
     {
+      "visual_asset_id": "VIS-090-A",
+      "source_ids": [
+        "SRC-090"
+      ],
+      "shot_instance_id": "SRC-090-I01",
+      "scene_id": "SCENE-125",
       "shot": 109,
       "file": "SCENE-125.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "if you think about it, the quiet cost hiding underneath every one of these Indian governance stories, the fix always arrives, eventually, for whoever comes after.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "bfb4b756d16c3d36cc8eb83bb63b150095064cd2b5211f8a40d5b1e484cd24b1"
     },
     {
+      "visual_asset_id": "VIS-091-A",
+      "source_ids": [
+        "SRC-091"
+      ],
+      "shot_instance_id": "SRC-091-I01",
+      "scene_id": "SCENE-126",
       "shot": 110,
       "file": "SCENE-126.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "I keep thinking about that one detail more than any other in this story.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "1e04250ba365bed0f6d2a885d9b29858500184db5323bae26fc7e29477f2d67d"
     },
     {
+      "visual_asset_id": "VIS-091-B",
+      "source_ids": [
+        "SRC-091"
+      ],
+      "shot_instance_id": "SRC-091-I02",
+      "scene_id": "SCENE-127",
       "shot": 111,
       "file": "SCENE-127.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "Which brings us back to where we started. There is already a 101-point reform plan sitting on a desk, mostly implemented,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "b8232fa1e4914e3622f86c14e02c367c8f4c5763aae362b845bf588da6661761"
     },
     {
+      "visual_asset_id": "VIS-093-A",
+      "source_ids": [
+        "SRC-093"
+      ],
+      "shot_instance_id": "SRC-093-I01",
+      "scene_id": "SCENE-129",
       "shot": 112,
       "file": "SCENE-129.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "from the last time this exact same thing happened and it wasn't enough to stop it from happening again two years later.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "6c7a5ccdcfb3c20f796327fbd6cd538c796dd3973d55197e821adf80c884aa2f"
     },
     {
+      "visual_asset_id": "VIS-094-A",
+      "source_ids": [
+        "SRC-094"
+      ],
+      "shot_instance_id": "SRC-094-I01",
+      "scene_id": "SCENE-130",
       "shot": 113,
       "file": "SCENE-130.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "The real problem clearly isn't that India can't write a good committee report – it's written two of them now,",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "32d79bc6a4d78b7608c49cf218114b9ae1083fa30c4dc29df8659664b0b3e4d3"
     },
     {
+      "visual_asset_id": "VIS-094-B",
+      "source_ids": [
+        "SRC-094"
+      ],
+      "shot_instance_id": "SRC-094-I02",
+      "scene_id": "SCENE-131",
       "shot": 114,
       "file": "SCENE-131.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "from two different chairmen, with broadly the same recommendations both times.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "cfae833ac8fe37e2f2c824e35fc70fe4918041fbf330fd228d77be93bdad7889"
     },
     {
+      "visual_asset_id": "VIS-095-A",
+      "source_ids": [
+        "SRC-095"
+      ],
+      "shot_instance_id": "SRC-095-I01",
+      "scene_id": "SCENE-132",
       "shot": 115,
       "file": "SCENE-132.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "The real question isn't whether India can write a reform report.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "964bdff136aaca977a24f537181dff6612acd5eb0874b2242fc124a189002c36"
     },
     {
+      "visual_asset_id": "VIS-096-A",
+      "source_ids": [
+        "SRC-096"
+      ],
+      "shot_instance_id": "SRC-096-I01",
+      "scene_id": "SCENE-133",
       "shot": 116,
       "file": "SCENE-133.png",
       "visual_type": "CARTOON",
-      "host_present": false,
+      "planned_type": "CARTOON",
+      "route_candidates": [],
+      "map_args": "",
+      "chart_args": "",
+      "narration": "It's whether next year's batch of 22.7 lakh students gets a fair exam or just a better logo for whichever protest comes after.",
       "pose_id": "",
       "scene_bound": false,
-      "paid": true
+      "host_present": false,
+      "paid": true,
+      "needs_review": false,
+      "route_args_sha256": "c8a17c6d9c06ec8390132e629a70862af303113da1c73191cb4e8b4e08eb6ee3"
     }
   ],
   "mix": {
@@ -1211,5 +2728,14 @@
     "estimate_usd": null,
     "basis": "no image_pricing entry in channel_config.json — any figure here would be invented, so none is given"
   },
-  "needs_review": []
+  "needs_review": [
+    {
+      "shot": 57,
+      "file": "SCENE-066.png",
+      "visual_asset_id": null,
+      "planned_route": "PHOTO",
+      "route_candidates": [],
+      "reason": "manifest scene SCENE-066 has no visual_asset_id"
+    }
+  ]
 }

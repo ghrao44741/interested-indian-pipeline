@@ -507,8 +507,11 @@ try:
     # its gate and reach the work itself. _stage_images is not used here: it now
     # requires Checkpoint 3, which test_2min deliberately does not have.
     ran = []
+    # _stage_prompts now owns the prompt review-and-edit checkpoint, moved there
+    # from _stage_images so no edit can land after approval.
     stub2 = types.SimpleNamespace(project_dir=ROOT / "test_2min",
-                                  _run_cmd=lambda cmd, label=None: ran.append(label))
+                                  _run_cmd=lambda cmd, label=None: ran.append(label),
+                                  _checkpoint=lambda msg: "")
     ok_direct = not gate.require_identity_ready(ROOT / "test_2min", "x",
                                                 raise_on_block=False).blockers
     try:
