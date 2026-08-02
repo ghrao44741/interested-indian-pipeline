@@ -1,0 +1,4 @@
+# Generated review exports — rebuildable from the masters via
+# export_character_package.py, and large. The masters, the spec and the
+# archives are tracked; the derived sheets are not.
+exports/

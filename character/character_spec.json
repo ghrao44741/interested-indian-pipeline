@@ -1,0 +1,265 @@
+{
+  "version": 3,
+  "status": "body-master-approved; face-master-v3-approved",
+  "name": "The Interested Indian — host",
+  "_comment": "Single source of truth for the host's identity. Consumed by the character generator, the visual router and the image QA rubric so they cannot drift apart. review_images.py previously hardcoded 'chubby round cartoon character with short stubby arms', which would fail every image of this design. Nothing here changes without a version bump and a fresh approval.",
+  "orientation_convention": {
+    "definition": "All left/right references are SUBJECT-relative, not viewer-relative.",
+    "subject-left": "the character's own left; appears on the viewer's right",
+    "subject-right": "the character's own right; appears on the viewer's left"
+  },
+  "identity": {
+    "summary": "A stylized Indian male investigative explainer in his late twenties. Intelligent, curious, approachable and occasionally humorous. Youthful proportions but unmistakably adult, with confident posture and expressive editorial-cartoon features.",
+    "age_reads_as": "25-30",
+    "prompt_block": "A stylized young Indian male explainer in his late twenties, with warm medium-brown skin, a rounded rectangular face with a slightly elongated mature lower face, a defined adult jaw and neck, large dark-brown eyes, thick black eyebrows, a small rounded nose, and a distinctive layered, swept-up black hair crest with broad tapered locks and a stable outer silhouette. He wears perfectly round gold-rimmed glasses. His signature outfit is an ivory kurta with a short standing collar and three small dark buttons on the placket, matching loose off-white trousers, and dark brown open-toe leather sandals. Adult proportions: head roughly one-seventh of total height, shoulders clearly wider than the head, natural adult limb length. Clean dark outlines, restrained cel shading, warm cream-and-navy editorial illustration style."
+  },
+  "immutable": [
+    "age reads as late twenties",
+    "facial structure and proportions",
+    "warm medium-brown skin tone",
+    "layered swept-up black hair crest with a stable outer silhouette",
+    "perfectly round gold-rimmed glasses",
+    "thick black eyebrows",
+    "small rounded nose",
+    "ivory kurta with standing collar and three dark buttons",
+    "loose off-white trousers",
+    "dark brown open-toe sandals",
+    "adult body proportions",
+    "outline weight and cel-shading style",
+    "eye design"
+  ],
+  "variable": [
+    "facial expression",
+    "pose and gesture",
+    "direction faced",
+    "camera framing",
+    "held prop",
+    "position in frame",
+    "lighting appropriate to the scene"
+  ],
+  "negative_prompt": "no beard, no moustache, no stubble, no hat, no earrings, no wristwatch, no bag, no changed eyewear shape, no rimless or square glasses, no alternate hairstyle, no costume change, no childlike or chibi proportions, no oversized head, no photorealism, no 3D render, no anime style, no children's picture-book style, no painterly background, no text, no watermark, no extra people, no extra fingers",
+  "_negative_prompt_note": "'no cropped hands or feet' is deliberately NOT here — it contradicts waist-up portraits and head-and-shoulders expressions. It is applied only to full-body framings, via negative_prompt_by_framing.",
+  "negative_prompt_by_framing": {
+    "full_body": "no cropped hands or feet",
+    "waist_up": "",
+    "head_shoulders": ""
+  },
+  "style": {
+    "palette": {
+      "skin": "#C68642",
+      "kurta": "#F5EFE1",
+      "trousers": "#EFE9DC",
+      "hair": "#1A1A1A",
+      "glasses": "#D4A017",
+      "sandals": "#6B4A2F",
+      "outline": "#1A2B4C",
+      "background_default": "#FAF7F2",
+      "accent": "#C0392B"
+    },
+    "rules": [
+      "flat base colours with restrained soft cel shading; no glossy, photorealistic or dramatic gradients",
+      "consistent light direction: upper left",
+      "clean dark navy outlines of even weight",
+      "consistent eye highlight: single small dot upper-right of each iris"
+    ]
+  },
+  "masters": {
+    "body_master": {
+      "path": "character/canonical/master-front.png",
+      "framing": "full_body",
+      "status": "approved-provisional",
+      "role": "AUTHORITY for clothing, body proportions and sandals. NOT an authority for the face — its v1 face is younger than approved.",
+      "model": "gpt-image-2",
+      "generation_mode": "images.generate (unanchored, defines the identity)",
+      "size_requested": "1024x1024",
+      "pixel_dimensions": "1024x1024",
+      "sha256": "72f9412faed604b7a8835a187b8ccd6bb1549904789f113146b650c058b0ccc2",
+      "created": "2026-08-01",
+      "approved_version": 2
+    },
+    "face_master": {
+      "path": "character/canonical/face-master.png",
+      "framing": "head_shoulders",
+      "status": "approved",
+      "role": "AUTHORITY for face, hair, glasses and age. Anchor for every expression and for the face in any waist-up or full-body view.",
+      "model": "gpt-image-2",
+      "generation_mode": "images.edit (dual reference: body_master + face master v2)",
+      "size_requested": "1024x1024",
+      "pixel_dimensions": "1024x1024",
+      "sha256": "172cfe68b9e803ab0293fb0340ae0efbc2332147bc3a606679c5d145da9ec653",
+      "created": "2026-08-01",
+      "approved_version": 3,
+      "version": 3,
+      "history": [
+        {
+          "version": 2,
+          "path": "character/archive/checkpoint1_v2_provisional/face-master-v2.png",
+          "sha256": "7c04017fd1236ddd59d76f3632c54e6ad24cf3ef9527c0c7a8572889034825c0",
+          "pixel_dimensions": "1024x1024",
+          "created": "2026-08-01",
+          "status": "archived-provisional",
+          "superseded_reason": "hair volume, multi-ring glasses, face width"
+        }
+      ]
+    }
+  },
+  "face_master_brief": {
+    "framing": "square, front-facing, symmetrical head-and-shoulders, face large enough to serve as the expression reference",
+    "expression": "neutral with a relaxed mouth — not a pronounced smile",
+    "lighting": "clean, upper-left",
+    "target_version": 3,
+    "_note": "v3 is a controlled refinement of v2, not a redesign. Two references are supplied: the body master for hair/glasses/overall identity, and face master v2 for the mature jaw, neck, eye size and close-up detail.",
+    "preserve_from_v2": [
+      "current eye size",
+      "longer lower face",
+      "defined adult jaw angle",
+      "wider adult neck",
+      "eyebrows, nose and skin tone",
+      "neutral relaxed mouth",
+      "head-and-shoulders framing and upper-left lighting"
+    ],
+    "corrections": [
+      "hair: reduce total crest height and volume by about 15-20 percent, returning closer to the body master's dense overlapping swept-up silhouette; locks must overlap and flow together rather than reading as individually separated sculpted leaves; preserve the recognizable upward sweep",
+      "glasses: match the body master's thinner, simple gold circular rims; remove the heavy concentric multi-ring appearance; keep perfectly round lenses and the same bridge position",
+      "face width: narrow the cheeks and overall face width by about 5-8 percent while preserving the mature jaw angle and neck width; do not return to the soft childlike v1 jaw"
+    ]
+  },
+  "planned_next_package": {
+    "status": "authorized",
+    "note": "Face master v3 IS the neutral expression — do not regenerate it.",
+    "views": [
+      {
+        "id": "waist-up-three-quarter-subject-left",
+        "framing": "waist_up",
+        "brief": "waist-up three-quarter view turned toward the subject's left"
+      },
+      {
+        "id": "waist-up-three-quarter-subject-right",
+        "framing": "waist_up",
+        "brief": "waist-up three-quarter view turned toward the subject's right"
+      },
+      {
+        "id": "waist-up-profile",
+        "framing": "waist_up",
+        "brief": "waist-up clean side profile facing subject-right"
+      }
+    ],
+    "expressions": [
+      "curious",
+      "concerned",
+      "surprised",
+      "skeptical",
+      "confident"
+    ]
+  },
+  "expressions": [
+    {
+      "id": "neutral",
+      "brief": "level eyebrows, relaxed eyes, straight relaxed mouth"
+    },
+    {
+      "id": "curious",
+      "brief": "one eyebrow raised, eyes looking slightly sideways, mouth slightly open"
+    },
+    {
+      "id": "concerned",
+      "brief": "eyebrows angled upward at inner ends, wide eyes, small downturned mouth"
+    },
+    {
+      "id": "surprised",
+      "brief": "both eyebrows raised high, wide eyes, open mouth"
+    },
+    {
+      "id": "skeptical",
+      "brief": "one eyebrow lowered, side glance, asymmetric closed mouth"
+    },
+    {
+      "id": "confident",
+      "brief": "level brows, direct gaze, slight closed-mouth smile"
+    }
+  ],
+  "pose_library": {
+    "status": "not-authorized",
+    "output_requirement": "transparent RGBA, or a validated background-removal stage with per-asset verification",
+    "anchor": "face_master for face-forward poses; body_master for full-figure poses"
+  },
+  "references": {
+    "body_master": "character/canonical/master-front.png",
+    "face_master": "character/canonical/face-master.png",
+    "canonical_dir": "character/canonical",
+    "expressions_dir": "character/expressions",
+    "poses_dir": "character/poses",
+    "archive_dir": "character/archive/checkpoint1_v1_provisional",
+    "contact_sheet": "character/canonical/contact_sheet.png",
+    "face_master_v2_archived": "character/archive/checkpoint1_v2_provisional/face-master-v2.png"
+  },
+  "naming": {
+    "canonical": "character/canonical/{view_id}.png",
+    "expression": "character/expressions/expr_{expression_id}.png",
+    "pose": "character/poses/host_{pose_id}.png"
+  },
+  "qa_checklist": [
+    "round gold-rimmed glasses present and circular",
+    "hair crest silhouette unchanged: layered, swept-up, broad tapered locks",
+    "face shape and proportions match the face master",
+    "reads as late twenties, not adolescent",
+    "skin tone within palette",
+    "kurta has standing collar and three dark buttons",
+    "trousers and sandals correct",
+    "adult proportions, not childlike",
+    "outline weight and shading consistent",
+    "hands anatomically plausible, five fingers",
+    "no facial hair",
+    "reads as the same person and the same age",
+    "only one version of the host appears in an episode"
+  ],
+  "master_authority": {
+    "face_master": [
+      "face",
+      "hair",
+      "glasses",
+      "age"
+    ],
+    "body_master": [
+      "clothing",
+      "body proportions",
+      "sandals"
+    ],
+    "rule": "Every full-body or waist-up generation MUST supply BOTH masters. The body master alone is prohibited: its younger v1 face would return. Expression portraits use face master v3 as the authority.",
+    "prohibited_anchors": [
+      "character/archive/checkpoint1_v1_provisional/**",
+      "character/archive/checkpoint1_v2_provisional/face-master-v2.png"
+    ]
+  },
+  "generation_rules": {
+    "waist_up": {
+      "references": [
+        "body_master",
+        "face_master"
+      ],
+      "framing": "waist_up"
+    },
+    "full_body": {
+      "references": [
+        "body_master",
+        "face_master"
+      ],
+      "framing": "full_body"
+    },
+    "head_shoulders": {
+      "references": [
+        "face_master"
+      ],
+      "framing": "head_shoulders"
+    },
+    "no_fallback": "Never fall back to single-reference or unanchored generation. Fail loudly instead — a silent fallback reintroduces the v1 face.",
+    "preserve_exactly": [
+      "hair silhouette",
+      "thin round gold glasses",
+      "face width",
+      "jaw angle",
+      "neck width",
+      "eye size"
+    ]
+  }
+}
