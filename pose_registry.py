@@ -69,7 +69,21 @@ def resolve(pose_id: str, scene_bound: bool = False) -> Path:
             f"{', '.join(e.get('includes_geometry', []))}). Pass scene_bound=True "
             f"only when the scene requires that setting.")
 
-    path = PIPELINE_DIR / e["path"]
+    # Containment before anything else. A registry entry is data, and data can be
+    # wrong: an absolute path, a ../ traversal or a symlink pointing outside the
+    # pose directory would all resolve to bytes nobody approved. Checked against
+    # the fully resolved path so symlinks cannot smuggle a target past it.
+    raw = e["path"]
+    if Path(raw).is_absolute() or ".." in Path(raw).parts:
+        raise PoseError(f"{pose_id}: registered path {raw!r} is absolute or traverses upward")
+
+    poses_root = (PIPELINE_DIR / "character" / "poses").resolve()
+    path = (PIPELINE_DIR / raw)
+    resolved = path.resolve()
+    if not resolved.is_relative_to(poses_root):
+        raise PoseError(f"{pose_id}: resolved path escapes {poses_root} "
+                        f"(resolved to {resolved})")
+
     if not path.exists():
         raise PoseError(f"{pose_id}: registered asset missing at {path}")
     # Integrity is always verified. There is deliberately no bypass: an

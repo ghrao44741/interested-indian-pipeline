@@ -142,6 +142,61 @@ def validate_alpha(img: Image.Image) -> dict:
     }
 
 
+class AssetIntegrityError(RuntimeError):
+    """An asset failed verification against its approved record."""
+
+
+MIN_TRANSPARENT_PCT = 40.0
+MAX_FRINGE_PIXELS = 400
+
+
+def verify_asset(path: Path, record: dict) -> tuple[bool, list[str], dict]:
+    """The single verification used by both replay and the validator.
+
+    Returns (ok, problems, observed). The approved hash in `record` is the
+    authority — the observed digest is reported, never written back over it.
+    Replay previously stored the observed hash as if it were approved, so a
+    tampered file recorded its own tampering as the truth.
+    """
+    problems, observed = [], {}
+    if not path.exists():
+        return False, [f"missing file: {path}"], observed
+
+    data = path.read_bytes()
+    digest = hashlib.sha256(data).hexdigest()
+    observed["sha256"] = digest
+    expected = record.get("sha256")
+    if expected and digest != expected:
+        problems.append(f"sha256 mismatch — expected {expected[:16]}…, "
+                        f"observed {digest[:16]}…")
+
+    img = Image.open(path)
+    observed["mode"] = img.mode
+    if img.mode != "RGBA":
+        problems.append(f"mode is {img.mode}, expected RGBA")
+    img = img.convert("RGBA")
+
+    dims = f"{img.size[0]}x{img.size[1]}"
+    observed["dimensions"] = dims
+    if record.get("dimensions") and dims != record["dimensions"]:
+        problems.append(f"dimensions {dims}, expected {record['dimensions']}")
+
+    alpha = validate_alpha(img)
+    observed["alpha"] = alpha
+    if not alpha["corners_transparent"]:
+        problems.append("corners are not transparent")
+    if alpha["transparent_pct"] < MIN_TRANSPARENT_PCT:
+        problems.append(f"only {alpha['transparent_pct']}% transparent "
+                        f"(minimum {MIN_TRANSPARENT_PCT}%)")
+    if alpha["fringe_pixels_sampled"] > MAX_FRINGE_PIXELS:
+        problems.append(f"{alpha['fringe_pixels_sampled']} fringe pixels "
+                        f"(maximum {MAX_FRINGE_PIXELS})")
+    if not alpha["subject_bbox"]:
+        problems.append("empty subject bounding box")
+
+    return (not problems), problems, observed
+
+
 def generate_batch(spec: dict, client, batch: int = 1, force: bool = False) -> list[dict]:
     pl = spec["pose_library"]
     status = pl.get("status", "")
@@ -175,28 +230,57 @@ def generate_batch(spec: dict, client, batch: int = 1, force: bool = False) -> l
     prior = {r["id"]: r for r in pl.get(f"{poses_key}_results", []) if r.get("ok")}
     registry = pl.get("registry", {})
 
+    cand_dir = PIPELINE_DIR / "character" / "pose_candidates"
+    approved_ids = {pid for pid, e in registry.items()
+                    if e.get("status", "").startswith("approved")}
+
     for pose in pl[poses_key]:
         out = out_dir / f"host_{pose['id']}.png"
+
+        if pose["id"] in approved_ids and force:
+            # An approved asset is never replaced in place. Regeneration writes a
+            # separate pending candidate; promotion is a deliberate, separate act.
+            if not out.exists():
+                print(f"  ✗ {out.name} is APPROVED but missing — restore it from git "
+                      f"before creating a replacement candidate")
+                results.append({"id": pose["id"], "ok": False,
+                                "error": "approved asset missing; restore from git"})
+                continue
+            cand_dir.mkdir(parents=True, exist_ok=True)
+            n = 2
+            while (cand_dir / f"host_{pose['id']}_v{n}.png").exists():
+                n += 1
+            out = cand_dir / f"host_{pose['id']}_v{n}.png"
+            print(f"  approved asset — generating candidate {out.name} instead")
+
         if out.exists() and not force:
             # Preserve the existing record rather than skipping it. Skipping
             # appended nothing, and the caller then overwrote batch_N_results with
             # that shorter list — a rerun with every file present wiped the entire
             # provenance history.
             kept = prior.get(pose["id"]) or registry.get(pose["id"])
-            if kept:
-                digest = hashlib.sha256(out.read_bytes()).hexdigest()
-                img = Image.open(out).convert("RGBA")
-                live = validate_alpha(img)
-                record = {**kept, "ok": True,
-                          "path": str(out.relative_to(PIPELINE_DIR)).replace("\\", "/"),
-                          "sha256": digest, "alpha": live, "replayed": True}
-                if digest != kept.get("sha256"):
-                    record["hash_changed"] = True
-                    print(f"  ⚠ {out.name}: hash differs from the recorded value")
-                results.append(record)
-                print(f"  keep {out.name} (existing, verified)")
+            if not kept:
+                # An unrecorded file is not evidence of anything. Appending a
+                # failure keeps the result list complete, so the caller cannot
+                # mistake a short list for success.
+                print(f"  ✗ {out.name} exists but has NO provenance record")
+                results.append({"id": pose["id"], "ok": False, "replayed": True,
+                                "error": "file present but no approved record; "
+                                         "restore from git or regenerate as a candidate"})
+                continue
+
+            ok, problems, observed = verify_asset(out, kept)
+            # The approved sha256 is preserved verbatim; the observed digest is
+            # reported separately and never written over it.
+            record = {**kept, "ok": ok, "replayed": True,
+                      "path": str(out.relative_to(PIPELINE_DIR)).replace("\\", "/"),
+                      "observed": observed}
+            if not ok:
+                record["error"] = "; ".join(problems)
+                print(f"  ✗ {out.name}: {record['error']}")
             else:
-                print(f"  ⚠ {out.name} exists but has no record — regenerate with --force")
+                print(f"  keep {out.name} (verified)")
+            results.append(record)
             continue
 
         if replay_only and not force:
@@ -308,6 +392,29 @@ def main():
     spec = load_spec()
     results = generate_batch(spec, get_client(), batch=args.batch, force=args.force)
 
+    # Whole-set validation: a short, duplicated or partly-failing result list is
+    # a failure, however healthy the individual entries look.
+    expected_ids = [p["id"] for p in spec["pose_library"][f"batch_{args.batch}"]]
+    got_ids = [r.get("id") for r in results]
+    set_problems = []
+    if len(got_ids) != len(expected_ids):
+        set_problems.append(f"expected {len(expected_ids)} results, got {len(got_ids)}")
+    if len(set(got_ids)) != len(got_ids):
+        dupes = sorted({i for i in got_ids if got_ids.count(i) > 1})
+        set_problems.append(f"duplicate result ids: {dupes}")
+    if set(got_ids) != set(expected_ids):
+        set_problems.append(f"id mismatch — missing {sorted(set(expected_ids) - set(got_ids))}, "
+                            f"unexpected {sorted(set(got_ids) - set(expected_ids))}")
+    failed = [r for r in results if not r.get("ok")]
+    if failed:
+        set_problems.append(f"{len(failed)} asset(s) failed: "
+                            + "; ".join(f"{r['id']}: {r.get('error', '?')}" for r in failed))
+    if set_problems:
+        print("\n  ✗ batch verification FAILED — spec not written:")
+        for p in set_problems:
+            print(f"     - {p}")
+        return 1
+
     newly_generated = [r for r in results if r.get("ok") and not r.get("replayed")]
     if not newly_generated:
         # Nothing was created, so there is nothing to record. Rewriting the spec
@@ -317,6 +424,19 @@ def main():
         print(f"\n  {len(kept)}/{len(results)} preserved from existing assets — "
               f"no generation, spec untouched")
         return 0 if len(kept) == len(results) else 1
+
+    # Candidates are recorded separately. Writing them into batch_N_results would
+    # overwrite the approved provenance with unreviewed entries — the approved
+    # registry and files must stay untouched until an explicit promotion.
+    candidates = [r for r in newly_generated if "pose_candidates" in r.get("path", "")]
+    if candidates:
+        fresh = load_spec()
+        key = f"batch_{args.batch}_candidates"
+        fresh["pose_library"][key] = (fresh["pose_library"].get(key, []) + candidates)
+        _write_spec_atomic(fresh)
+        print(f"\n  {len(candidates)} candidate(s) recorded under {key}, "
+              f"status pending-approval — approved assets untouched")
+        return 0
 
     fresh = load_spec()
     existing = fresh["pose_library"].get(f"batch_{args.batch}_results", [])

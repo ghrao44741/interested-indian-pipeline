@@ -164,6 +164,96 @@ def build_master_comparison(spec: dict) -> Path:
     return out
 
 
+def _package_assets(spec: dict) -> list[tuple[str, Path, str]]:
+    """(label, path, framing) for everything in the current approved package."""
+    out = [("face master v3 (= neutral)", PIPELINE_DIR / spec["references"]["face_master"],
+            "head_shoulders"),
+           ("body master", PIPELINE_DIR / spec["references"]["body_master"], "full_body")]
+    for v in spec["planned_next_package"]["views"]:
+        out.append((v["id"].replace("waist-up-", ""),
+                    PIPELINE_DIR / spec["naming"]["canonical"].format(view_id=v["id"]),
+                    v["framing"]))
+    for e in spec["planned_next_package"]["expressions"]:
+        out.append((e, PIPELINE_DIR / spec["naming"]["expression"].format(expression_id=e),
+                    "head_shoulders"))
+    return [(l, p, f) for l, p, f in out if p.exists()]
+
+
+def build_package_contact_sheet(spec: dict) -> Path:
+    """Everything in the package, one sheet, at native framing."""
+    tiles = _package_assets(spec)
+    cols, cell, pad, label_h, header = 5, 300, 14, 40, 56
+    rows = (len(tiles) + cols - 1) // cols
+    W = cols * (cell + pad) + pad
+    H = header + rows * (cell + label_h + pad) + pad
+    sheet = Image.new("RGB", (W, H), CREAM)
+    d = ImageDraw.Draw(sheet)
+    d.text((pad, 14), f"{spec['name']} — canonical package v{spec['version']} "
+                      f"(face master approved; {len(tiles)} assets)",
+           font=font(True, 21), fill=NAVY)
+
+    for i, (label, path, framing) in enumerate(tiles):
+        r, c = divmod(i, cols)
+        x, y = pad + c * (cell + pad), header + pad + r * (cell + label_h + pad)
+        img = Image.open(path).convert("RGB")
+        img.thumbnail((cell, cell))
+        sheet.paste(img, (x + (cell - img.width) // 2, y))
+        d.rectangle([x, y, x + cell, y + cell], outline=(220, 212, 200), width=1)
+        d.text((x + 2, y + cell + 6), label, font=font(True, 17), fill=NAVY)
+        d.text((x + 2, y + cell + 24), framing, font=font(False, 13), fill=MUTED)
+
+    out = OUT_DIR / "package_contact_sheet.png"
+    sheet.save(out)
+    print(f"  ✓ {out.name}  ({len(tiles)} assets)")
+    return out
+
+
+def build_face_comparison_sheet(spec: dict) -> Path:
+    """Every face in the package at equal head height — the drift check.
+
+    Normalising on measured head height is the point: at native framing a
+    waist-up face and a portrait face cannot be compared, so identity drift
+    hides behind the difference in scale.
+    """
+    TARGET = 300
+    tiles = []
+    for label, path, _ in _package_assets(spec):
+        img = Image.open(path).convert("RGB")
+        hh = head_height(img)
+        if hh <= 0:
+            continue
+        crop = img.crop(head_box(img))
+        s = TARGET / hh
+        tiles.append((label, crop.resize((max(1, int(crop.width * s)),
+                                          max(1, int(crop.height * s))), Image.LANCZOS)))
+
+    cols = 5
+    cw = max(t[1].width for t in tiles)
+    ch = max(t[1].height for t in tiles)
+    pad, label_h, header = 14, 30, 60
+    rows = (len(tiles) + cols - 1) // cols
+    W = cols * (cw + pad) + pad
+    H = header + rows * (ch + label_h + pad) + pad
+    sheet = Image.new("RGB", (W, H), CREAM)
+    d = ImageDraw.Draw(sheet)
+    d.text((pad, 14), f"Every face at equal head height ({TARGET}px) — identity drift check",
+           font=font(True, 21), fill=NAVY)
+    d.text((pad, 38), "same scale for portraits, waist-ups and the full body",
+           font=font(False, 14), fill=MUTED)
+
+    for i, (label, im) in enumerate(tiles):
+        r, c = divmod(i, cols)
+        x, y = pad + c * (cw + pad), header + pad + r * (ch + label_h + pad)
+        sheet.paste(im, (x + (cw - im.width) // 2, y + (ch - im.height)))
+        d.rectangle([x, y, x + cw, y + ch], outline=(220, 212, 200), width=1)
+        d.text((x + 2, y + ch + 6), label, font=font(True, 16), fill=NAVY)
+
+    out = OUT_DIR / "face_consistency_sheet.png"
+    sheet.save(out)
+    print(f"  ✓ {out.name}  ({len(tiles)} faces at equal scale)")
+    return out
+
+
 def build_expression_faces(spec: dict) -> Path:
     tiles = []
     for expr in spec["expressions"]:
