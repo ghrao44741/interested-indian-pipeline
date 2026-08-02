@@ -35,7 +35,8 @@ import sys
 import time
 from pathlib import Path
 
-from generation_gate import GateBlocked, require_generation_ready
+from generation_gate import (GateBlocked, require_character_ready,
+                             require_generation_ready)
 
 PIPELINE_DIR = Path(__file__).parent
 
@@ -309,7 +310,10 @@ def main():
             print(f"❌ Project folder not found: {project_dir}")
             sys.exit(1)
     try:
-        require_generation_ready(project_dir, "generate_images_aibmm (gpt-image-2)")
+        if project_dir is None:
+            require_character_ready("generate_images_aibmm --test")
+        else:
+            require_generation_ready(project_dir, "generate_images_aibmm (gpt-image-2)")
     except GateBlocked as e:
         print(f"\n{e}")
         print("\nNo images were generated and no API client was created.")

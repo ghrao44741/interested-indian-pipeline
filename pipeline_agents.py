@@ -2101,6 +2101,15 @@ class OrchestratorAgent:
         self._run_cmd(cmd, cwd=run_dir, label=split.name)
 
     def _stage_prompts(self):
+        # Identity, not approval. Prompt authoring decides routing from scene
+        # identity, so identity must be current — but it produces the input to
+        # the plan a human approves, so it cannot require that approval.
+        from generation_gate import GateBlocked, require_identity_ready
+        try:
+            require_identity_ready(self.project_dir, "orchestrated prompt authoring")
+        except GateBlocked as e:
+            raise RuntimeError(f"prompts stage blocked:\n{e}") from None
+
         gen = PIPELINE_DIR / "generate_image_prompts.py"
         self._run_cmd([sys.executable, str(gen), "--project", str(self.project_dir)], label="generate_image_prompts.py")
 

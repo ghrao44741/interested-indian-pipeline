@@ -21,7 +21,9 @@ guessing.
 import argparse
 import json
 import sys
+import uuid
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 
 import generation_gate
@@ -55,22 +57,30 @@ def build_plan(project_dir: Path) -> dict:
                 if manifest_path.exists() else {})
     scenes = manifest.get("scenes", [])
 
-    gate = generation_gate.require_generation_ready(
-        project_dir, "visual planning", require_visual_plan=False,
-        raise_on_block=False)
+    # Identity only. plan_visuals.py produces the artifact a human approves, so
+    # it must be runnable before approval exists — and it must never create,
+    # modify or imply approval. Granting Checkpoint 3 is a separate,
+    # human-only command.
+    gate = generation_gate.require_identity_ready(
+        project_dir, "visual planning", raise_on_block=False)
 
     needs_review = []
     if not prompts.exists():
         needs_review.append({"shot": None,
                              "reason": f"{route_images.PROMPTS_FILE} not found"})
     for s in shots:
+        # The router's own verdict comes first. It is the code that knows a route
+        # cannot be executed, and the plan must carry that forward — a plan whose
+        # needs_review list disagreed with the router would let a human approve
+        # shots the router will then refuse to generate.
+        if s.get("needs_review"):
+            needs_review.append({"shot": s["shot_num"], "file": s["file"],
+                                 "planned_route": s["planned_type"],
+                                 "reason": s["review_reason"]})
+            continue
         if not s["type"]:
             needs_review.append({"shot": s["shot_num"], "file": s["file"],
                                  "reason": "no TYPE declared and no keyword match"})
-        if s.get("pose_id") and s["pose_id"] not in route_images.approved_pose_ids():
-            needs_review.append({"shot": s["shot_num"], "file": s["file"],
-                                 "reason": f"HOST_POSE {s['pose_id']!r} is not an "
-                                           f"approved, generically compositable pose"})
 
     types = Counter(s["type"] or "UNCLASSIFIED" for s in shots)
     host_shots = [s for s in shots if s["type"] == "HOST"]
@@ -91,6 +101,12 @@ def build_plan(project_dir: Path) -> dict:
         "project": project_dir.name,
         "generated_by": "plan_visuals.py",
         "read_only": True,
+        # A plan is a point-in-time artifact: approval attaches to the specific
+        # run a human read, identified here. Without this, editing the plan by
+        # hand and re-running the planner restored the old approval, because the
+        # bytes round-tripped back to the approved ones.
+        "plan_id": uuid.uuid4().hex,
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "identity": {
             "state": manifest.get("identity_state"),
             "reasons": manifest.get("identity_reasons", []),

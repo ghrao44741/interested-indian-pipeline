@@ -237,15 +237,22 @@ def main():
                         help="Print search results without downloading")
     args = parser.parse_args()
 
-    # Preflight before the key is read or anything is fetched. A bare --query has
-    # no project to check, so it runs the character-scope subset — the router
-    # always passes --project, and that is the path that can attach a photo to a
-    # scene, which is the case identity actually protects.
-    try:
-        require_generation_ready(args.project, "search_pexels")
-    except GateBlocked as e:
-        print(f"\n{e}")
-        print("\nNothing was fetched.")
+    # A Pexels download writes approved episode artwork, so it is gated exactly
+    # like a paid generator even though the fetch itself is free. A bare --query
+    # with no project has no approval to check, so it may only preview: allowing
+    # it to download to an arbitrary --out was a way to put an unapproved photo
+    # into an episode with no gate at all.
+    if args.project:
+        try:
+            require_generation_ready(args.project, "search_pexels download")
+        except GateBlocked as e:
+            print(f"\n{e}")
+            print("\nNothing was fetched or written.")
+            sys.exit(1)
+    elif not args.preview:
+        print("A download needs --project, so the episode's Checkpoint 3 approval "
+              "can be checked.\nUse --preview to inspect search results without "
+              "downloading.")
         sys.exit(1)
 
     api_key = _get_api_key()

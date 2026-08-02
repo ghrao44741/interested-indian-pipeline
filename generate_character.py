@@ -32,7 +32,7 @@ import json
 import sys
 from pathlib import Path
 
-from generation_gate import GateBlocked, require_generation_ready
+from generation_gate import GateBlocked, require_character_ready
 
 PIPELINE_DIR = Path(__file__).parent
 SPEC_PATH = PIPELINE_DIR / "character" / "character_spec.json"
@@ -493,7 +493,7 @@ def main():
     # to what was approved and the pose registry must audit clean, or a generation
     # anchored to a drifted reference would silently redefine the character.
     try:
-        require_generation_ready(None, "character asset generation")
+        require_character_ready("character asset generation")
     except GateBlocked as e:
         print(f"\n{e}")
         print("\nNo client was created and nothing was generated.")

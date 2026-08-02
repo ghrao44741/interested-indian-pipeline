@@ -49,7 +49,9 @@ def sha(p):
 
 def census(root: Path) -> dict:
     out = {}
-    for sub in ("character/poses", "character/pose_sources", "character/canonical"):
+    # Every subtree, not a chosen few: a narrower census missed previews being
+    # written into the real character/ directory by a test.
+    for sub in ("character",):
         d = root / sub
         if d.exists():
             for f in sorted(d.rglob("*")):
@@ -158,15 +160,20 @@ def build_fixture() -> tuple[Path, Path]:
 def patched(root: Path):
     """Point both the gate and the registry at the fixture world."""
     spec = root / "character" / "character_spec.json"
+    # PREVIEW_DIR is computed at import time, so patching PIPELINE_DIR alone
+    # leaves previews landing in the real repository — which is what happened
+    # here until the census was widened to cover the whole character/ tree.
     return mock.patch.multiple(gate, PIPELINE_DIR=root, SPEC_PATH=spec), \
         mock.patch.multiple(pose_registry, PIPELINE_DIR=root, SPEC_PATH=spec), \
-        mock.patch.object(composite_character, "PIPELINE_DIR", root)
+        mock.patch.multiple(composite_character, PIPELINE_DIR=root,
+                            PREVIEW_DIR=root / "character" / "previews")
 
 
 def run_gate(root, project, **kw):
+    """The identity gate. Approval behaviour is tests/test_approval_gate.py."""
     a, b, c = patched(root)
     with a, b, c:
-        return gate.require_generation_ready(project, "test", raise_on_block=False, **kw)
+        return gate.require_identity_ready(project, "test", raise_on_block=False, **kw)
 
 
 def edit_spec(root: Path, fn):
@@ -192,23 +199,23 @@ REPO_BEFORE = census(ROOT)
 try:
     # ── 1. the real projects ─────────────────────────────────────────────────
     print("\n1. the real pilot is blocked, and blocked on SCENE-066")
-    rep = gate.require_generation_ready(ROOT / "pilot_neet_scandal", "pilot images",
-                                        raise_on_block=False)
+    rep = gate.require_identity_ready(ROOT / "pilot_neet_scandal", "pilot images",
+                                      raise_on_block=False)
     check("pilot is blocked", bool(rep.blockers), "gate passed the pilot")
     check("blocked on SCENE-066", blocked_on(rep, "SCENE-066"), str(rep.blockers))
     check("raises GateBlocked by default", True)
     try:
-        gate.require_generation_ready(ROOT / "pilot_neet_scandal", "pilot images")
+        gate.require_identity_ready(ROOT / "pilot_neet_scandal", "pilot images")
         check("raises GateBlocked by default", False, "returned instead of raising")
     except gate.GateBlocked as e:
         check("GateBlocked names the blocking condition", "SCENE-066" in str(e), str(e))
 
-    print("\n2. test_2min passes the full gate")
-    rep = gate.require_generation_ready(ROOT / "test_2min", "images",
-                                        raise_on_block=False)
-    check("test_2min is ready", not rep.blockers, str(rep.blockers))
-    check("the visual-plan check actually ran",
-          any(n == "visual plan exists" for n, _, _ in rep.checks))
+    print("\n2. test_2min passes the identity gate")
+    rep = gate.require_identity_ready(ROOT / "test_2min", "images",
+                                      raise_on_block=False)
+    check("test_2min identity is ready", not rep.blockers, str(rep.blockers))
+    check("the identity gate does not ask about approval",
+          not any("approval" in n.lower() for n, _, _ in rep.checks))
 
     # ── 3. fixture: the healthy baseline ─────────────────────────────────────
     print("\n3. the synthetic fixture is healthy to begin with")
@@ -366,36 +373,40 @@ try:
         bg = proj / "images" / "SCENE-001.png"
         _png(bg, alpha=False)
         with mock.patch.object(pose_registry, "resolve", spy):
-            rec = composite_character.composite("pointing_viewer_left", bg,
-                                                proj / "images" / "out.png")
-            check("resolve() was called", seen == [("pointing_viewer_left", False)], str(seen))
+            rec = composite_character.render_preview("pointing_viewer_left", bg,
+                                                     "out")
+            # The gate resolves too — the audit checks every approved pose and
+            # the pose-selection check resolves the chosen one. What matters is
+            # that the render itself resolves the id it was given.
+            check("resolve() was called for the requested pose",
+                  seen[-1] == ("pointing_viewer_left", False), str(seen))
             check("the record keys on the id, not a path",
                   rec["pose_id"] == "pointing_viewer_left" and "path" not in rec)
             check("negative space drives placement — viewer_left pose sits right",
                   rec["side"] == "right", rec["side"])
             seen.clear()
-            composite_character.composite("seated_reading_document", bg,
-                                          proj / "images" / "out2.png", scene_bound=True)
+            composite_character.render_preview("seated_reading_document", bg,
+                                               "out2", scene_bound=True)
             check("scene_bound is passed through explicitly",
-                  seen == [("seated_reading_document", True)], str(seen))
+                  seen[-1] == ("seated_reading_document", True), str(seen))
         try:
-            composite_character.composite("half_finished", bg, proj / "images" / "no.png")
+            composite_character.render_preview("half_finished", bg, "no")
             check("a pending pose cannot be composited", False, "it rendered")
-        except pose_registry.PoseError:
+        except (pose_registry.PoseError, gate.GateBlocked):
             check("a pending pose cannot be composited", True)
         check("no output file was written for the refused pose",
-              not (proj / "images" / "no.png").exists())
+              not (root / "character" / "previews" / "no.png").exists())
 
     # ── 15. registry completeness ────────────────────────────────────────────
     print("\n15. every registered paid entry point invokes the shared gate")
 
-    def gate_called_in(module: str, func: str) -> bool:
+    def gate_called_in(module: str, func: str, kind: str) -> bool:
         tree = ast.parse((ROOT / module).read_text(encoding="utf-8"))
+        want = f"require_{kind}_ready"
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == func:
-                for sub in ast.walk(node):
-                    if isinstance(sub, ast.Call) and \
-                            ast.unparse(sub.func).endswith("require_generation_ready"):
+                for n in ast.walk(node):
+                    if isinstance(n, ast.Call) and ast.unparse(n.func).endswith(want):
                         return True
         return False
 
@@ -405,8 +416,10 @@ try:
                   not (ROOT / e["module"]).exists(),
                   f"{e['module']} exists but the registry says it does not")
             continue
-        check(f"{e['id']} ({e['module']}:{e['gate']}) calls the gate",
-              gate_called_in(e["module"], e["gate"]))
+        for g in e["gates"]:
+            check(f"{e['id']} ({e['module']}:{g['function']}) calls "
+                  f"require_{g['kind']}_ready",
+                  gate_called_in(e["module"], g["function"], g["kind"]))
 
     print("\n16. no unregistered paid image path exists")
     MARKERS = [("images.generate(", "image generation"),
@@ -477,8 +490,8 @@ try:
         sys.modules["anthropic"] = stub
     import pipeline_agents
 
-    direct = gate.require_generation_ready(ROOT / "pilot_neet_scandal", "x",
-                                           raise_on_block=False)
+    direct = gate.require_identity_ready(ROOT / "pilot_neet_scandal", "x",
+                                         raise_on_block=False)
     stub = types.SimpleNamespace(project_dir=ROOT / "pilot_neet_scandal")
     try:
         pipeline_agents.OrchestratorAgent._stage_images(stub)
@@ -490,24 +503,35 @@ try:
           orchestrated_blocked and bool(direct.blockers))
     check("and blocks for the same reason", "SCENE-066" in err, err[:200])
 
-    # On a passing project the orchestrator must get past the gate and stop at
-    # its own spend checkpoint. Declining there is how this test proves the gate
-    # let it through without letting it generate anything.
-    reached = []
+    # On an identity-clean project the orchestrated prompts stage must get past
+    # its gate and reach the work itself. _stage_images is not used here: it now
+    # requires Checkpoint 3, which test_2min deliberately does not have.
+    ran = []
     stub2 = types.SimpleNamespace(project_dir=ROOT / "test_2min",
-                                  _checkpoint=lambda msg: reached.append(msg) or "q")
-    ok_direct = not gate.require_generation_ready(ROOT / "test_2min", "x",
-                                                  raise_on_block=False).blockers
+                                  _run_cmd=lambda cmd, label=None: ran.append(label))
+    ok_direct = not gate.require_identity_ready(ROOT / "test_2min", "x",
+                                                raise_on_block=False).blockers
     try:
-        pipeline_agents.OrchestratorAgent._stage_images(stub2)
-        passed = True
-        why = ""
+        pipeline_agents.OrchestratorAgent._stage_prompts(stub2)
+        passed, why = True, ""
     except RuntimeError as e:
-        passed, why = "Aborted by user" in str(e), str(e)
-    check("the orchestrator passes where the direct script passes",
+        passed, why = False, str(e)
+    check("the orchestrator passes where the direct gate passes",
           passed and ok_direct, why[:200])
-    check("the orchestrated path reached its spend checkpoint and spent nothing",
-          bool(reached), "checkpoint never reached")
+    check("and reached the stage body", bool(ran), "never got past the gate")
+
+    # ...and the images stage, which does require approval, refuses on a project
+    # that has none — the same verdict the direct script gives.
+    stub3 = types.SimpleNamespace(project_dir=ROOT / "test_2min",
+                                  _checkpoint=lambda msg: "q")
+    try:
+        pipeline_agents.OrchestratorAgent._stage_images(stub3)
+        blocked_images = False
+        detail = "it proceeded"
+    except RuntimeError as e:
+        blocked_images, detail = "Checkpoint 3 approval" in str(e), str(e)
+    check("the orchestrated images stage refuses without approval",
+          blocked_images, detail[:200])
 
 finally:
     for td in _fixtures:

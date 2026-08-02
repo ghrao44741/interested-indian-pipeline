@@ -34,7 +34,7 @@ SIZE = "1024x1024"
 
 sys.path.insert(0, str(PIPELINE_DIR))
 from generate_character import build_prompt, get_client, load_spec  # noqa: E402
-from generation_gate import GateBlocked, require_generation_ready  # noqa: E402
+from generation_gate import GateBlocked, require_character_ready  # noqa: E402
 
 
 def _write_spec_atomic(spec: dict) -> None:
@@ -202,7 +202,7 @@ def generate_batch(spec: dict, client, batch: int = 1, force: bool = False) -> l
     # Character-scope preflight: no episode manifest exists when the channel's own
     # assets are made, but drifted masters or a broken registry must still stop the
     # run before a single image is paid for.
-    require_generation_ready(None, f"pose batch {batch}")
+    require_character_ready(f"pose batch {batch}")
     pl = spec["pose_library"]
     status = pl.get("status", "")
     approved_batches = pl.get("approved_batches", [])
@@ -394,7 +394,7 @@ def generate_replacement_candidate(spec: dict, client, pose_id: str) -> int:
     routed the processed file to a candidate path but still wrote the raw over
     the approved pose's own source.
     """
-    require_generation_ready(None, f"replacement candidate for {pose_id}")
+    require_character_ready(f"replacement candidate for {pose_id}")
     pl = spec["pose_library"]
     registry = pl.get("registry", {})
 
@@ -523,7 +523,7 @@ def main():
     # inner calls stay: a direct caller of generate_batch() must not be able to
     # skip the check by not going through this CLI.
     try:
-        require_generation_ready(None, "pose generation")
+        require_character_ready("pose generation")
     except GateBlocked as e:
         print(f"\n{e}")
         print("\nNo client was created and nothing was generated.")

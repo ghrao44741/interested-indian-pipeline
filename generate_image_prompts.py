@@ -21,6 +21,8 @@ import sys
 import time
 from pathlib import Path
 
+from generation_gate import GateBlocked, require_identity_ready
+
 # Auto-load .env from the pipeline directory
 _env_path = Path(__file__).parent / ".env"
 if _env_path.exists():
@@ -283,8 +285,24 @@ def generate_prompts(project_dir: Path, batch_size: int, overwrite: bool):
     manifest_path = project_dir / "manifest.json"
     output_path   = project_dir / "image_prompts_one_line_per_prompt.md"
 
-    if not manifest_path.exists():
-        print(f"❌ manifest.json not found: {manifest_path}")
+    # Identity gate, before the key is read, before the client exists, before any
+    # request, and before the existing prompts file can be overwritten.
+    #
+    # This step used to be classed as "pre-manifest", alongside TTS. That was
+    # wrong: TTS genuinely runs before scenes exist, but this reads the manifest
+    # and writes per-shot routing keyed to scene identity. Authoring routes
+    # against stale or ambiguous identity produces prompts attached to the wrong
+    # words — and overwriting a good prompts file with them loses the good one.
+    #
+    # It is deliberately NOT approval-gated. It runs before the visual plan that
+    # a human approves, so requiring Checkpoint 3 here would make the checkpoint
+    # unreachable.
+    try:
+        require_identity_ready(project_dir, "image prompt authoring")
+    except GateBlocked as e:
+        print(f"\n{e}")
+        print("\nNo key was read, no client created, no request made, and "
+              "the existing prompts file was left untouched.")
         sys.exit(1)
 
     if output_path.exists() and not overwrite:

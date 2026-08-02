@@ -113,7 +113,7 @@ comp_calls = calls_in(comp)
 check("compositor calls pose_registry.resolve()", "pose_registry.resolve" in comp_calls)
 check("compositor calls pose_registry.metadata()", "pose_registry.metadata" in comp_calls)
 check("router delegates rendering to the compositor",
-      "composite_character.composite" in calls_in(router))
+      "composite_character.render_production" in calls_in(router))
 check("router reads pose ids from the registry, not from disk",
       "pose_registry.list_poses" in calls_in(router))
 

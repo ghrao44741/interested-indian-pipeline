@@ -81,3 +81,8 @@ __pycache__/
 *.pyc
 .DS_Store
 Thumbs.db
+
+# Checkpoint 3 approval records are per-machine, per-run decisions bound to
+# exact file hashes. Committing one would let a stale approval travel to a
+# checkout where the manifest or plan differs.
+*/checkpoint_3_approval.json

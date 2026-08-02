@@ -6,3 +6,6 @@ exports/
 # Replacement candidates — unreviewed generation output, promoted only by an
 # explicit approval step. Never a runtime asset.
 pose_candidates/
+
+# Character-development previews are scratch output, not approved assets.
+previews/

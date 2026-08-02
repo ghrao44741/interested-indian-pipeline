@@ -1,28 +1,34 @@
 """
-generation_gate.py — one preflight gate in front of every paid generation.
+generation_gate.py — preflight gates in front of every paid operation.
 
-Two things live here, and they are deliberately together:
+Three gates, because "may this run?" has three different answers:
 
-  PAID_ENTRY_POINTS         the registry of every code path that can spend money
-  require_generation_ready  the check each of those paths must run first
+  require_character_ready()    channel asset work: masters + pose registry
+  require_identity_ready()     planning on an episode: content identity is sound
+  require_generation_ready()   identity AND an explicit Checkpoint 3 approval
 
-Keeping them apart is how the earlier failures happened: checks existed but
-nothing called them, because the only caller was an orchestrator no project ever
-used. A registry that sits next to the gate can be tested against it — every
-registered entry point must invoke the gate, and no unregistered paid path may
-exist (tests/test_generation_gate.py asserts both).
+The middle one is what prompt authoring, route classification and dry runs need.
+They read scene identity and decide routing, so identity must be current — but
+they run before the plan a human approves, so demanding approval would make the
+checkpoint unreachable. The last one is what spending needs.
 
-The gate fails BEFORE a client is constructed, before references are opened,
-before an output file is created and before any cost record is incremented, so a
-blocked project cannot spend anything and cannot leave half-written artwork
-behind. It raises rather than warns: generating against uncertain identity is
-how approved artwork ends up attached to the wrong words.
+Alongside them lives PAID_ENTRY_POINTS, the registry of every code path that can
+spend money, each recording which gate it must call. Keeping the registry next to
+the gates is what makes them testable against each other: every registered entry
+point must invoke its declared gate, and no unregistered paid path may exist
+(tests/test_generation_gate.py asserts both).
 
-    from generation_gate import require_generation_ready, GateBlocked
+A gate fails BEFORE a client is constructed, before references are opened, before
+an output file is created and before any cost record is incremented, so a blocked
+project cannot spend anything and cannot leave half-written artwork behind.
+
+    from generation_gate import require_identity_ready, require_generation_ready
+    require_identity_ready("pilot_neet_scandal", "prompt authoring")
     require_generation_ready("pilot_neet_scandal", "xai image batch")
 
 CLI:
-    python generation_gate.py --project test_2min --operation "image batch"
+    python generation_gate.py --project test_2min --gate identity
+    python generation_gate.py --project test_2min --gate generation
     python generation_gate.py --list-entry-points
 """
 
@@ -31,6 +37,7 @@ import hashlib
 import json
 import sys
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 
 import pose_registry
@@ -39,6 +46,11 @@ import source_ids
 PIPELINE_DIR = Path(__file__).parent
 SPEC_PATH = PIPELINE_DIR / "character" / "character_spec.json"
 VISUAL_PLAN_NAME = "visual_plan.json"
+APPROVAL_NAME = "checkpoint_3_approval.json"
+APPROVAL_SCHEMA_VERSIONS = {1}
+APPROVAL_REQUIRED_FIELDS = ("schema_version", "project", "manifest_sha256",
+                            "visual_plan_sha256", "approved_at", "approved_by",
+                            "confirmation", "paid_generation")
 
 # Directories whose contents are, by definition, not approved output. A pose or
 # reference resolving into any of these must never reach a render: raw holds
@@ -49,125 +61,153 @@ NON_RENDERABLE_DIRS = ("pose_candidates", "pose_sources", "archive", "raw", "pen
 
 # ── the registry of paid entry points ────────────────────────────────────────
 #
-# scope:
-#   project    — needs a clean manifest for a specific project
-#   character  — channel-level asset work; no project manifest exists
-# `gate` names the function whose body must contain the require_generation_ready
-# call. Entries with implemented=False name work that does not exist yet; the
-# registry test asserts those modules are genuinely absent, so an entry cannot
-# quietly stay unimplemented once someone writes the file.
+# Each entry declares which gates its code must call and in which function.
+#   character   — channel asset work, no episode involved
+#   identity    — reads scene identity; must not require Checkpoint 3
+#   generation  — spends on episode artwork; requires Checkpoint 3 approval
+# An entry may declare both, when one function plans and a later one dispatches.
+# Entries with implemented=False name work that does not exist yet; the registry
+# test asserts those modules are genuinely absent, so an entry cannot quietly
+# stay unimplemented once someone writes the file.
 
 PAID_ENTRY_POINTS = [
     {
+        "id": "prompts.author",
+        "module": "generate_image_prompts.py",
+        "gates": [{"kind": "identity", "function": "generate_prompts"}],
+        "provider": "anthropic",
+        "operation": "author per-shot image prompts and routing fields",
+        "retry_paths": ["--overwrite", "per-batch retry loop"],
+        "implemented": True,
+        "note": "identity-gated, not approval-gated: it decides routing and so "
+                "runs before the plan a human approves",
+    },
+    {
+        "id": "images.router",
+        "module": "route_images.py",
+        "gates": [{"kind": "identity", "function": "classify"},
+                  {"kind": "generation", "function": "dispatch_routes"}],
+        "provider": "delegated (xai, pexels) + local",
+        "operation": "classify shots, then dispatch to generators",
+        "retry_paths": ["--overwrite"],
+        "implemented": True,
+        "note": "two phases: classification and --dry-run need identity only; "
+                "the first dispatch needs approval",
+    },
+    {
         "id": "images.flux_batch",
         "module": "generate_images_flux.py",
-        "gate": "main",
+        "gates": [{"kind": "generation", "function": "main"}],
         "provider": "xai | replicate",
-        "operation": "episode image batch (CARTOON/REENACTMENT shots)",
-        "scope": "project",
+        "operation": "episode image batch (illustration/reenactment shots)",
         "retry_paths": ["--from-report", "--shot", "--overwrite"],
         "implemented": True,
     },
     {
         "id": "images.aibmm_batch",
         "module": "generate_images_aibmm.py",
-        "gate": "main",
+        "gates": [{"kind": "generation", "function": "main"}],
         "provider": "openai",
-        "operation": "episode image batch via gpt-image-2 (mascot/general scenes)",
-        "scope": "project",
+        "operation": "episode image batch via gpt-image-2",
         "retry_paths": ["--overwrite", "--test"],
         "implemented": True,
-    },
-    {
-        "id": "images.router",
-        "module": "route_images.py",
-        "gate": "main",
-        "provider": "delegated (xai, pexels) + local",
-        "operation": "route shots to MAP/CHART/PHOTO/HOST/AI generators",
-        "scope": "project",
-        "retry_paths": ["--overwrite"],
-        "implemented": True,
+        "note": "--test has no episode and runs the character gate instead",
     },
     {
         "id": "images.pexels",
         "module": "search_pexels.py",
-        "gate": "main",
+        "gates": [{"kind": "generation", "function": "main"}],
         "provider": "pexels (free tier, rate limited)",
-        "operation": "stock photo fetch",
-        "scope": "project",
+        "operation": "stock photo download",
+        "retry_paths": [],
+        "implemented": True,
+        "note": "free of charge but writes approved episode artwork, so it is "
+                "approval-gated like any other route that produces a shot",
+    },
+    {
+        "id": "images.host_composite",
+        "module": "composite_character.py",
+        "gates": [{"kind": "generation", "function": "render_production"}],
+        "provider": "local (writes approved episode artwork)",
+        "operation": "composite an approved pose into an episode shot",
         "retry_paths": [],
         "implemented": True,
     },
     {
         "id": "qa.review_images",
         "module": "review_images.py",
-        "gate": "main",
+        "gates": [{"kind": "generation", "function": "main"}],
         "provider": "anthropic (vision)",
         "operation": "per-image QA rubric pass",
-        "scope": "project",
         "retry_paths": ["repeated review rounds in _stage_images"],
         "implemented": True,
     },
     {
         "id": "character.masters",
         "module": "generate_character.py",
-        "gate": "main",
+        "gates": [{"kind": "character", "function": "main"}],
         "provider": "openai",
         "operation": "canonical masters, expression and view packages",
-        "scope": "character",
         "retry_paths": ["--force"],
         "implemented": True,
     },
     {
         "id": "character.pose_batch",
         "module": "generate_poses.py",
-        "gate": "generate_batch",
+        "gates": [{"kind": "character", "function": "generate_batch"}],
         "provider": "openai",
         "operation": "authorized pose batch",
-        "scope": "character",
         "retry_paths": ["--force (rejected over an approved batch)"],
         "implemented": True,
     },
     {
         "id": "character.pose_replacement",
         "module": "generate_poses.py",
-        "gate": "generate_replacement_candidate",
+        "gates": [{"kind": "character", "function": "generate_replacement_candidate"}],
         "provider": "openai",
         "operation": "single replacement candidate for one approved pose",
-        "scope": "character",
         "retry_paths": ["repeat invocation creates vNN+1"],
+        "implemented": True,
+    },
+    {
+        "id": "orchestrator.stage_prompts",
+        "module": "pipeline_agents.py",
+        "gates": [{"kind": "identity", "function": "_stage_prompts"}],
+        "provider": "delegated",
+        "operation": "orchestrated prompt-authoring stage",
+        "retry_paths": [],
         "implemented": True,
     },
     {
         "id": "orchestrator.stage_images",
         "module": "pipeline_agents.py",
-        "gate": "_stage_images",
+        "gates": [{"kind": "generation", "function": "_stage_images"}],
         "provider": "delegated",
         "operation": "orchestrated images stage (router + review rounds)",
-        "scope": "project",
         "retry_paths": ["review round re-route loop"],
         "implemented": True,
     },
     {
         "id": "images.reenactment",
         "module": "generate_reenactment.py",
-        "gate": "main",
+        "gates": [{"kind": "generation", "function": "main"}],
         "provider": "openai (planned)",
         "operation": "illustrated reenactment of an unobservable historical event",
-        "scope": "project",
         "retry_paths": [],
         "implemented": False,
         "note": "not written yet; reenactments currently route through images.flux_batch",
     },
 ]
 
-# Paid, but not image generation and not identity-scoped. Recorded so the
-# inventory is honest about where money goes, not to bring them under this gate:
-# narration must be generatable before a manifest exists, and script/prompt
-# generation runs before any visual identity is assigned.
+# Paid, but genuinely pre-manifest. These run before scene identity exists, so
+# there is nothing for an identity gate to check: a script must be reviewable
+# before it is narrated, and narrated before it can be split into scenes.
+# generate_image_prompts.py used to be listed here on the claim that it 'runs
+# before any visual identity is assigned'. That was wrong — it reads the
+# manifest and writes per-shot routing — so it is now a registered,
+# identity-gated entry point above.
 OTHER_PAID_APIS = [
     {"module": "generate_source_audio.py", "provider": "gemini | elevenlabs | edge", "operation": "TTS narration"},
-    {"module": "generate_image_prompts.py", "provider": "anthropic | gemini", "operation": "prompt authoring"},
     {"module": "review_script.py", "provider": "anthropic", "operation": "script review"},
     {"module": "generate_chapters.py", "provider": "anthropic", "operation": "chapter timestamps"},
     {"module": "review_narration_audio.py", "provider": "anthropic", "operation": "narration QA"},
@@ -414,42 +454,155 @@ def _check_visual_plan(rep: GateReport, project_dir: Path, manifest: dict | None
                 "plan was built against a different split — re-run plan_visuals.py")
 
 
-# ── the gate ─────────────────────────────────────────────────────────────────
+def _check_approval(rep: GateReport, project_dir: Path, manifest: dict | None) -> None:
+    """An explicit, human-granted Checkpoint 3 approval, bound to exact bytes.
 
-def require_generation_ready(project=None,
+    This is the check the previous single gate did not have. It verified that a
+    visual plan existed, had an empty needs_review list and matched the manifest
+    — all three of which plan_visuals.py produces itself. Checking them proved
+    only that a program agreed with itself; anyone could clear the checkpoint by
+    running a free command.
+
+    Approval is a separate artifact carrying the SHA-256 of both the manifest and
+    the plan it approved. Editing either side changes a hash and the approval
+    stops applying, which is what makes "approve this exact plan" mean something.
+    """
+    path = project_dir / APPROVAL_NAME
+    if not rep.add("Checkpoint 3 approval exists", path.exists(),
+                   f"{APPROVAL_NAME} missing — a human must run "
+                   f"approve_checkpoint.py after reviewing {VISUAL_PLAN_NAME}"):
+        return
+    try:
+        rec = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        rep.add("approval record parses", False, str(e))
+        return
+    rep.add("approval record parses", True)
+
+    rep.add("approval schema is supported",
+            rec.get("schema_version") in APPROVAL_SCHEMA_VERSIONS,
+            f"schema_version={rec.get('schema_version')!r}, "
+            f"supported: {sorted(APPROVAL_SCHEMA_VERSIONS)}")
+
+    missing = [f for f in APPROVAL_REQUIRED_FIELDS if not rec.get(f)]
+    rep.add("approval record is complete", not missing, f"missing/empty: {missing}")
+
+    rep.add("approval names this project", rec.get("project") == project_dir.name,
+            f"approval is for {rec.get('project')!r}, this is {project_dir.name!r}")
+
+    for label, fname, key in (("manifest", "manifest.json", "manifest_sha256"),
+                              ("visual plan", VISUAL_PLAN_NAME, "visual_plan_sha256")):
+        f = project_dir / fname
+        if not f.exists():
+            rep.add(f"approved {label} still present", False, f"{fname} is gone")
+            continue
+        found = _sha(f)
+        rep.add(f"{label} is unchanged since approval", rec.get(key) == found,
+                f"{fname} has been edited since approval — re-run plan_visuals.py "
+                f"and approve the new plan (approved {str(rec.get(key))[:12]}…, "
+                f"found {found[:12]}…)")
+
+    if rec.get("approved_at"):
+        try:
+            when = datetime.fromisoformat(str(rec["approved_at"]).replace("Z", "+00:00"))
+            rep.add("approval timestamp is UTC", when.tzinfo is not None,
+                    "timestamp carries no timezone")
+        except ValueError as e:
+            rep.add("approval timestamp parses", False, str(e))
+
+    rep.add("approval carries a paid-generation summary",
+            isinstance(rec.get("paid_generation"), dict)
+            and "shots" in rec["paid_generation"],
+            "no approved cost summary — the approver saw no spend figure")
+
+
+# ── the gates ────────────────────────────────────────────────────────────────
+#
+# Two gates, because they answer two different questions with different answers,
+# different lifetimes and different callers:
+#
+#   require_identity_ready     is this project's content identity sound?
+#   require_generation_ready   ...and has a human approved spending on this exact
+#                              manifest and this exact plan?
+#
+# Collapsing them meant prompt authoring — which reads the manifest and decides
+# routing — was grouped with TTS as "pre-manifest", and meant Checkpoint 3 was
+# satisfied by a file the planner wrote itself.
+
+def _resolve_project(project) -> Path:
+    p = Path(project)
+    return p if p.is_absolute() else (PIPELINE_DIR / project).resolve()
+
+
+def require_character_ready(operation: str = "character asset generation",
+                            *,
+                            pose_id: str | None = None,
+                            scene_bound: bool = False,
+                            raise_on_block: bool = True) -> GateReport:
+    """Channel-level asset work: masters and pose registry only.
+
+    Deliberately separate from any episode. Making the channel's own artwork has
+    no manifest to be current with, and must not be gated on an episode's
+    approval — nor may an episode approval stand in for it.
+    """
+    rep = GateReport(operation=operation, project=None, scope="character")
+    _check_masters(rep)
+    _check_pose_registry(rep)
+    if pose_id is not None:
+        _check_pose_selection(rep, pose_id, scene_bound)
+    if rep.blockers and raise_on_block:
+        raise GateBlocked(operation, rep.blockers)
+    return rep
+
+
+def require_identity_ready(project,
+                           operation: str = "planning",
+                           *,
+                           pose_id: str | None = None,
+                           scene_bound: bool = False,
+                           raise_on_block: bool = True) -> GateReport:
+    """Content identity is sound. No approval required, no spend authorised.
+
+    For planning-only work: prompt authoring, route classification, dry runs and
+    plan_visuals.py. These read scene identity and decide routing, so they need
+    identity to be current — but they run *before* the plan a human approves, so
+    requiring approval would make the checkpoint impossible to reach.
+    """
+    project_dir = _resolve_project(project)
+    rep = GateReport(operation=operation, project=project_dir.name, scope="identity")
+    if rep.add("project directory exists", project_dir.is_dir(), str(project_dir)):
+        _check_manifest_identity(rep, project_dir, operation)
+        _check_sidecar_currency(rep, project_dir)
+    _check_masters(rep)
+    _check_pose_registry(rep)
+    if pose_id is not None:
+        _check_pose_selection(rep, pose_id, scene_bound)
+    if rep.blockers and raise_on_block:
+        raise GateBlocked(operation, rep.blockers)
+    return rep
+
+
+def require_generation_ready(project,
                              operation: str = "paid generation",
                              *,
                              pose_id: str | None = None,
                              scene_bound: bool = False,
-                             require_visual_plan: bool = True,
                              raise_on_block: bool = True) -> GateReport:
-    """Verify everything that must hold before money is spent.
+    """Everything identity requires, plus an explicit Checkpoint 3 approval.
 
-    project=None runs the character-scope subset (masters + pose registry): there
-    is no episode manifest when the channel's own assets are being made.
-
-    Returns a GateReport. Raises GateBlocked unless raise_on_block is False —
-    which exists for reporting tools such as plan_visuals.py, never for a
-    generator deciding to carry on anyway.
+    Required before anything that downloads, generates, reviews with a paid
+    vision model, or writes approved episode artwork. A project argument is
+    mandatory: there is no such thing as approved generation with no episode to
+    approve.
     """
-    scope = "character" if project is None else "project"
-    project_dir = None
-    if project is not None:
-        project_dir = Path(project)
-        if not project_dir.is_absolute():
-            project_dir = (PIPELINE_DIR / project).resolve()
-
-    rep = GateReport(operation=operation,
-                     project=project_dir.name if project_dir else None,
-                     scope=scope)
-
-    if project_dir is not None:
-        if rep.add("project directory exists", project_dir.is_dir(), str(project_dir)):
-            manifest = _check_manifest_identity(rep, project_dir, operation)
-            _check_sidecar_currency(rep, project_dir)
-            if require_visual_plan:
-                _check_visual_plan(rep, project_dir, manifest)
-
+    project_dir = _resolve_project(project)
+    rep = GateReport(operation=operation, project=project_dir.name, scope="generation")
+    manifest = None
+    if rep.add("project directory exists", project_dir.is_dir(), str(project_dir)):
+        manifest = _check_manifest_identity(rep, project_dir, operation)
+        _check_sidecar_currency(rep, project_dir)
+        _check_visual_plan(rep, project_dir, manifest)
+        _check_approval(rep, project_dir, manifest)
     _check_masters(rep)
     _check_pose_registry(rep)
     if pose_id is not None:
@@ -466,25 +619,30 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--project", default=None)
+    ap.add_argument("--gate", choices=["character", "identity", "generation"],
+                    default="generation",
+                    help="Which gate to evaluate (default: generation)")
     ap.add_argument("--operation", default="preflight check")
     ap.add_argument("--pose-id", default=None)
     ap.add_argument("--scene-bound", action="store_true")
-    ap.add_argument("--no-visual-plan", action="store_true",
-                    help="Skip the visual-plan check (identity only)")
     ap.add_argument("--list-entry-points", action="store_true",
                     help="Print the paid entry-point registry as JSON")
     args = ap.parse_args()
 
     if args.list_entry_points:
-        print(json.dumps({"paid_image_entry_points": PAID_ENTRY_POINTS,
-                          "other_paid_apis": OTHER_PAID_APIS}, indent=2))
+        print(json.dumps({"paid_entry_points": PAID_ENTRY_POINTS,
+                          "pre_manifest_paid_apis": OTHER_PAID_APIS}, indent=2))
         return 0
 
-    rep = require_generation_ready(args.project, args.operation,
-                                   pose_id=args.pose_id,
-                                   scene_bound=args.scene_bound,
-                                   require_visual_plan=not args.no_visual_plan,
-                                   raise_on_block=False)
+    kw = dict(pose_id=args.pose_id, scene_bound=args.scene_bound,
+              raise_on_block=False)
+    if args.gate == "character":
+        rep = require_character_ready(args.operation, **kw)
+    else:
+        if not args.project:
+            ap.error("--project is required for the identity and generation gates")
+        fn = require_identity_ready if args.gate == "identity" else require_generation_ready
+        rep = fn(args.project, args.operation, **kw)
     print(rep.render())
     return 1 if rep.blockers else 0
 
