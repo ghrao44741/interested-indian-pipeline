@@ -211,10 +211,9 @@
     }
   ],
   "pose_library": {
-    "status": "batch-1-approved; batch-2-pending-approval",
+    "status": "approved",
     "output_requirement": "transparent RGBA, or a validated background-removal stage with per-asset verification",
     "anchor": "BOTH approved masters for every pose",
-    "blocked_on": "approval of the integrated full-body master candidate",
     "batch_1": [
       {
         "id": "neutral_presenter",
@@ -225,7 +224,7 @@
         "brief": "standing, both hands open and turned upward at chest height in an explaining gesture"
       },
       {
-        "id": "pointing_to_evidence",
+        "id": "pointing_viewer_right",
         "brief": "standing, turned slightly toward subject-left, subject-left arm extended pointing to an empty area at his side, leaving that area clear"
       },
       {
@@ -303,9 +302,9 @@
         "status": "pending-approval"
       },
       {
-        "id": "pointing_to_evidence",
+        "id": "pointing_viewer_right",
         "ok": true,
-        "path": "character/poses/host_pointing_to_evidence.png",
+        "path": "character/poses/host_pointing_viewer_right.png",
         "sha256": "3849bfd8274c7ff46422169737eb2d15b951e3cefe30d1de952a35e1df93d5b5",
         "dimensions": "1024x1024",
         "model": "gpt-image-2",
@@ -334,7 +333,8 @@
           ]
         },
         "created": "2026-08-01",
-        "status": "pending-approval"
+        "status": "pending-approval",
+        "renamed_from": "pointing_to_evidence"
       },
       {
         "id": "seated_reading_document",
@@ -371,7 +371,7 @@
         "status": "pending-approval"
       }
     ],
-    "version": 1,
+    "version": 2,
     "character_identity_version": 4,
     "registry": {
       "neutral_presenter": {
@@ -415,35 +415,6 @@
         "classification": "reusable_pose",
         "direction": "front",
         "negative_space": "both_sides",
-        "props": [],
-        "framing": "full_body",
-        "includes_geometry": [],
-        "generic_compositing_allowed": true
-      },
-      "pointing_to_evidence": {
-        "id": "pointing_to_evidence",
-        "path": "character/poses/host_pointing_to_evidence.png",
-        "sha256": "3849bfd8274c7ff46422169737eb2d15b951e3cefe30d1de952a35e1df93d5b5",
-        "dimensions": "1024x1024",
-        "model": "gpt-image-2",
-        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
-        "references": [
-          "character/canonical/body-master.png",
-          "character/canonical/face-master.png"
-        ],
-        "transparency": "background_removed",
-        "created": "2026-08-01",
-        "batch": 1,
-        "status": "approved",
-        "classification": "reusable_directional_pose",
-        "direction": "points_viewer_right",
-        "points_to": "viewer_right",
-        "negative_space": "viewer_right",
-        "pointing_hand": {
-          "anatomical": "subject_left_hand",
-          "appears_on": "viewer_right",
-          "note": "recorded from the rendered image, not inferred from subject-left/right terminology, which is the opposite of screen direction"
-        },
         "props": [],
         "framing": "full_body",
         "includes_geometry": [],
@@ -493,7 +464,7 @@
         "transparency": "background_removed",
         "created": "2026-08-01",
         "batch": 2,
-        "status": "pending-approval",
+        "status": "approved",
         "framing": "full_body",
         "includes_geometry": [],
         "generic_compositing_allowed": true,
@@ -507,7 +478,8 @@
           "appears_on": "viewer_left",
           "note": "measured from rendered pixels (arm reach from torso centre), not inferred"
         },
-        "props": []
+        "props": [],
+        "approved_pose_library_version": 2
       },
       "thinking_hand_at_chin": {
         "id": "thinking_hand_at_chin",
@@ -523,7 +495,7 @@
         "transparency": "background_removed",
         "created": "2026-08-01",
         "batch": 2,
-        "status": "pending-approval",
+        "status": "approved",
         "framing": "full_body",
         "includes_geometry": [],
         "generic_compositing_allowed": true,
@@ -531,7 +503,8 @@
         "classification": "reusable_pose",
         "direction": "front",
         "negative_space": "both_sides",
-        "props": []
+        "props": [],
+        "approved_pose_library_version": 2
       },
       "skeptical_arms_crossed": {
         "id": "skeptical_arms_crossed",
@@ -547,7 +520,7 @@
         "transparency": "background_removed",
         "created": "2026-08-01",
         "batch": 2,
-        "status": "pending-approval",
+        "status": "approved",
         "framing": "full_body",
         "includes_geometry": [],
         "generic_compositing_allowed": true,
@@ -555,7 +528,8 @@
         "classification": "reusable_pose",
         "direction": "front",
         "negative_space": "both_sides",
-        "props": []
+        "props": [],
+        "approved_pose_library_version": 2
       },
       "concerned_explaining": {
         "id": "concerned_explaining",
@@ -571,7 +545,7 @@
         "transparency": "background_removed",
         "created": "2026-08-01",
         "batch": 2,
-        "status": "pending-approval",
+        "status": "approved",
         "framing": "full_body",
         "includes_geometry": [],
         "generic_compositing_allowed": true,
@@ -579,7 +553,8 @@
         "classification": "reusable_pose",
         "direction": "front",
         "negative_space": "both_sides",
-        "props": []
+        "props": [],
+        "approved_pose_library_version": 2
       },
       "confident_conclusion": {
         "id": "confident_conclusion",
@@ -595,7 +570,7 @@
         "transparency": "background_removed",
         "created": "2026-08-01",
         "batch": 2,
-        "status": "pending-approval",
+        "status": "approved",
         "framing": "full_body",
         "includes_geometry": [],
         "generic_compositing_allowed": true,
@@ -603,7 +578,8 @@
         "classification": "reusable_pose",
         "direction": "front",
         "negative_space": "both_sides",
-        "props": []
+        "props": [],
+        "approved_pose_library_version": 2
       },
       "holding_phone_evidence": {
         "id": "holding_phone_evidence",
@@ -619,7 +595,7 @@
         "transparency": "background_removed",
         "created": "2026-08-01",
         "batch": 2,
-        "status": "pending-approval",
+        "status": "approved",
         "framing": "full_body",
         "includes_geometry": [],
         "generic_compositing_allowed": true,
@@ -630,11 +606,42 @@
         "props": [
           "phone"
         ],
-        "prop_note": "phone is held, not environmental geometry; figure remains free-floating"
+        "prop_note": "phone is held, not environmental geometry; figure remains free-floating",
+        "approved_pose_library_version": 2
       },
-      "examining_chart_standing": {
-        "id": "examining_chart_standing",
-        "path": "character/poses/host_examining_chart_standing.png",
+      "pointing_viewer_right": {
+        "id": "pointing_viewer_right",
+        "path": "character/poses/host_pointing_viewer_right.png",
+        "sha256": "3849bfd8274c7ff46422169737eb2d15b951e3cefe30d1de952a35e1df93d5b5",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "created": "2026-08-01",
+        "batch": 1,
+        "status": "approved",
+        "classification": "reusable_directional_pose",
+        "direction": "points_viewer_right",
+        "points_to": "viewer_right",
+        "negative_space": "viewer_right",
+        "pointing_hand": {
+          "anatomical": "subject_left_hand",
+          "appears_on": "viewer_right",
+          "note": "recorded from the rendered image, not inferred from subject-left/right terminology, which is the opposite of screen direction"
+        },
+        "props": [],
+        "framing": "full_body",
+        "includes_geometry": [],
+        "generic_compositing_allowed": true,
+        "renamed_from": "pointing_to_evidence"
+      },
+      "examining_document_standing": {
+        "id": "examining_document_standing",
+        "path": "character/poses/host_examining_document_standing.png",
         "sha256": "b76e13819b39b0415b78d81c02e730149d1dddfc790a2eddfd6e5a4b04c38e5b",
         "dimensions": "1024x1024",
         "model": "gpt-image-2",
@@ -646,7 +653,7 @@
         "transparency": "background_removed",
         "created": "2026-08-01",
         "batch": 2,
-        "status": "pending-approval",
+        "status": "approved",
         "framing": "full_body",
         "includes_geometry": [],
         "generic_compositing_allowed": true,
@@ -657,7 +664,9 @@
         "props": [
           "document"
         ],
-        "prop_note": "sheet is held in both hands; no desk or furniture"
+        "prop_note": "blank document held in both hands; no desk or furniture. The sheet is BLANK — do not route this pose as evidence that a chart is visible. Compositing real chart or document content onto it is a separate deterministic overlay feature.",
+        "renamed_from": "examining_chart_standing",
+        "approved_pose_library_version": 2
       }
     },
     "discovery_rule": "Resolve ONLY exact paths from this registry via pose_registry.resolve(). Never glob character/poses/*.png — raw, in-progress or unapproved files must not be discoverable.",
@@ -710,7 +719,7 @@
         "expression": "neutral, relaxed mouth, eyes on the phone screen"
       },
       {
-        "id": "examining_chart_standing",
+        "id": "examining_document_standing",
         "brief": "standing, holding a single sheet of paper or chart in both hands at chest height, examining it",
         "expect_direction": "front",
         "expect_negative_space": "both_sides",
@@ -770,7 +779,8 @@
         "props": [],
         "framing": "full_body",
         "includes_geometry": [],
-        "expression": "neutral, relaxed mouth"
+        "expression": "neutral, relaxed mouth",
+        "replayed": true
       },
       {
         "id": "thinking_hand_at_chin",
@@ -811,7 +821,8 @@
         "props": [],
         "framing": "full_body",
         "includes_geometry": [],
-        "expression": "curious: one eyebrow raised, eyes looking slightly upward, mouth closed"
+        "expression": "curious: one eyebrow raised, eyes looking slightly upward, mouth closed",
+        "replayed": true
       },
       {
         "id": "skeptical_arms_crossed",
@@ -852,7 +863,8 @@
         "props": [],
         "framing": "full_body",
         "includes_geometry": [],
-        "expression": "skeptical: one eyebrow lowered, side glance, asymmetric closed mouth"
+        "expression": "skeptical: one eyebrow lowered, side glance, asymmetric closed mouth",
+        "replayed": true
       },
       {
         "id": "concerned_explaining",
@@ -893,7 +905,8 @@
         "props": [],
         "framing": "full_body",
         "includes_geometry": [],
-        "expression": "concerned: eyebrows angled upward at inner ends, small downturned mouth"
+        "expression": "concerned: eyebrows angled upward at inner ends, small downturned mouth",
+        "replayed": true
       },
       {
         "id": "confident_conclusion",
@@ -934,7 +947,8 @@
         "props": [],
         "framing": "full_body",
         "includes_geometry": [],
-        "expression": "confident: level brows, direct gaze, slight closed-mouth smile"
+        "expression": "confident: level brows, direct gaze, slight closed-mouth smile",
+        "replayed": true
       },
       {
         "id": "holding_phone_evidence",
@@ -977,12 +991,13 @@
         ],
         "framing": "full_body",
         "includes_geometry": [],
-        "expression": "neutral, relaxed mouth, eyes on the phone screen"
+        "expression": "neutral, relaxed mouth, eyes on the phone screen",
+        "replayed": true
       },
       {
-        "id": "examining_chart_standing",
+        "id": "examining_document_standing",
         "ok": true,
-        "path": "character/poses/host_examining_chart_standing.png",
+        "path": "character/poses/host_examining_document_standing.png",
         "sha256": "b76e13819b39b0415b78d81c02e730149d1dddfc790a2eddfd6e5a4b04c38e5b",
         "dimensions": "1024x1024",
         "model": "gpt-image-2",
@@ -1020,10 +1035,30 @@
         ],
         "framing": "full_body",
         "includes_geometry": [],
-        "expression": "curious, focused on the sheet"
+        "expression": "curious, focused on the sheet",
+        "renamed_from": "examining_chart_standing",
+        "replayed": true
       }
     ],
-    "direction_measurement": "Direction is measured from rendered pixels: torso centre from the legs (which no gesture displaces), then arm reach either side of it. An earlier attempt compared left/right thirds of the bounding box and reported both pointing poses backwards, because the torso sits in the third opposite the extended arm. neutral_presenter returns symmetric as a control."
+    "direction_measurement": "Direction is measured from rendered pixels: torso centre from the legs (which no gesture displaces), then arm reach either side of it. An earlier attempt compared left/right thirds of the bounding box and reported both pointing poses backwards, because the torso sits in the third opposite the extended arm. neutral_presenter returns symmetric as a control.",
+    "approved_batches": [
+      1,
+      2
+    ],
+    "runtime_contract": {
+      "resolver": "pose_registry.resolve() is the only supported runtime resolver",
+      "proven": [
+        "resolve() rejects unknown, pending, hash-mismatched, missing and scene-bound-without-permission assets",
+        "raw sources are unregistered and unreachable",
+        "replay preserves provenance with zero generation calls"
+      ],
+      "NOT_yet_proven": "that globbing is impossible throughout runtime — the router and compositor are not written yet, so nothing currently consumes the resolver. This becomes true only when Task 6 wires them and the regression check below passes.",
+      "task_6_acceptance": [
+        "router and compositor resolve poses exclusively via pose_registry.resolve()",
+        "regression check rejects glob or direct character/poses/ access outside generation, validation and registry modules",
+        "pending, raw or hash-mismatched files can never reach a render"
+      ]
+    }
   },
   "references": {
     "body_master": "character/canonical/body-master.png",
@@ -1165,5 +1200,6 @@
       "complete hands and feet"
     ]
   },
-  "checkpoint_1_status": "approved"
+  "checkpoint_1_status": "approved",
+  "checkpoint_2_status": "approved"
 }

@@ -51,7 +51,7 @@ def metadata(pose_id: str) -> dict:
     return reg[pose_id]
 
 
-def resolve(pose_id: str, scene_bound: bool = False, verify_hash: bool = True) -> Path:
+def resolve(pose_id: str, scene_bound: bool = False) -> Path:
     """Absolute path to an approved pose asset.
 
     `scene_bound` must be set explicitly to use a tableau such as the seated
@@ -72,12 +72,14 @@ def resolve(pose_id: str, scene_bound: bool = False, verify_hash: bool = True) -
     path = PIPELINE_DIR / e["path"]
     if not path.exists():
         raise PoseError(f"{pose_id}: registered asset missing at {path}")
-    if verify_hash:
-        digest = hashlib.sha256(path.read_bytes()).hexdigest()
-        if digest != e["sha256"]:
-            raise PoseError(
-                f"{pose_id}: hash mismatch — the file has changed since approval "
-                f"(expected {e['sha256'][:12]}…, found {digest[:12]}…)")
+    # Integrity is always verified. There is deliberately no bypass: an
+    # opt-out parameter is an invitation for a caller to skip the one check that
+    # proves the bytes are the approved ones.
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    if digest != e["sha256"]:
+        raise PoseError(
+            f"{pose_id}: hash mismatch — the file has changed since approval "
+            f"(expected {e['sha256'][:12]}…, found {digest[:12]}…)")
     return path
 
 

@@ -36,6 +36,25 @@ sys.path.insert(0, str(PIPELINE_DIR))
 from generate_character import build_prompt, get_client, load_spec  # noqa: E402
 
 
+def _write_spec_atomic(spec: dict) -> None:
+    """Temp file plus os.replace, so a crash mid-write cannot truncate the spec.
+
+    The spec carries every asset's provenance; a half-written one is worse than
+    no write at all.
+    """
+    import os
+    import tempfile
+    fd, tmp = tempfile.mkstemp(dir=str(SPEC_PATH.parent), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(spec, f, indent=2, ensure_ascii=False)
+        os.replace(tmp, SPEC_PATH)
+    except Exception:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        raise
+
+
 def _extract(response) -> bytes | None:
     for item in getattr(response, "data", []) or []:
         b64 = getattr(item, "b64_json", None)
@@ -125,8 +144,16 @@ def validate_alpha(img: Image.Image) -> dict:
 
 def generate_batch(spec: dict, client, batch: int = 1, force: bool = False) -> list[dict]:
     pl = spec["pose_library"]
-    if f"batch-{batch}-authorized" not in pl.get("status", "") and        pl.get("status") != f"authorized-batch-{batch}":
-        sys.exit(f"  pose library status is {pl.get('status')!r} — batch {batch} not authorized")
+    status = pl.get("status", "")
+    approved_batches = pl.get("approved_batches", [])
+    authorized = (f"batch-{batch}-authorized" in status
+                  or status == f"authorized-batch-{batch}")
+    # An already-approved batch stays runnable for replay/verification — that is
+    # how provenance gets re-checked without generating. It just may not create
+    # new images unless the caller is explicit.
+    if not authorized and batch not in approved_batches:
+        sys.exit(f"  pose library status is {status!r} — batch {batch} not authorized")
+    replay_only = not authorized and batch in approved_batches
     poses_key = f"batch_{batch}"
 
     body = PIPELINE_DIR / spec["references"]["body_master"]
@@ -144,10 +171,41 @@ def generate_batch(spec: dict, client, batch: int = 1, force: bool = False) -> l
     raw_dir.mkdir(parents=True, exist_ok=True)
     results = []
 
+    # Existing provenance, so a replay preserves records instead of destroying them.
+    prior = {r["id"]: r for r in pl.get(f"{poses_key}_results", []) if r.get("ok")}
+    registry = pl.get("registry", {})
+
     for pose in pl[poses_key]:
         out = out_dir / f"host_{pose['id']}.png"
         if out.exists() and not force:
-            print(f"  skip {out.name} (exists)")
+            # Preserve the existing record rather than skipping it. Skipping
+            # appended nothing, and the caller then overwrote batch_N_results with
+            # that shorter list — a rerun with every file present wiped the entire
+            # provenance history.
+            kept = prior.get(pose["id"]) or registry.get(pose["id"])
+            if kept:
+                digest = hashlib.sha256(out.read_bytes()).hexdigest()
+                img = Image.open(out).convert("RGBA")
+                live = validate_alpha(img)
+                record = {**kept, "ok": True,
+                          "path": str(out.relative_to(PIPELINE_DIR)).replace("\\", "/"),
+                          "sha256": digest, "alpha": live, "replayed": True}
+                if digest != kept.get("sha256"):
+                    record["hash_changed"] = True
+                    print(f"  ⚠ {out.name}: hash differs from the recorded value")
+                results.append(record)
+                print(f"  keep {out.name} (existing, verified)")
+            else:
+                print(f"  ⚠ {out.name} exists but has no record — regenerate with --force")
+            continue
+
+        if replay_only and not force:
+            # The batch is approved; creating a new image here would silently
+            # replace an approved asset with an unreviewed one.
+            print(f"  ⚠ {out.name} missing from an APPROVED batch — refusing to "
+                  f"generate. Re-run with --force to deliberately replace it.")
+            results.append({"id": pose["id"], "ok": False,
+                            "error": "missing from approved batch; use --force"})
             continue
 
         brief = (
@@ -250,9 +308,25 @@ def main():
     spec = load_spec()
     results = generate_batch(spec, get_client(), batch=args.batch, force=args.force)
 
+    newly_generated = [r for r in results if r.get("ok") and not r.get("replayed")]
+    if not newly_generated:
+        # Nothing was created, so there is nothing to record. Rewriting the spec
+        # anyway would churn the file — and the requirement is that a pure replay
+        # leaves it byte-for-byte identical.
+        kept = [r for r in results if r.get("ok")]
+        print(f"\n  {len(kept)}/{len(results)} preserved from existing assets — "
+              f"no generation, spec untouched")
+        return 0 if len(kept) == len(results) else 1
+
     fresh = load_spec()
+    existing = fresh["pose_library"].get(f"batch_{args.batch}_results", [])
+    if len(results) < len([r for r in existing if r.get("ok")]):
+        # Guard the guard: never shrink a results list. If this fires, something
+        # upstream failed and the spec must not be rewritten from it.
+        sys.exit(f"  refusing to write {len(results)} record(s) over "
+                 f"{len(existing)} existing — provenance would be lost")
     fresh["pose_library"][f"batch_{args.batch}_results"] = results
-    SPEC_PATH.write_text(json.dumps(fresh, indent=2, ensure_ascii=False), encoding="utf-8")
+    _write_spec_atomic(fresh)
 
     ok = [r for r in results if r.get("ok")]
     print(f"\n  {len(ok)}/{len(results)} poses generated")
