@@ -211,7 +211,7 @@
     }
   ],
   "pose_library": {
-    "status": "authorized-batch-1",
+    "status": "batch-1-approved; batch-2-authorized",
     "output_requirement": "transparent RGBA, or a validated background-removal stage with per-asset verification",
     "anchor": "BOTH approved masters for every pose",
     "blocked_on": "approval of the integrated full-body master candidate",
@@ -232,6 +232,316 @@
         "id": "seated_reading_document",
         "brief": "seated at a plain desk, reading a single sheet of paper held in both hands, looking down at it"
       }
+    ],
+    "batch_1_results": [
+      {
+        "id": "neutral_presenter",
+        "ok": true,
+        "path": "character/poses/host_neutral_presenter.png",
+        "sha256": "10dc4df7beccd8a65ab3db0f3fa8f4e97d26f02641c5bb324f37e757fe08e088",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "removal": {
+          "method": "edge_seeded_flood_fill",
+          "tolerance": 26,
+          "cleared_fraction": 0.8202
+        },
+        "alpha": {
+          "has_alpha": true,
+          "transparent_pct": 82.02,
+          "partial_pct": 0.0,
+          "corners_transparent": true,
+          "fringe_pixels_sampled": 0,
+          "subject_bbox": [
+            351,
+            36,
+            656,
+            991
+          ]
+        },
+        "created": "2026-08-01",
+        "status": "pending-approval"
+      },
+      {
+        "id": "open_hand_explaining",
+        "ok": true,
+        "path": "character/poses/host_open_hand_explaining.png",
+        "sha256": "3b8d405341f85f314d421e60cf660a81759744b91b6e2a12dd74f93528271d2c",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "removal": {
+          "method": "edge_seeded_flood_fill",
+          "tolerance": 26,
+          "cleared_fraction": 0.8259
+        },
+        "alpha": {
+          "has_alpha": true,
+          "transparent_pct": 82.59,
+          "partial_pct": 0.0,
+          "corners_transparent": true,
+          "fringe_pixels_sampled": 0,
+          "subject_bbox": [
+            243,
+            35,
+            752,
+            991
+          ]
+        },
+        "created": "2026-08-01",
+        "status": "pending-approval"
+      },
+      {
+        "id": "pointing_to_evidence",
+        "ok": true,
+        "path": "character/poses/host_pointing_to_evidence.png",
+        "sha256": "3849bfd8274c7ff46422169737eb2d15b951e3cefe30d1de952a35e1df93d5b5",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "removal": {
+          "method": "edge_seeded_flood_fill",
+          "tolerance": 26,
+          "cleared_fraction": 0.8212
+        },
+        "alpha": {
+          "has_alpha": true,
+          "transparent_pct": 82.12,
+          "partial_pct": 0.0,
+          "corners_transparent": true,
+          "fringe_pixels_sampled": 0,
+          "subject_bbox": [
+            230,
+            43,
+            723,
+            991
+          ]
+        },
+        "created": "2026-08-01",
+        "status": "pending-approval"
+      },
+      {
+        "id": "seated_reading_document",
+        "ok": true,
+        "path": "character/poses/host_seated_reading_document.png",
+        "sha256": "0bf67ddd895106ffa038663c49b6bccf8883e2899a7b6480fc72ec9bd08df3da",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "removal": {
+          "method": "edge_seeded_flood_fill",
+          "tolerance": 26,
+          "cleared_fraction": 0.7507
+        },
+        "alpha": {
+          "has_alpha": true,
+          "transparent_pct": 75.07,
+          "partial_pct": 0.0,
+          "corners_transparent": true,
+          "fringe_pixels_sampled": 0,
+          "subject_bbox": [
+            241,
+            51,
+            781,
+            970
+          ]
+        },
+        "created": "2026-08-01",
+        "status": "pending-approval"
+      }
+    ],
+    "version": 1,
+    "character_identity_version": 4,
+    "registry": {
+      "neutral_presenter": {
+        "id": "neutral_presenter",
+        "path": "character/poses/host_neutral_presenter.png",
+        "sha256": "10dc4df7beccd8a65ab3db0f3fa8f4e97d26f02641c5bb324f37e757fe08e088",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "created": "2026-08-01",
+        "batch": 1,
+        "status": "approved",
+        "classification": "reusable_pose",
+        "direction": "front",
+        "negative_space": "both_sides",
+        "props": [],
+        "framing": "full_body",
+        "includes_geometry": [],
+        "generic_compositing_allowed": true
+      },
+      "open_hand_explaining": {
+        "id": "open_hand_explaining",
+        "path": "character/poses/host_open_hand_explaining.png",
+        "sha256": "3b8d405341f85f314d421e60cf660a81759744b91b6e2a12dd74f93528271d2c",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "created": "2026-08-01",
+        "batch": 1,
+        "status": "approved",
+        "classification": "reusable_pose",
+        "direction": "front",
+        "negative_space": "both_sides",
+        "props": [],
+        "framing": "full_body",
+        "includes_geometry": [],
+        "generic_compositing_allowed": true
+      },
+      "pointing_to_evidence": {
+        "id": "pointing_to_evidence",
+        "path": "character/poses/host_pointing_to_evidence.png",
+        "sha256": "3849bfd8274c7ff46422169737eb2d15b951e3cefe30d1de952a35e1df93d5b5",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "created": "2026-08-01",
+        "batch": 1,
+        "status": "approved",
+        "classification": "reusable_directional_pose",
+        "direction": "points_viewer_right",
+        "points_to": "viewer_right",
+        "negative_space": "viewer_right",
+        "pointing_hand": {
+          "anatomical": "subject_left_hand",
+          "appears_on": "viewer_right",
+          "note": "recorded from the rendered image, not inferred from subject-left/right terminology, which is the opposite of screen direction"
+        },
+        "props": [],
+        "framing": "full_body",
+        "includes_geometry": [],
+        "generic_compositing_allowed": true
+      },
+      "seated_reading_document": {
+        "id": "seated_reading_document",
+        "path": "character/poses/host_seated_reading_document.png",
+        "sha256": "0bf67ddd895106ffa038663c49b6bccf8883e2899a7b6480fc72ec9bd08df3da",
+        "dimensions": "1024x1024",
+        "model": "gpt-image-2",
+        "generation_mode": "images.edit (dual reference: body_master v4 + face_master v3)",
+        "references": [
+          "character/canonical/body-master.png",
+          "character/canonical/face-master.png"
+        ],
+        "transparency": "background_removed",
+        "created": "2026-08-01",
+        "batch": 1,
+        "status": "approved_scene_bound",
+        "classification": "scene_bound_character_tableau",
+        "direction": "front",
+        "negative_space": "none",
+        "props": [
+          "document"
+        ],
+        "framing": "full_body",
+        "includes_geometry": [
+          "desk",
+          "chair",
+          "document"
+        ],
+        "generic_compositing_allowed": false,
+        "routing_requirement": "only route to this asset when the scene already calls for a desk-and-document setting; the furniture is baked in and cannot be separated from the figure"
+      }
+    },
+    "discovery_rule": "Resolve ONLY exact paths from this registry via pose_registry.resolve(). Never glob character/poses/*.png — raw, in-progress or unapproved files must not be discoverable.",
+    "raw_sources": "character/pose_sources/",
+    "alpha_policy": "Binary 0/255 alpha accepted for this cel-outlined style; no feathering. Validate every asset over light, navy and magenta; compositor must use high-quality (LANCZOS) resampling when scaling.",
+    "batch_2": [
+      {
+        "id": "pointing_viewer_left",
+        "brief": "standing, turned slightly toward subject-right, subject-right arm extended pointing to an empty area on the viewer's left, leaving that area clear",
+        "expect_direction": "points_viewer_left",
+        "expect_negative_space": "viewer_left"
+      },
+      {
+        "id": "thinking_hand_at_chin",
+        "brief": "standing, one hand raised with fingers at the chin in a thoughtful gesture, looking slightly upward",
+        "expect_direction": "front",
+        "expect_negative_space": "both_sides"
+      },
+      {
+        "id": "skeptical_arms_crossed",
+        "brief": "standing with arms crossed over the chest, one eyebrow lowered, skeptical",
+        "expect_direction": "front",
+        "expect_negative_space": "both_sides"
+      },
+      {
+        "id": "concerned_explaining",
+        "brief": "standing, concerned expression, one hand raised in a small restrained explanatory gesture near chest height",
+        "expect_direction": "front",
+        "expect_negative_space": "both_sides"
+      },
+      {
+        "id": "confident_conclusion",
+        "brief": "standing upright and settled, confident closed-mouth expression, hands relaxed, one hand lightly gesturing outward at waist height",
+        "expect_direction": "front",
+        "expect_negative_space": "both_sides"
+      },
+      {
+        "id": "holding_phone_evidence",
+        "brief": "standing, holding a smartphone up in one hand at chest height and looking at its screen",
+        "expect_direction": "front",
+        "expect_negative_space": "both_sides",
+        "expect_props": [
+          "phone"
+        ]
+      },
+      {
+        "id": "examining_chart_standing",
+        "brief": "standing, holding a single sheet of paper or chart in both hands at chest height, examining it",
+        "expect_direction": "front",
+        "expect_negative_space": "both_sides",
+        "expect_props": [
+          "document"
+        ]
+      }
+    ],
+    "batch_2_rules": [
+      "both approved masters supplied for every asset",
+      "no single-reference or unanchored fallback",
+      "transparent RGBA via the validated removal path",
+      "five plausible fingers wherever hands are visible",
+      "three kurta buttons",
+      "no furniture or environmental geometry unless classified scene-bound",
+      "record direction, negative-space side, props and framing for every asset",
+      "no horizontal mirroring to create directional variants — it would reverse the hair silhouette and the upper-left lighting"
     ]
   },
   "references": {
