@@ -1,6 +1,6 @@
 {
-  "version": 3,
-  "status": "body-master-approved; face-master-v3-approved",
+  "version": 4,
+  "status": "checkpoint-1-approved",
   "name": "The Interested Indian — host",
   "_comment": "Single source of truth for the host's identity. Consumed by the character generator, the visual router and the image QA rubric so they cannot drift apart. review_images.py previously hardcoded 'chubby round cartoon character with short stubby arms', which would fail every image of this design. Nothing here changes without a version bump and a fresh approval.",
   "orientation_convention": {
@@ -65,17 +65,49 @@
   },
   "masters": {
     "body_master": {
-      "path": "character/canonical/master-front.png",
+      "path": "character/canonical/body-master.png",
       "framing": "full_body",
-      "status": "approved-provisional",
-      "role": "AUTHORITY for clothing, body proportions and sandals. NOT an authority for the face — its v1 face is younger than approved.",
+      "status": "approved",
+      "role": "AUTHORITY for full-body identity, clothing, body proportions and sandals.",
+      "reason": "the current body master still contains the superseded younger v1 face; metadata cannot stop an image model averaging it with v3, and the three-quarter drift shows the risk is real",
       "model": "gpt-image-2",
-      "generation_mode": "images.generate (unanchored, defines the identity)",
+      "generation_mode": "images.edit (dual reference: body_master + face_master v3)",
       "size_requested": "1024x1024",
       "pixel_dimensions": "1024x1024",
-      "sha256": "72f9412faed604b7a8835a187b8ccd6bb1549904789f113146b650c058b0ccc2",
+      "sha256": "8a63a65e86c5d52c0e9f62857bf643105ec35a5c5d67407e050295e9de34e594",
       "created": "2026-08-01",
-      "approved_version": 2
+      "approved_version": 4,
+      "references_used": [
+        {
+          "role": "clothing/proportions/sandals",
+          "path": "character/archive/body_master_v1_superseded/master-front-v1.png",
+          "sha256": "72f9412faed604b7a8835a187b8ccd6bb1549904789f113146b650c058b0ccc2",
+          "note": "source has since been archived and prohibited as an anchor"
+        },
+        {
+          "role": "face/age/eyes/jaw/hair/glasses",
+          "path": "character/canonical/face-master.png",
+          "sha256": "172cfe68b9e803ab0293fb0340ae0efbc2332147bc3a606679c5d145da9ec653"
+        }
+      ],
+      "version": 4,
+      "history": [
+        {
+          "path": "character/archive/body_master_v1_superseded/master-front-v1.png",
+          "framing": "full_body",
+          "status": "archived-superseded",
+          "role": "AUTHORITY for clothing, body proportions and sandals. NOT an authority for the face — its v1 face is younger than approved.",
+          "model": "gpt-image-2",
+          "generation_mode": "images.generate (unanchored, defines the identity)",
+          "size_requested": "1024x1024",
+          "pixel_dimensions": "1024x1024",
+          "sha256": "72f9412faed604b7a8835a187b8ccd6bb1549904789f113146b650c058b0ccc2",
+          "created": "2026-08-01",
+          "approved_version": 2,
+          "version": 1,
+          "superseded_reason": "contained the younger v1 face; metadata alone could not stop an image model averaging it with v3"
+        }
+      ]
     },
     "face_master": {
       "path": "character/canonical/face-master.png",
@@ -125,7 +157,7 @@
     ]
   },
   "planned_next_package": {
-    "status": "authorized",
+    "status": "approved",
     "note": "Face master v3 IS the neutral expression — do not regenerate it.",
     "views": [
       {
@@ -179,19 +211,40 @@
     }
   ],
   "pose_library": {
-    "status": "not-authorized",
+    "status": "authorized-batch-1",
     "output_requirement": "transparent RGBA, or a validated background-removal stage with per-asset verification",
-    "anchor": "face_master for face-forward poses; body_master for full-figure poses"
+    "anchor": "BOTH approved masters for every pose",
+    "blocked_on": "approval of the integrated full-body master candidate",
+    "batch_1": [
+      {
+        "id": "neutral_presenter",
+        "brief": "standing front-facing, weight even, hands relaxed at sides, calm presenting posture"
+      },
+      {
+        "id": "open_hand_explaining",
+        "brief": "standing, both hands open and turned upward at chest height in an explaining gesture"
+      },
+      {
+        "id": "pointing_to_evidence",
+        "brief": "standing, turned slightly toward subject-left, subject-left arm extended pointing to an empty area at his side, leaving that area clear"
+      },
+      {
+        "id": "seated_reading_document",
+        "brief": "seated at a plain desk, reading a single sheet of paper held in both hands, looking down at it"
+      }
+    ]
   },
   "references": {
-    "body_master": "character/canonical/master-front.png",
+    "body_master": "character/canonical/body-master.png",
     "face_master": "character/canonical/face-master.png",
     "canonical_dir": "character/canonical",
     "expressions_dir": "character/expressions",
     "poses_dir": "character/poses",
     "archive_dir": "character/archive/checkpoint1_v1_provisional",
-    "contact_sheet": "character/canonical/contact_sheet.png",
-    "face_master_v2_archived": "character/archive/checkpoint1_v2_provisional/face-master-v2.png"
+    "contact_sheet": "character/exports/package_contact_sheet.png",
+    "face_master_v2_archived": "character/archive/checkpoint1_v2_provisional/face-master-v2.png",
+    "_contact_sheet_note": "derived artifact, rebuilt by export_character_package.py; not tracked in git",
+    "body_master_v1_archived": "character/archive/body_master_v1_superseded/master-front-v1.png"
   },
   "naming": {
     "canonical": "character/canonical/{view_id}.png",
@@ -214,21 +267,25 @@
     "only one version of the host appears in an episode"
   ],
   "master_authority": {
-    "face_master": [
-      "face",
-      "hair",
-      "glasses",
-      "age"
-    ],
     "body_master": [
+      "full-body identity",
       "clothing",
       "body proportions",
       "sandals"
     ],
-    "rule": "Every full-body or waist-up generation MUST supply BOTH masters. The body master alone is prohibited: its younger v1 face would return. Expression portraits use face master v3 as the authority.",
+    "face_master": [
+      "facial structure",
+      "age",
+      "hair",
+      "glasses",
+      "eyes",
+      "close-up detail"
+    ],
+    "rule": "Full-body AND upper-torso pose generations must receive BOTH approved masters. Angle references may guide orientation only and must never replace either master or supply identity.",
     "prohibited_anchors": [
       "character/archive/checkpoint1_v1_provisional/**",
-      "character/archive/checkpoint1_v2_provisional/face-master-v2.png"
+      "character/archive/checkpoint1_v2_provisional/face-master-v2.png",
+      "character/archive/body_master_v1_superseded/master-front-v1.png"
     ]
   },
   "generation_rules": {
@@ -261,5 +318,61 @@
       "neck width",
       "eye size"
     ]
-  }
+  },
+  "angle_references": {
+    "classification": "upper_torso_angle_reference",
+    "usable_for": [
+      "orientation and angle guidance when generating new poses"
+    ],
+    "not_usable_for": [
+      "direct reuse as a waist-up pose asset",
+      "compositing into scenes"
+    ],
+    "note": "Framing is chest-up rather than true waist-up. The profile's 56.3% head fraction is an accepted exception and will not be re-rendered.",
+    "assets": [
+      {
+        "id": "waist-up-three-quarter-subject-left",
+        "path": "character/canonical/waist-up-three-quarter-subject-left.png",
+        "head_fraction": 0.464
+      },
+      {
+        "id": "waist-up-three-quarter-subject-right",
+        "path": "character/canonical/waist-up-three-quarter-subject-right.png",
+        "head_fraction": 0.53
+      },
+      {
+        "id": "waist-up-profile",
+        "path": "character/canonical/waist-up-profile.png",
+        "head_fraction": 0.563,
+        "framing_exception": "accepted"
+      }
+    ]
+  },
+  "integrated_body_brief": {
+    "framing": "front-facing, neutral, full body, complete hands and feet visible",
+    "expression": "neutral, relaxed mouth",
+    "authority": {
+      "body_master": [
+        "clothing",
+        "body proportions",
+        "sandals"
+      ],
+      "face_master": [
+        "face",
+        "age",
+        "eyes",
+        "jaw",
+        "hair",
+        "glasses"
+      ]
+    },
+    "preserve": [
+      "adult proportions",
+      "ivory kurta with three dark buttons",
+      "loose off-white trousers",
+      "dark brown open-toe sandals",
+      "complete hands and feet"
+    ]
+  },
+  "checkpoint_1_status": "approved"
 }
