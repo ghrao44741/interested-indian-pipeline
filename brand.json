@@ -1,3 +1,6 @@
 {
+  "_do_not_edit": "GENERATED FILE — DO NOT EDIT. Change the channel pack and re-run render_channel_dna.py. Hand edits are detected and refused at load time.",
+  "_generated_from": "channels/interested_indian/channel.json",
+  "_source_sha256": "331bbe8c9f9571ed882dc7dbae23aaa1acd4f0ff7cdeb27536c2e30cc7180374",
   "pad_color": "#1A2B4C"
 }

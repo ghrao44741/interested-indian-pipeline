@@ -1,13 +1,20 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "project": "test_2min",
   "generated_by": "plan_visuals.py",
   "read_only": true,
-  "plan_id": "88ff894c9475439d85f3bfc3a2d88f4d",
-  "generated_at": "2026-08-02T17:42:19+00:00",
+  "plan_id": "5678f1706cd44d2c979f24aebd787640",
+  "generated_at": "2026-08-02T21:16:24+00:00",
   "inputs": {
     "prompts_sha256": "50948389517161c102f3dd0565cb826f5583c01cccc365fb2ea655710d555412",
-    "manifest_sha256": "8d3fce361c02a959fb1d008a942a91e686cc5fdfa40590027825bc0bb0fca349"
+    "manifest_sha256": "c7ce6b9dae2dce847af959dbafd40a17aab1d8816c76003f18ecc6c19685efc6"
+  },
+  "channel": {
+    "channel_id": "interested_indian",
+    "channel_dna_version": 1,
+    "channel_json_sha256": "331bbe8c9f9571ed882dc7dbae23aaa1acd4f0ff7cdeb27536c2e30cc7180374",
+    "character_spec_sha256": "6880706f55071463d04e1f243899bb70d284a3fbc160b8bcd9c57ea84cdb6e32",
+    "voice_profile_sha256": null
   },
   "failure_revision": 0,
   "auto_resolved_failures": [],
@@ -477,7 +484,7 @@
   "paid_generation": {
     "shots": 17,
     "estimate_usd": null,
-    "basis": "no image_pricing entry in channel_config.json — any figure here would be invented, so none is given"
+    "basis": "no image_pricing entry in the channel pack — any figure here would be invented, so none is given"
   },
   "needs_review": []
 }

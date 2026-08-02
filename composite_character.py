@@ -36,6 +36,7 @@ from pathlib import Path
 
 from PIL import Image, ImageFilter
 
+import channel_context
 import pose_registry
 from generation_gate import (GateBlocked, require_character_ready,
                              require_generation_ready)
@@ -97,7 +98,8 @@ def _composite(pose_id: str,
                scene_bound: bool = False,
                side: str | None = None,
                height_frac: float = HOST_HEIGHT_FRAC,
-               shadow: bool = True) -> dict:
+               shadow: bool = True,
+               context=None) -> dict:
     """The rendering itself. Private: it performs no authorisation.
 
     Reachable only through render_production() (episode artwork, Checkpoint 3
@@ -112,8 +114,8 @@ def _composite(pose_id: str,
     registry exists to close, by letting a router drop a desk into a shot that
     never asked for one.
     """
-    pose_path = pose_registry.resolve(pose_id, scene_bound=scene_bound)
-    meta = pose_registry.metadata(pose_id)
+    pose_path = pose_registry.resolve(pose_id, scene_bound=scene_bound, context=context)
+    meta = pose_registry.metadata(pose_id, context=context)
     chosen = placement_side(meta, side)
 
     bg = Image.open(background).convert("RGBA")
@@ -178,7 +180,10 @@ def render_production(project, pose_id: str, background, out, **kw) -> dict:
     if not out.resolve().is_relative_to(project_dir.resolve()):
         raise ValueError(f"production output {out} is outside the approved project "
                          f"{project_dir.name}")
-    return _composite(pose_id, background, out, **kw)
+    # The pose is resolved through the episode's own channel, so an id that names
+    # one channel's artwork cannot reach another's, however alike the ids look.
+    context = channel_context.load_channel_for_project(project_dir)
+    return _composite(pose_id, background, out, context=context, **kw)
 
 
 def render_preview(pose_id: str, background, name: str, **kw) -> dict:
@@ -246,7 +251,7 @@ def main() -> int:
         print(f"\n{e}", file=sys.stderr)
         print("\nNothing was rendered.", file=sys.stderr)
         return 1
-    except (pose_registry.PoseError, ValueError) as e:
+    except (pose_registry.PoseError, ValueError, channel_context.ChannelError) as e:
         print(f"refused: {e}", file=sys.stderr)
         return 2
     print(f"  composited {rec['pose_id']} ({rec['side']}) -> {rec['output']}"

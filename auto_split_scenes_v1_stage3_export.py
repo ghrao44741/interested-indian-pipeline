@@ -67,6 +67,16 @@ from pathlib import Path
 # Stdlib-only module — safe to import under the WhisperX venv, which has none of
 # the orchestrator's dependencies.
 import source_ids
+
+# This script is shared with sibling channels whose checkouts have no Channel
+# Pack support at all. Importing defensively is what lets the same file keep
+# working there unchanged — see resolve_creation_channel() below for the four
+# cases, none of which silently discards an explicit --channel.
+try:
+    import channel_context
+except ImportError:                                     # sibling-channel checkout
+    channel_context = None
+
 import whisperx
 import gc
 import torch
@@ -503,6 +513,11 @@ def main():
                          help="Filename of the full voiceover (e.g. shorts1.wav). "
                               "Must already be placed inside {project}/source_audio/")
     parser.add_argument("--project", required=True, help="Project folder name (e.g. ep02)")
+    parser.add_argument("--channel", default=None,
+                        help="Channel pack this episode belongs to. Required in a "
+                             "checkout that has channels/, refused in one that does "
+                             "not. An episode's channel is chosen once, by a person, "
+                             "and never changes afterwards.")
     parser.add_argument("--max-seconds", type=float, default=10.0, help="Max duration per scene")
     parser.add_argument("--fragment-max-seconds", type=float, default=DEFAULT_FRAGMENT_MAX_SECONDS,
                          help="Only used with --video-type LongVideo. Scenes at or under this "
@@ -540,6 +555,38 @@ def main():
                               "75-second Short with a numbered-steps format benefits from "
                               "--video-type LongVideo just as much as a 10-minute episode does.")
     args = parser.parse_args()
+
+    # ── Channel assignment ──────────────────────────────────────────────────
+    # Settled before any transcription work, so an unusable answer costs seconds
+    # rather than a full GPU pass. Four cases, and an explicit --channel is never
+    # silently dropped: a manifest that quietly lacks the channel someone asked
+    # for would be wrong in a way nothing downstream ever reports.
+    channel_id = channel_dna_version = None
+    if channel_context is None:
+        if args.channel:
+            print(f"\n✗ --channel {args.channel!r} was given, but this checkout has no "
+                  f"channel_context.py and cannot honour a channel assignment.")
+            return 2
+    else:
+        existing_path = Path(args.project) / "manifest.json"
+        existing_id = None
+        if existing_path.is_file():
+            try:
+                existing_id = json.loads(
+                    existing_path.read_text(encoding="utf-8")).get("channel_id")
+            except (OSError, json.JSONDecodeError):
+                existing_id = None
+        if existing_id and args.channel and args.channel != existing_id:
+            print(f"\n✗ {args.project} already belongs to channel {existing_id!r}; "
+                  f"refusing to reassign it to {args.channel!r}. A channel is chosen "
+                  f"once and never changes.")
+            return 2
+        try:
+            channel_id, channel_dna_version = channel_context.resolve_creation_channel(
+                args.channel or existing_id)
+        except channel_context.ChannelError as e:
+            print(f"\n✗ {e}")
+            return 2
 
     audio_dir = f"{args.project}/audio"
     source_audio_dir = f"{args.project}/source_audio"
@@ -724,6 +771,11 @@ def main():
     total_duration = round(sum(s["duration"] for s in manifest_scenes), 3)
     manifest = {
         "episode": os.path.basename(args.project.rstrip("/\\")),  # always "ep01", never full path
+        # Which channel's DNA, character, poses and rules apply to this episode.
+        # Written once at creation; every later stage reads it rather than being
+        # told, so an episode's identity cannot be changed from a command line.
+        "channel_id": channel_id,
+        "channel_dna_version": channel_dna_version,
         "title": args.title,
         "voice": args.voice,
         "word_segments_file": words_filename,

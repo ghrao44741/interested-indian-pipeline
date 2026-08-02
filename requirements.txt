@@ -1,0 +1,20 @@
+# Core dependencies — must be installed, and must import.
+#
+# "Core" means: needed to run the test suite and the free, identity-and-planning
+# half of the pipeline (channel loading, source identity, routing classification,
+# visual planning, pose resolution, compositing). tests/test_dependencies.py
+# fails if any of these is missing, so an incomplete environment is reported
+# here rather than halfway through someone else's run.
+#
+# Everything that belongs to one specific paid or heavyweight stage lives in
+# requirements-optional.txt. Nothing is undeclared: the same test walks every
+# import in the repository by AST and fails on anything absent from both files.
+#
+# Ranges rather than bare names, and rather than exact pins: bare names let a
+# major version land silently, and exact pins go stale into a lie.
+
+jsonschema>=4.20,<5      # Channel Pack schema validation (channel_context.py)
+Pillow>=10.0,<13         # every image path: compositing, overlays, QA, charts
+requests>=2.31,<3        # Pexels, xAI, map GeoJSON fetch
+openai>=1.40,<3          # imported at module load by the image generators
+python-dotenv>=1.0,<2    # .env loading

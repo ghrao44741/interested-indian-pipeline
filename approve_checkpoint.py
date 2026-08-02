@@ -42,12 +42,15 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+import channel_context
 import generation_gate as gg
 import plan_visuals
 import route_failures
 
 PIPELINE_DIR = Path(__file__).parent
-SCHEMA_VERSION = 1
+# 2: every approval records the Channel Pack, character specification and voice
+# profile it was granted under. A v1 record bound none of them.
+SCHEMA_VERSION = 2
 
 # Modules that must never be able to grant approval, even indirectly. The planner
 # writes the very artifact being approved, and the orchestrator runs unattended —
@@ -141,6 +144,36 @@ def write_approval(project, approver: str, confirmation: str) -> Path:
             f"the plan's schema_version is {plan.get('schema_version')!r}, this "
             f"code expects {gg.PLAN_SCHEMA_VERSION} — re-run plan_visuals.py")
 
+    # The channel decides what the artwork is supposed to be, so approval is
+    # granted against a specific pack, character specification and voice — not
+    # against a plan that merely happens to sit in this folder.
+    try:
+        context = channel_context.load_channel_for_project(project_dir)
+    except channel_context.ChannelError as e:
+        raise ApprovalRefused(f"the channel could not be resolved: {e}")
+
+    binding = plan.get("channel")
+    if not isinstance(binding, dict) or not binding:
+        raise ApprovalRefused("the plan records no channel — re-run plan_visuals.py")
+    expected_binding = context.plan_binding()
+    if binding != expected_binding:
+        differing = sorted(k for k in expected_binding
+                           if binding.get(k) != expected_binding[k])
+        raise ApprovalRefused(
+            f"the plan was built against a different channel state ({', '.join(differing)} "
+            f"changed). Re-run plan_visuals.py and read the new plan before approving.")
+
+    # Defense in depth is the gate's job; refusing here is what makes the voice
+    # decision a recorded act rather than a config edit nobody has to make.
+    if not context.voice_approved:
+        raise ApprovalRefused(
+            f"{context.channel_id} has no approved voice profile "
+            f"(selection_status={context.voice_selection_status!r}). Paid generation "
+            f"cannot be approved against narration produced by an unapproved voice. "
+            f"Record the decision as voice.approved_profile in "
+            f"{context.pack_dir / channel_context.PACK_NAME}, re-render, re-narrate, "
+            f"then re-plan.")
+
     plan_id = plan.get("plan_id")
     if not plan_id:
         raise ApprovalRefused("the plan has no plan_id — re-run plan_visuals.py")
@@ -221,6 +254,7 @@ def write_approval(project, approver: str, confirmation: str) -> Path:
         "schema_version": SCHEMA_VERSION,
         "project": project_dir.name,
         "plan_id": plan_id,
+        "channel": expected_binding,
         "manifest_sha256": _sha(manifest_path),
         "visual_plan_sha256": _sha(plan_path),
         "visual_plan_md_sha256": _sha(md_path),
@@ -273,6 +307,13 @@ def main() -> int:
         if not plan:
             print(f"plan           : none — run plan_visuals.py first")
             return 1
+        ch = plan.get("channel") or {}
+        print(f"channel        : {ch.get('channel_id') or 'UNRESOLVED'} "
+              f"(DNA v{ch.get('channel_dna_version')})")
+        print(f"voice profile  : "
+              + (str(ch.get('voice_profile_sha256'))[:16] + "…"
+                 if ch.get("voice_profile_sha256")
+                 else "none approved — approval will be refused"))
         print(f"plan id        : {plan.get('plan_id')}")
         print(f"generated      : {plan.get('generated_at')}")
         print(f"routing input  : {str(plan.get('inputs', {}).get('prompts_sha256'))[:16]}…")

@@ -1,0 +1,380 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-interested-indian.local/schema/channel.schema.json",
+  "title": "Channel Pack",
+  "description": "A Channel Pack is the single machine-readable source of truth for one channel's identity. Generic pipeline code must read this rather than carry a channel's name, palette, character or terminology in its own source. additionalProperties is false everywhere on purpose: a misspelled key must be an error, not a silently ignored no-op.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "channel_id",
+    "channel_dna_version",
+    "brand",
+    "audience",
+    "editorial",
+    "narrative",
+    "visual_style",
+    "host",
+    "voice",
+    "routing",
+    "renderers",
+    "evidence",
+    "safety",
+    "economics"
+  ],
+  "properties": {
+    "schema_version": {
+      "description": "Refused by version, not by shape. An unsupported value is an error even if every other field validates.",
+      "enum": [1]
+    },
+    "channel_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{2,63}$",
+      "description": "Directory name under channels/. Constrained so it can never traverse or escape."
+    },
+    "channel_dna_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Declared for humans and recorded in each episode manifest. Plan invalidation is driven by the pack hash, not by this number, so an un-bumped edit still invalidates every plan."
+    },
+    "legacy_adapter": {
+      "type": "boolean",
+      "description": "True only for a channel that still owns generated root-level compatibility files. Exactly one pack may set this."
+    },
+    "brand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "promise", "language"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "handle": { "type": "string" },
+        "promise": { "type": "string", "minLength": 1 },
+        "language": { "type": "string", "minLength": 2 }
+      }
+    },
+    "audience": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primary", "secondary"],
+      "properties": {
+        "primary": { "type": "string", "minLength": 1 },
+        "secondary": { "type": "string", "minLength": 1 }
+      }
+    },
+    "editorial": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tone", "principles"],
+      "properties": {
+        "tone": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "principles": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "structural_inspiration_only": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source", "permitted", "prohibited"],
+          "properties": {
+            "source": { "type": "string" },
+            "url": { "type": "string" },
+            "permitted": { "type": "string" },
+            "prohibited": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "narrative": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["structure", "portfolio_planning_guidance"],
+      "properties": {
+        "structure": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["step", "beat"],
+            "properties": {
+              "step": { "type": "integer", "minimum": 1 },
+              "beat": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "portfolio_planning_guidance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["note", "shares"],
+          "properties": {
+            "note": {
+              "type": "string",
+              "description": "Must state that this is editorial planning guidance and not a mechanical per-episode quota."
+            },
+            "shares": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["share_pct", "label"],
+                "properties": {
+                  "share_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+                  "label": { "type": "string", "minLength": 1 }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "visual_style": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["palette", "pad_color", "rules"],
+      "properties": {
+        "palette": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          }
+        },
+        "pad_color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" },
+        "rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "ken_burns_zoom": { "type": "number", "minimum": 1.0, "maximum": 2.0 }
+      }
+    },
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "kind": { "type": "string" },
+        "never_a_real_expert": { "type": "boolean" },
+        "target_presence_pct": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["min", "max"],
+          "properties": {
+            "min": { "type": "number", "minimum": 0, "maximum": 100 },
+            "max": { "type": "number", "minimum": 0, "maximum": 100 }
+          }
+        },
+        "soft_ceiling_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+        "max_consecutive": { "type": "integer", "minimum": 1 },
+        "used_for": { "type": "array", "items": { "type": "string" } },
+        "not_used_for": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "character": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["spec_path", "path_kind"],
+      "properties": {
+        "spec_path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Relative only. Absolute paths and .. segments are refused by the loader before resolution."
+        },
+        "path_kind": {
+          "enum": ["pack_relative", "legacy_pipeline_root"],
+          "description": "pack_relative resolves under channels/<channel_id>/. legacy_pipeline_root resolves under an explicit allowlist of approved legacy subtrees; the pipeline root itself is NOT a boundary, since every other pack and every episode lives beneath it."
+        },
+        "identity_version": { "type": "integer", "minimum": 1 },
+        "pose_library_version": { "type": "integer", "minimum": 1 },
+        "_migration_note": { "type": "string" }
+      }
+    },
+    "voice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selection_status", "approved_profile"],
+      "properties": {
+        "selection_status": { "enum": ["pending", "approved"] },
+        "approved_profile": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["provider", "voice", "approved_by", "approved_at"],
+              "properties": {
+                "provider": { "type": "string" },
+                "voice": { "type": "string" },
+                "rate": { "type": "string" },
+                "pitch": { "type": "string" },
+                "speaking_rate": { "type": "number" },
+                "locale": { "type": "string" },
+                "style": { "type": "string" },
+                "approved_by": { "type": "string", "minLength": 1 },
+                "approved_at": { "type": "string", "minLength": 1 },
+                "_note": { "type": "string" }
+              }
+            }
+          ]
+        },
+        "working_default": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["provider", "voice", "approved"],
+              "properties": {
+                "provider": { "type": "string" },
+                "voice": { "type": "string" },
+                "rate": { "type": "string" },
+                "pitch": { "type": "string" },
+                "approved": {
+                  "const": false,
+                  "description": "A working default is by definition not approved. If it were, it would belong in approved_profile."
+                },
+                "_note": { "type": "string" }
+              }
+            }
+          ]
+        },
+        "requirements": { "type": "array", "items": { "type": "string" } },
+        "preview_dir": {
+          "type": "string",
+          "description": "The only directory synthesis may write to while selection_status is pending."
+        },
+        "legacy_config": {
+          "type": "object",
+          "description": "Frozen payload for the generated root channel_config.json. Carried verbatim so the three existing consumers keep working unchanged; dismantled in Task 2B. Deliberately unconstrained.",
+          "additionalProperties": true
+        }
+      }
+    },
+    "routing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_version"],
+      "properties": {
+        "policy_version": { "type": "integer", "minimum": 1 },
+        "low_confidence_threshold": { "type": "number", "minimum": 0, "maximum": 1 },
+        "require_override_reason": { "type": "boolean" },
+        "_note": { "type": "string" }
+      }
+    },
+    "renderers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capabilities"],
+      "properties": {
+        "capabilities": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "pattern": "^[A-Z][A-Z0-9_]*$" },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1,
+            "description": "A renderer id that must already be registered in renderers.py. Never an importable module path — configuration does not choose code by string."
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["require_provenance_for"],
+      "properties": {
+        "require_provenance_for": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "reconstruction_label": { "type": "string" },
+        "document_policy": { "type": "string" }
+      }
+    },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rules"],
+      "properties": {
+        "rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "human_review_required_for": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "economics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["currency", "image_pricing"],
+      "properties": {
+        "currency": { "type": "string", "minLength": 3 },
+        "image_pricing": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["cost_usd", "basis"],
+            "properties": {
+              "cost_usd": { "type": "number", "minimum": 0 },
+              "basis": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "_note": { "type": "string" }
+      }
+    },
+    "_legacy_notes": {
+      "type": "object",
+      "description": "Institutional memory carried over from the pre-pack configuration so it is not lost when the generated adapters stop emitting it. Read by nothing.",
+      "additionalProperties": true
+    }
+  },
+  "allOf": [
+    {
+      "description": "A channel that uses a host must say where its character specification lives.",
+      "if": {
+        "properties": { "host": { "properties": { "enabled": { "const": true } } } },
+        "required": ["host"]
+      },
+      "then": { "required": ["character"] }
+    },
+    {
+      "description": "An approved voice must carry a profile; a pending one must not pretend to.",
+      "if": {
+        "properties": { "voice": { "properties": { "selection_status": { "const": "approved" } } } },
+        "required": ["voice"]
+      },
+      "then": {
+        "properties": {
+          "voice": {
+            "properties": { "approved_profile": { "type": "object" } }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "voice": {
+            "properties": { "approved_profile": { "type": "null" } }
+          }
+        }
+      }
+    }
+  ]
+}

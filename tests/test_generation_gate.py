@@ -32,6 +32,8 @@ import composite_character  # noqa: E402
 import generation_gate as gate  # noqa: E402
 import pose_registry  # noqa: E402
 import route_images  # noqa: E402
+import channel_context as cc  # noqa: E402
+import channel_fixture  # noqa: E402
 
 failures = []
 _fixtures = []
@@ -145,8 +147,10 @@ def build_fixture() -> tuple[Path, Path]:
             "source_match": "ok", "visual_match": "ok", "visual_state": "planned",
             "visual_asset_id": f"VIS-{i:03d}-A",
         })
-    manifest = {"episode": "demo", "identity_state": "ok", "identity_reasons": [],
-                "scenes": scenes}
+    manifest = channel_fixture.stamp(
+        {"episode": "demo", "identity_state": "ok", "identity_reasons": [],
+         "scenes": scenes})
+    channel_fixture.install(td)
     (proj / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
     plan = {"project": "demo_project", "needs_review": [],
@@ -163,7 +167,9 @@ def patched(root: Path):
     # PREVIEW_DIR is computed at import time, so patching PIPELINE_DIR alone
     # leaves previews landing in the real repository — which is what happened
     # here until the census was widened to cover the whole character/ tree.
-    return mock.patch.multiple(gate, PIPELINE_DIR=root, SPEC_PATH=spec), \
+    return mock.patch.multiple(cc, PIPELINE_DIR=root,
+                               CHANNELS_DIR=root / "channels"), \
+        mock.patch.multiple(gate, PIPELINE_DIR=root, SPEC_PATH=spec), \
         mock.patch.multiple(pose_registry, PIPELINE_DIR=root, SPEC_PATH=spec), \
         mock.patch.multiple(composite_character, PIPELINE_DIR=root,
                             PREVIEW_DIR=root / "character" / "previews")
@@ -171,8 +177,8 @@ def patched(root: Path):
 
 def run_gate(root, project, **kw):
     """The identity gate. Approval behaviour is tests/test_approval_gate.py."""
-    a, b, c = patched(root)
-    with a, b, c:
+    a, b, c, d = patched(root)
+    with a, b, c, d:
         return gate.require_identity_ready(project, "test", raise_on_block=False, **kw)
 
 
@@ -290,8 +296,8 @@ try:
     root, proj = build_fixture()
     rep = run_gate(root, proj, pose_id="half_finished")
     check("pending status refused", blocked_on(rep, "half_finished"), str(rep.blockers))
-    a, b, c = patched(root)
-    with a, b, c:
+    a, b, c, d = patched(root)
+    with a, b, c, d:
         check("pending pose is not even listed",
               "half_finished" not in pose_registry.list_poses())
 
@@ -361,12 +367,12 @@ try:
           "Image.LANCZOS" in (ROOT / "composite_character.py").read_text(encoding="utf-8"))
 
     root, proj = build_fixture()
-    a, b, c = patched(root)
+    a, b, c, d = patched(root)
     seen = []
-    with a, b, c:
+    with a, b, c, d:
         real = pose_registry.resolve
 
-        def spy(pid, scene_bound=False):
+        def spy(pid, scene_bound=False, **kw):      # **kw: pose calls carry a context
             seen.append((pid, scene_bound))
             return real(pid, scene_bound=scene_bound)
 

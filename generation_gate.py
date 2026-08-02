@@ -40,6 +40,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+import channel_context
 import pose_registry
 import route_failures
 import source_ids
@@ -50,15 +51,20 @@ VISUAL_PLAN_NAME = "visual_plan.json"
 VISUAL_PLAN_MD_NAME = "visual_plan.md"
 # Bumped whenever the executable plan gains or changes a field that
 # dispatch relies on, so an older plan cannot be executed by newer code.
-PLAN_SCHEMA_VERSION = 1
+# 2: every plan records the Channel Pack it was built against.
+PLAN_SCHEMA_VERSION = 2
 APPROVAL_NAME = "checkpoint_3_approval.json"
 PROMPTS_NAME = "image_prompts_one_line_per_prompt.md"
-APPROVAL_SCHEMA_VERSIONS = {1}
+# Deliberately not {1, 2}. A v1 record carries no channel binding at all, so
+# accepting one would mean reinterpreting an approval as covering something its
+# approver never saw — which is the silent reinterpretation this version exists
+# to prevent. There are no v1 approvals in existence to migrate.
+APPROVAL_SCHEMA_VERSIONS = {2}
 APPROVAL_REQUIRED_FIELDS = ("schema_version", "project", "plan_id",
                             "manifest_sha256", "visual_plan_sha256",
                             "visual_plan_md_sha256", "prompts_sha256",
                             "failure_revision", "approved_at", "approved_by",
-                            "confirmation", "paid_generation")
+                            "confirmation", "paid_generation", "channel")
 
 # Directories whose contents are, by definition, not approved output. A pose or
 # reference resolving into any of these must never reach a render: raw holds
@@ -276,21 +282,71 @@ def _sha(path: Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def _load_spec() -> dict:
-    return json.loads(SPEC_PATH.read_text(encoding="utf-8"))
+def _load_spec(context=None) -> dict:
+    return json.loads(_spec_path(context).read_text(encoding="utf-8"))
 
 
-def _check_masters(rep: GateReport) -> None:
+def _spec_path(context=None) -> Path:
+    """Where this channel's character specification lives.
+
+    Falls back to the module constant only when there is no channel to ask —
+    character-setup work, which has no episode. See the narrowly scoped legacy
+    exception documented in pose_registry.
+    """
+    return SPEC_PATH if context is None else Path(context.character_spec_path)
+
+
+def _asset_base(context=None) -> Path:
+    return (PIPELINE_DIR if context is None
+            else Path(context.character_spec_path).parent.parent)
+
+
+def _check_channel(rep: GateReport, project_dir: Path):
+    """The episode names a loadable Channel Pack. Returns the context, or None.
+
+    Everything downstream — which character, which poses, which renderers, which
+    voice — is a property of the channel, so an episode that cannot say which
+    channel it belongs to cannot be checked at all, let alone generated for.
+    """
+    try:
+        ctx = channel_context.load_channel_for_project(project_dir)
+    except channel_context.ChannelError as e:
+        rep.add("episode names a loadable channel", False, str(e))
+        return None
+    rep.add("episode names a loadable channel", True)
+    return ctx
+
+
+def _check_voice_approved(rep: GateReport, context) -> None:
+    """A recorded voice decision, not merely a configured one.
+
+    Defense in depth: approve_checkpoint refuses to grant approval while the
+    voice is pending, and this refuses to act on an approval that somehow
+    predates the selection being reopened. Either check alone would be one edit
+    away from being the only thing standing between an unapproved voice and a
+    published episode.
+    """
+    if context is None:
+        return
+    rep.add("channel has an approved voice profile", context.voice_approved,
+            f"{context.channel_id} voice selection is "
+            f"{context.voice_selection_status!r} with no approved profile — record "
+            f"the decision as voice.approved_profile in the channel pack, then "
+            f"re-narrate and re-plan")
+
+
+def _check_masters(rep: GateReport, context=None) -> None:
     """Masters exist and still hash to what was approved.
 
     A drifted master silently changes the character in every asset generated
     afterwards, and nothing downstream would notice — the files would all look
     like valid output.
     """
-    if not rep.add("character spec present", SPEC_PATH.exists(), str(SPEC_PATH)):
+    spec_path = _spec_path(context)
+    if not rep.add("character spec present", spec_path.exists(), str(spec_path)):
         return
     try:
-        spec = _load_spec()
+        spec = _load_spec(context)
     except json.JSONDecodeError as e:
         rep.add("character spec parses", False, str(e))
         return
@@ -301,7 +357,7 @@ def _check_masters(rep: GateReport) -> None:
                    "spec has no masters block"):
         return
     for key, m in masters.items():
-        path = PIPELINE_DIR / m["path"]
+        path = _asset_base(context) / m["path"]
         if not rep.add(f"master {key} present", path.exists(), str(path)):
             continue
         expected = m.get("sha256")
@@ -314,9 +370,9 @@ def _check_masters(rep: GateReport) -> None:
                 f"expected {expected[:12]}…, found {found[:12]}…")
 
 
-def _check_pose_registry(rep: GateReport) -> None:
+def _check_pose_registry(rep: GateReport, context=None) -> None:
     try:
-        audit = pose_registry.audit()
+        audit = pose_registry.audit(context=context)
     except Exception as e:                                  # unreadable spec, etc.
         rep.add("pose registry audits clean", False, f"{type(e).__name__}: {e}")
         return
@@ -324,22 +380,25 @@ def _check_pose_registry(rep: GateReport) -> None:
             "; ".join(audit["problems"]))
 
 
-def _check_pose_selection(rep: GateReport, pose_id: str, scene_bound: bool) -> None:
+def _check_pose_selection(rep: GateReport, pose_id: str, scene_bound: bool,
+                          context=None) -> None:
     """The selected pose resolves, and resolves to approved, renderable bytes."""
     try:
-        path = pose_registry.resolve(pose_id, scene_bound=scene_bound)
+        path = pose_registry.resolve(pose_id, scene_bound=scene_bound, context=context)
     except pose_registry.PoseError as e:
         rep.add(f"pose {pose_id!r} resolves", False, str(e))
         return
     rep.add(f"pose {pose_id!r} resolves", True)
 
-    rel = path.relative_to(PIPELINE_DIR).as_posix()
+    base = _asset_base(context).resolve()
+    rel = (path.resolve().relative_to(base).as_posix()
+           if path.resolve().is_relative_to(base) else path.as_posix())
     offending = [d for d in NON_RENDERABLE_DIRS if f"/{d}/" in f"/{rel}"]
     rep.add(f"pose {pose_id!r} is not raw/candidate/archived", not offending,
             f"resolves into {offending} via {rel}")
 
-    meta = pose_registry.metadata(pose_id)
-    prohibited = set(_load_spec().get("prohibited_anchors") or [])
+    meta = pose_registry.metadata(pose_id, context=context)
+    prohibited = set(_load_spec(context).get("prohibited_anchors") or [])
     rep.add(f"pose {pose_id!r} is not a prohibited anchor",
             pose_id not in prohibited and meta.get("path") not in prohibited)
 
@@ -431,7 +490,47 @@ def _check_sidecar_currency(rep: GateReport, project_dir: Path) -> None:
             if not matches else f"ambiguous: {matches} both reproduce them")
 
 
-def _check_visual_plan(rep: GateReport, project_dir: Path, manifest: dict | None) -> None:
+def _check_plan_channel(rep: GateReport, plan: dict, context, label: str) -> None:
+    """A plan or approval describes the exact Channel Pack still in force.
+
+    Changing Channel DNA or the character specification changes what the artwork
+    is supposed to be, so it must invalidate work approved under the old one. And
+    a plan built for one channel must never be executable under another, however
+    similar the two look.
+    """
+    block = plan.get("channel")
+    if not rep.add(f"{label} records its channel", isinstance(block, dict) and block,
+                   f"no channel block — re-run plan_visuals.py"):
+        return
+    if context is None:
+        return
+
+    rep.add(f"{label} names this episode's channel",
+            block.get("channel_id") == context.channel_id,
+            f"{label} is for {block.get('channel_id')!r}, this episode belongs to "
+            f"{context.channel_id!r}")
+    rep.add(f"{label} channel pack is unchanged",
+            block.get("channel_json_sha256") == context.channel_json_sha256,
+            f"the channel pack has changed since the {label} was made "
+            f"(recorded {str(block.get('channel_json_sha256'))[:12]}…, now "
+            f"{context.channel_json_sha256[:12]}…) — re-plan and re-approve")
+    rep.add(f"{label} channel DNA version is current",
+            block.get("channel_dna_version") == context.channel_dna_version,
+            f"recorded v{block.get('channel_dna_version')}, pack is now "
+            f"v{context.channel_dna_version}")
+    if context.host_enabled:
+        rep.add(f"{label} character specification is unchanged",
+                block.get("character_spec_sha256") == context.character_spec_sha256,
+                f"the character specification has changed since the {label} was made "
+                f"— every host shot it authorised would be a different character")
+    rep.add(f"{label} voice binding matches the channel",
+            block.get("voice_profile_sha256") == context.voice_profile_sha256,
+            f"recorded voice profile {str(block.get('voice_profile_sha256'))[:12]}, "
+            f"channel now has {str(context.voice_profile_sha256)[:12]}")
+
+
+def _check_visual_plan(rep: GateReport, project_dir: Path, manifest: dict | None,
+                       context=None) -> None:
     """A reviewed visual plan, matching this manifest, with nothing outstanding."""
     plan_path = project_dir / VISUAL_PLAN_NAME
     if not rep.add("visual plan exists", plan_path.exists(),
@@ -448,6 +547,8 @@ def _check_visual_plan(rep: GateReport, project_dir: Path, manifest: dict | None
             plan.get("schema_version") == PLAN_SCHEMA_VERSION,
             f"schema_version={plan.get('schema_version')!r}, expected "
             f"{PLAN_SCHEMA_VERSION} — re-run plan_visuals.py")
+
+    _check_plan_channel(rep, plan, context, "visual plan")
 
     review = plan.get("needs_review", [])
     rep.add("visual plan has no unresolved review items", not review,
@@ -529,7 +630,8 @@ def _check_route_failures(rep: GateReport, project_dir: Path) -> None:
             + ". Resolve with route_failures.py, then re-plan and re-approve.")
 
 
-def _check_approval(rep: GateReport, project_dir: Path, manifest: dict | None) -> None:
+def _check_approval(rep: GateReport, project_dir: Path, manifest: dict | None,
+                    context=None) -> None:
     """An explicit, human-granted Checkpoint 3 approval, bound to exact bytes.
 
     This is the check the previous single gate did not have. It verified that a
@@ -567,6 +669,10 @@ def _check_approval(rep: GateReport, project_dir: Path, manifest: dict | None) -
 
     rep.add("approval names this project", rec.get("project") == project_dir.name,
             f"approval is for {rec.get('project')!r}, this is {project_dir.name!r}")
+
+    # An approval granted under one channel's DNA, character and voice must not
+    # authorise a dispatch under another's.
+    _check_plan_channel(rep, rec, context, "approval")
 
     # Four artifacts, because a human reads the markdown, the gate executes the
     # JSON, the JSON is derived from the prompts, and all of it describes one
@@ -677,13 +783,18 @@ def require_identity_ready(project,
     """
     project_dir = _resolve_project(project)
     rep = GateReport(operation=operation, project=project_dir.name, scope="identity")
+    ctx = None
     if rep.add("project directory exists", project_dir.is_dir(), str(project_dir)):
+        ctx = _check_channel(rep, project_dir)
         _check_manifest_identity(rep, project_dir, operation)
         _check_sidecar_currency(rep, project_dir)
-    _check_masters(rep)
-    _check_pose_registry(rep)
+    # Deliberately no voice check here: planning must stay reachable while the
+    # voice is still being chosen, or the checkpoint that records the choice
+    # could never be prepared for.
+    _check_masters(rep, ctx)
+    _check_pose_registry(rep, ctx)
     if pose_id is not None:
-        _check_pose_selection(rep, pose_id, scene_bound)
+        _check_pose_selection(rep, pose_id, scene_bound, ctx)
     if rep.blockers and raise_on_block:
         raise GateBlocked(operation, rep.blockers)
     return rep
@@ -704,17 +815,19 @@ def require_generation_ready(project,
     """
     project_dir = _resolve_project(project)
     rep = GateReport(operation=operation, project=project_dir.name, scope="generation")
-    manifest = None
+    manifest = ctx = None
     if rep.add("project directory exists", project_dir.is_dir(), str(project_dir)):
+        ctx = _check_channel(rep, project_dir)
         manifest = _check_manifest_identity(rep, project_dir, operation)
         _check_sidecar_currency(rep, project_dir)
+        _check_voice_approved(rep, ctx)
         _check_route_failures(rep, project_dir)
-        _check_visual_plan(rep, project_dir, manifest)
-        _check_approval(rep, project_dir, manifest)
-    _check_masters(rep)
-    _check_pose_registry(rep)
+        _check_visual_plan(rep, project_dir, manifest, ctx)
+        _check_approval(rep, project_dir, manifest, ctx)
+    _check_masters(rep, ctx)
+    _check_pose_registry(rep, ctx)
     if pose_id is not None:
-        _check_pose_selection(rep, pose_id, scene_bound)
+        _check_pose_selection(rep, pose_id, scene_bound, ctx)
 
     if rep.blockers and raise_on_block:
         raise GateBlocked(operation, rep.blockers)

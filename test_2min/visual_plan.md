@@ -1,10 +1,13 @@
 # Visual plan — test_2min
 
-- **plan id**: `88ff894c9475439d85f3bfc3a2d88f4d`
-- **generated**: 2026-08-02T17:42:19+00:00
-- **schema**: 1
+- **plan id**: `5678f1706cd44d2c979f24aebd787640`
+- **generated**: 2026-08-02T21:16:24+00:00
+- **schema**: 2
 - **routing input**: `50948389517161c1…`
 - **failure revision**: 0
+- **channel**: `interested_indian` (DNA v1, pack `331bbe8c9f9571ed…`)
+- **character spec**: `6880706f55071463…`
+- **voice profile**: _none approved — paid generation is blocked until one is_
 
 **Identity**: `ok`
 
@@ -21,7 +24,7 @@ Host presence: **0.0%** (target 25–30%, soft ceiling 35%)
 ## Paid generation
 
 - shots that would spend: **17**
-- estimate: _not priced_ — no image_pricing entry in channel_config.json — any figure here would be invented, so none is given
+- estimate: _not priced_ — no image_pricing entry in the channel pack — any figure here would be invented, so none is given
 
 ## Needs review
 

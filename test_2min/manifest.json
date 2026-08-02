@@ -790,5 +790,7 @@
     }
   ],
   "identity_state": "ok",
-  "identity_reasons": []
+  "identity_reasons": [],
+  "channel_id": "interested_indian",
+  "channel_dna_version": 1
 }

@@ -47,6 +47,8 @@ import plan_visuals  # noqa: E402
 import pose_registry  # noqa: E402
 import route_images  # noqa: E402
 import source_ids  # noqa: E402
+import channel_context as cc  # noqa: E402
+import channel_fixture  # noqa: E402
 
 failures = []
 _fixtures = []
@@ -150,15 +152,19 @@ def build_fixture(prompts: str = PROMPTS_OK) -> tuple[Path, Path]:
                "visual_asset_id": f"VIS-{i:03d}-A"}
               for i, u in enumerate(units, 1)]
     (proj / "manifest.json").write_text(
-        json.dumps({"episode": "demo", "identity_state": "ok",
-                    "identity_reasons": [], "scenes": scenes}, indent=2), encoding="utf-8")
+        json.dumps(channel_fixture.stamp(
+            {"episode": "demo", "identity_state": "ok",
+             "identity_reasons": [], "scenes": scenes}), indent=2), encoding="utf-8")
+    channel_fixture.install(td)
     (proj / route_images.PROMPTS_FILE).write_text(prompts, encoding="utf-8")
     return td, proj
 
 
 def patched(root: Path):
     spec = root / "character" / "character_spec.json"
-    return (mock.patch.multiple(gate, PIPELINE_DIR=root, SPEC_PATH=spec),
+    return (mock.patch.multiple(cc, PIPELINE_DIR=root,
+                                CHANNELS_DIR=root / "channels"),
+            mock.patch.multiple(gate, PIPELINE_DIR=root, SPEC_PATH=spec),
             mock.patch.multiple(pose_registry, PIPELINE_DIR=root, SPEC_PATH=spec),
             mock.patch.object(composite_character, "PIPELINE_DIR", root),
             mock.patch.object(composite_character, "PREVIEW_DIR",

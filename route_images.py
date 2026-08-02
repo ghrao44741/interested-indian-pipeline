@@ -37,6 +37,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import channel_context
 import composite_character
 import pose_registry
 import route_failures
@@ -136,7 +137,7 @@ def _validate_chart_args(chart_args: str) -> bool:
     return isinstance(data, list) and len(data) > 0
 
 
-def parse_shots(prompts_path: Path) -> list[dict]:
+def parse_shots(prompts_path: Path, context=None) -> list[dict]:
     """Parse every shot from the one-line prompts file."""
     shots = []
     for line in prompts_path.read_text(encoding="utf-8").splitlines():
@@ -216,7 +217,7 @@ def parse_shots(prompts_path: Path) -> list[dict]:
                 in ("true", "yes", "1")
             if not pose_id:
                 flag("HOST shot with no HOST_POSE id")
-            elif pose_id not in approved_pose_ids():
+            elif pose_id not in approved_pose_ids(context):
                 flag(f"HOST_POSE {pose_id!r} is not an approved registry id")
 
         # Parse narration for Pexels keyword extraction
@@ -242,9 +243,13 @@ def parse_shots(prompts_path: Path) -> list[dict]:
     return shots
 
 
-def approved_pose_ids() -> set[str]:
-    """Pose ids the router may reference, from the registry — never from disk."""
-    return set(pose_registry.list_poses())
+def approved_pose_ids(context=None) -> set[str]:
+    """Pose ids the router may reference, from the registry — never from disk.
+
+    Scoped to the episode's channel: an identically named pose in another
+    channel's pack is a different asset and must be unreachable from here.
+    """
+    return set(pose_registry.list_poses(context=context))
 
 
 # ── Generators ─────────────────────────────────────────────────────────────────
@@ -375,7 +380,10 @@ def run_ai_batch(project_dir: Path, script_dir: Path, overwrite: bool) -> bool:
 def classify(project_dir: Path) -> tuple[list[dict], list[dict]]:
     """Identity-gated. Returns (shots, review_items). Writes nothing."""
     require_identity_ready(project_dir, "route classification")
-    shots = parse_shots(project_dir / PROMPTS_FILE)
+    # Pose ids are validated against the episode's own channel, so a HOST_POSE
+    # naming another channel's pose is flagged rather than accepted.
+    shots = parse_shots(project_dir / PROMPTS_FILE,
+                        channel_context.load_channel_for_project(project_dir))
     review = [{"shot": s["shot_num"], "file": s["file"],
                "planned_route": s["planned_type"], "reason": s["review_reason"]}
               for s in shots if s["needs_review"]]
@@ -394,6 +402,21 @@ def validate_plan(project_dir: Path, plan: dict) -> list[dict]:
         raise RouteError(f"visual plan schema_version is "
                          f"{plan.get('schema_version')!r}, expected "
                          f"{PLAN_SCHEMA_VERSION} — re-run plan_visuals.py")
+
+    # A plan carries a channel; so does the episode. If they disagree, the plan
+    # was built for different artwork under different rules, and executing it
+    # here would put one channel's character and palette into another's episode.
+    context = channel_context.load_channel_for_project(project_dir)
+    binding = plan.get("channel") or {}
+    if binding.get("channel_id") != context.channel_id:
+        raise RouteError(
+            f"the plan was built for channel {binding.get('channel_id')!r} but this "
+            f"episode belongs to {context.channel_id!r} — a plan is not portable "
+            f"between channels")
+    if binding.get("channel_json_sha256") != context.channel_json_sha256:
+        raise RouteError(
+            f"the channel pack has changed since this plan was built — re-plan and "
+            f"re-approve before dispatching")
 
     shots = plan.get("shots", [])
     if not shots:
@@ -414,7 +437,7 @@ def validate_plan(project_dir: Path, plan: dict) -> list[dict]:
     manifest = json.loads((project_dir / "manifest.json").read_text(encoding="utf-8"))
     known_ids = {s.get("visual_asset_id") for s in manifest.get("scenes", [])}
     images_dir = (project_dir / "images").resolve()
-    approved_poses = approved_pose_ids()
+    approved_poses = approved_pose_ids(context)
 
     for s in shots:
         where = f"shot {s.get('shot')} ({s.get('file')})"
@@ -444,13 +467,14 @@ def validate_plan(project_dir: Path, plan: dict) -> list[dict]:
             pid = s.get("pose_id")
             if pid not in approved_poses:
                 raise RouteError(f"{where}: HOST pose {pid!r} is not approved")
-            meta = pose_registry.metadata(pid)
+            meta = pose_registry.metadata(pid, context=context)
             if meta.get("includes_geometry") and not s.get("scene_bound"):
                 raise RouteError(f"{where}: {pid!r} is a scene-bound tableau and the "
                                  f"plan does not grant scene_bound permission")
             # Resolving here proves the bytes exist and still hash correctly,
             # before any of the cheaper routes have written anything.
-            pose_registry.resolve(pid, scene_bound=bool(s.get("scene_bound")))
+            pose_registry.resolve(pid, scene_bound=bool(s.get("scene_bound")),
+                                  context=context)
 
         out = (images_dir / s["file"]).resolve()
         if not out.is_relative_to(images_dir):

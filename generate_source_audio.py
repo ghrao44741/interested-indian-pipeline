@@ -58,6 +58,8 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
+import channel_context
+
 # ── Auto-load .env ─────────────────────────────────────────────────────────────
 _env_path = Path(__file__).parent / ".env"
 if _env_path.exists():
@@ -951,6 +953,11 @@ async def main():
                         help="Edge TTS speaking-rate offset, e.g. '+12%%' or '-10%%'. Edge-only.")
     parser.add_argument("--edge-pitch", default="+0Hz", metavar="PITCH",
                         help="Edge TTS pitch offset, e.g. '+15Hz' or '-5Hz'. Edge-only.")
+    parser.add_argument("--channel", default=None,
+                        help="Channel pack governing this narration. Needed only when "
+                             "the episode has no manifest yet and more than one pack "
+                             "is installed — narration legitimately runs before the "
+                             "split stage, so there is not always an episode to ask.")
     args = parser.parse_args()
 
     # ── List voices ──
@@ -1008,12 +1015,34 @@ async def main():
     # If --out is absolute or no --project given, use it directly; else put in project/source_audio/
     out_path = Path(output_filename)
     if out_path.is_absolute() or not args.project:
-        output_path = str(out_path)
-        out_path.parent.mkdir(parents=True, exist_ok=True)
+        intended = out_path
     else:
-        source_audio_dir = Path(__file__).parent / args.project / "source_audio"
-        source_audio_dir.mkdir(parents=True, exist_ok=True)
-        output_path = str(source_audio_dir / output_filename)
+        intended = Path(__file__).parent / args.project / "source_audio" / output_filename
+
+    # ── Voice gate ──────────────────────────────────────────────────────────
+    # Runs before the directory is created, before any credential is read,
+    # before a client is built and before a single byte is synthesised.
+    #
+    # An allowlist, not a blocklist. Refusing only the project's audio folder
+    # would still let `--out ../elsewhere/narration.mp3` produce a usable file
+    # from a voice nobody approved, which someone then copies into place by
+    # hand. So until the channel records an approved voice profile, synthesis
+    # may write into the pack's preview directory and nowhere else.
+    try:
+        _channel = channel_context.channel_for_voice(
+            project_dir=(Path(__file__).parent / args.project) if args.project else None,
+            requested=args.channel)
+        output_path = str(channel_context.require_voice_output_allowed(_channel, intended))
+    except channel_context.VoiceNotApproved as e:
+        print(f"\n{e}", file=sys.stderr)
+        print("\nNothing was synthesised.", file=sys.stderr)
+        sys.exit(1)
+    except channel_context.ChannelError as e:
+        print(f"\ncannot determine the channel governing this narration: {e}",
+              file=sys.stderr)
+        sys.exit(1)
+
+    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
     word_count = len(text.split())
     char_count = len(text)

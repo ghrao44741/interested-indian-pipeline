@@ -48,6 +48,8 @@ import pose_registry  # noqa: E402
 import route_failures  # noqa: E402
 import route_images  # noqa: E402
 import source_ids  # noqa: E402
+import channel_context as cc  # noqa: E402
+import channel_fixture  # noqa: E402
 
 failures = []
 _fixtures = []
@@ -142,16 +144,36 @@ def build_fixture(prompts: str = PROMPTS_OK) -> tuple[Path, Path]:
                "visual_asset_id": f"VIS-{i:03d}-A"}
               for i, u in enumerate(units, 1)]
     (proj / "manifest.json").write_text(
-        json.dumps({"episode": "demo", "identity_state": "ok",
-                    "identity_reasons": [], "scenes": scenes}, indent=2), encoding="utf-8")
+        json.dumps(channel_fixture.stamp(
+            {"episode": "demo", "identity_state": "ok",
+             "identity_reasons": [], "scenes": scenes}), indent=2), encoding="utf-8")
+    channel_fixture.install(td)
     (proj / route_images.PROMPTS_FILE).write_text(prompts, encoding="utf-8")
     return td, proj
+
+
+def use_real_channel(proj: Path) -> None:
+    """Point a fixture project at the real, installed channel.
+
+    Only for the subprocess CLI tests below: those run route_images.py as a real
+    process against the actual repository, unpatched, so CHANNELS_DIR is the real
+    channels/ directory and the fixture pack this module installs into a temp
+    root is not on that path. The real pack's character reference already
+    resolves against this repo's own character/, which is what a real subprocess
+    sees anyway.
+    """
+    m = json.loads((proj / "manifest.json").read_text(encoding="utf-8"))
+    m["channel_id"] = "interested_indian"
+    m["channel_dna_version"] = 1
+    (proj / "manifest.json").write_text(json.dumps(m, indent=2), encoding="utf-8")
 
 
 class World:
     def __init__(self, root):
         spec = root / "character" / "character_spec.json"
         self.ctxs = [
+            mock.patch.multiple(cc, PIPELINE_DIR=root,
+                                CHANNELS_DIR=root / "channels"),
             mock.patch.multiple(gate, PIPELINE_DIR=root, SPEC_PATH=spec),
             mock.patch.multiple(pose_registry, PIPELINE_DIR=root, SPEC_PATH=spec),
             mock.patch.multiple(composite_character, PIPELINE_DIR=root,
@@ -538,10 +560,13 @@ try:
             capture_output=True, text=True, encoding="utf-8", errors="replace", env=env)
 
     # A real subprocess sees the real character spec, so the fixture project must
-    # reference poses that exist there. The MAP/PHOTO/CARTOON shots do not.
+    # reference poses that exist there. The MAP/PHOTO/CARTOON shots do not. It
+    # also sees the real channels/ directory, not the fixture pack World patches
+    # in — so these projects point at the real installed channel instead.
     root, proj = build_fixture(
         '**SHOT 01** · SCENE-001 · standalone → `SCENE-001.png` TYPE: MAP '
         'NARRATION: "one" PROMPT: a map\n')          # MAP with no args -> review
+    use_real_channel(proj)
     r = run_cli(root, proj, "--dry-run")
     check("a dry run with review items exits 0 (it only reports)", r.returncode == 0,
           r.stdout[-300:])
@@ -552,6 +577,7 @@ try:
     root, proj = build_fixture(
         '**SHOT 01** · SCENE-001 · standalone → `SCENE-001.png` TYPE: CARTOON '
         'NARRATION: "one" PROMPT: a thing\n')
+    use_real_channel(proj)
     r = run_cli(root, proj, "--dry-run")
     check("a clean dry run exits 0", r.returncode == 0, r.stdout[-300:])
     r = run_cli(root, proj)
@@ -560,8 +586,14 @@ try:
     check("and says a plan is needed first",
           "visual_plan.json" in r.stdout, r.stdout[-300:])
 
-    # With a plan but no approval, the gate itself is what refuses.
+    # With a plan but no approval, the gate itself is what refuses. Planning goes
+    # back through World(root), so the project reverts to the fixture channel
+    # that lives on that patched path.
+    m = json.loads((proj / "manifest.json").read_text(encoding="utf-8"))
+    channel_fixture.stamp(m)
+    (proj / "manifest.json").write_text(json.dumps(m, indent=2), encoding="utf-8")
     plan(root, proj)
+    use_real_channel(proj)
     r = run_cli(root, proj)
     check("a missing approval exits nonzero", r.returncode == 1,
           f"exit={r.returncode}: {r.stdout[-400:]}")

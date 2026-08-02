@@ -1,0 +1,48 @@
+# Stage-specific and heavyweight dependencies.
+#
+# None of these is needed to run the test suite or the planning path, so
+# tests/test_dependencies.py does NOT require them to import — it requires them
+# to be DECLARED, and imports each only if it happens to be installed. Requiring
+# an optional package to import would make it mandatory, which is the opposite
+# of what this file is for.
+#
+# Install the ones for the stages you actually run:
+#     pip install -r requirements-optional.txt
+# or pick individually. `python tests/test_dependencies.py --optional-env`
+# asserts the whole set imports, for a machine that is meant to have them all.
+
+# ── script, prompt and review stages (Anthropic) ─────────────────────────────
+anthropic>=0.40,<1              # prompt authoring, image QA, chapters, script review
+
+# ── narration (TTS providers; the channel pack selects one) ──────────────────
+edge-tts>=7.0,<8                # free Microsoft Azure TTS
+google-genai>=1.0,<2            # Gemini TTS and Gemini image generation
+replicate>=0.30,<2              # alternate image backend
+
+# ── audio handling ───────────────────────────────────────────────────────────
+mutagen>=1.47,<2                # MP3 duration probing (split, stitch, SRT)
+pydub>=0.25,<1                  # chunk concatenation, narration QA
+
+# ── charts, overlays and maps ────────────────────────────────────────────────
+matplotlib>=3.8,<4              # chart renderer, text overlay metrics
+geopandas>=1.0,<2               # GeoJSON map rendering
+
+# ── transcription and alignment (GPU; large downloads) ───────────────────────
+torch>=2.0                      # pinned by the shared WhisperX venv, not here
+whisperx>=3.1                   # forced alignment in the split stage
+openai-whisper>=20231117        # final-MP4 analysis and narration QA
+
+# ── publishing ───────────────────────────────────────────────────────────────
+google-api-python-client>=2.100,<3
+google-auth-oauthlib>=1.2,<2
+google-auth>=2.30,<3
+
+# ── research (either package satisfies pipeline_agents' fallback import) ─────
+ddgs>=6.0
+duckduckgo-search>=6.0
+
+# ── not on PyPI ──────────────────────────────────────────────────────────────
+# creative_feedback_loop — imported by review_images.py. Local/first-party, from
+# the AIBMM tooling; not published, so there is nothing to pin here. Recorded
+# rather than omitted, so the two-way import audit does not report it as an
+# undeclared dependency and so nobody goes looking for it on PyPI.

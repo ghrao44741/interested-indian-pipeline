@@ -3655,5 +3655,7 @@
       "visual_state": "planned",
       "visual_owner_source_id": "SRC-098"
     }
-  ]
+  ],
+  "channel_id": "interested_indian",
+  "channel_dna_version": 1
 }

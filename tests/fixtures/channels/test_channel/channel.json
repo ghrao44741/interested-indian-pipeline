@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "channel_id": "harbourline",
+  "channel_dna_version": 3,
+  "brand": {
+    "name": "Harbour Line",
+    "handle": "@harbourline",
+    "promise": "Shipping lanes, port towns and the paperwork that moves the world",
+    "language": "Portuguese"
+  },
+  "audience": {
+    "primary": "Working mariners and port-town residents",
+    "secondary": "Logistics and trade professionals"
+  },
+  "editorial": {
+    "tone": ["dry", "procedural", "understated"],
+    "principles": [
+      "Follow the cargo, not the personalities.",
+      "A tonnage figure without a manifest is a rumour."
+    ]
+  },
+  "narrative": {
+    "structure": [
+      { "step": 1, "beat": "Open on a vessel and a delay." },
+      { "step": 2, "beat": "Trace the delay to a document." },
+      { "step": 3, "beat": "Show who signed it and why." }
+    ],
+    "portfolio_planning_guidance": {
+      "note": "Planning guidance across the slate, not a per-episode quota.",
+      "shares": [
+        { "share_pct": 70, "label": "Freight, ports and customs procedure" },
+        { "share_pct": 30, "label": "Crew life and maritime labour" }
+      ]
+    }
+  },
+  "visual_style": {
+    "palette": {
+      "rust": "#B7410E",
+      "seafoam": "#93E9BE",
+      "slate": "#708090"
+    },
+    "pad_color": "#708090",
+    "rules": [
+      "Photographic and documentary sources are preferred over illustration.",
+      "No presenter figure appears in any shot."
+    ],
+    "ken_burns_zoom": 1.02
+  },
+  "host": {
+    "enabled": false
+  },
+  "voice": {
+    "selection_status": "approved",
+    "approved_profile": {
+      "provider": "mock_tts",
+      "voice": "fixture_narrator",
+      "approved_by": "fixture",
+      "approved_at": "2026-01-01T00:00:00+00:00",
+      "_note": "A fixture profile. No real synthesis backend is named."
+    },
+    "working_default": null,
+    "requirements": ["Neutral delivery."],
+    "preview_dir": "voice_previews"
+  },
+  "routing": {
+    "policy_version": 1,
+    "low_confidence_threshold": 0.75,
+    "require_override_reason": true
+  },
+  "renderers": {
+    "capabilities": {
+      "PHOTO": "pexels",
+      "CHART": "matplotlib_chart",
+      "DOCUMENT": "deterministic_document"
+    }
+  },
+  "evidence": {
+    "require_provenance_for": ["PHOTO", "DOCUMENT"],
+    "reconstruction_label": "Reconstrucao",
+    "document_policy": "Deterministic layout naming its source."
+  },
+  "safety": {
+    "rules": [
+      "Attribute every claim about a named vessel or operator.",
+      "Do not identify individual crew members."
+    ]
+  },
+  "economics": {
+    "currency": "EUR",
+    "image_pricing": {},
+    "_note": "Fixture channel. No paid renderer is declared and no price is set."
+  }
+}

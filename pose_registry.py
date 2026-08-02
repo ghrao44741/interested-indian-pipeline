@@ -7,9 +7,22 @@ picked up by a glob would put an opaque, unapproved, wrong-identity image into a
 render. Resolution goes through the registry in character_spec.json: exact paths,
 verified hashes, explicit approval status.
 
-    resolve("neutral_presenter")            -> Path, or raises
-    resolve("seated_reading_document")      -> raises unless scene_bound=True
-    list_poses(generic_only=True)           -> ids the router may choose freely
+    resolve("neutral_presenter", context=ctx)   -> Path, or raises
+    resolve("seated_reading_document", ...)     -> raises unless scene_bound=True
+    list_poses(generic_only=True, context=ctx)  -> ids the router may choose freely
+
+Pose ids are local to a channel. `context` is a ChannelContext, and supplies both
+the registry to read and the directory a resolved asset must stay inside — so the
+same id in two packs resolves to two different assets, and neither can reach the
+other's.
+
+LEGACY EXCEPTION, narrowly scoped: `context` may be omitted, in which case the
+module-level SPEC_PATH applies. This is not evidence of channel portability and
+is not for runtime use. It exists because character-setup commands operate on the
+channel's own artwork with no episode in hand, and therefore have no manifest to
+derive a channel from. The exception covers exactly the modules listed in
+LEGACY_CONTEXTLESS_CALLERS below, and a static test pins that list. Every
+episode-facing caller passes a context.
 """
 
 import hashlib
@@ -22,20 +35,51 @@ SPEC_PATH = PIPELINE_DIR / "character" / "character_spec.json"
 APPROVED = "approved"
 APPROVED_SCENE_BOUND = "approved_scene_bound"
 
+# Modules permitted to resolve poses without a ChannelContext. Character-setup
+# work only: no episode exists, so there is nothing to read a channel from. Any
+# module that touches an episode must pass a context, and the static test in
+# tests/test_channel_context.py fails if this list grows silently.
+LEGACY_CONTEXTLESS_CALLERS = (
+    "generate_character.py",
+    "generate_poses.py",
+    "validate_poses.py",
+    "check_character_consistency.py",
+    "export_character_package.py",
+)
+
 
 class PoseError(RuntimeError):
     """Raised when a pose cannot be resolved safely."""
 
 
-def _registry() -> dict:
-    spec = json.loads(SPEC_PATH.read_text(encoding="utf-8"))
+def _spec_path(context=None) -> Path:
+    return SPEC_PATH if context is None else Path(context.character_spec_path)
+
+
+def _poses_root(context=None) -> Path:
+    if context is None:
+        return (PIPELINE_DIR / "character" / "poses").resolve()
+    return Path(context.poses_root).resolve()
+
+
+def _asset_base(context=None) -> Path:
+    """The directory a registered relative path is joined to.
+
+    With a context this is the pack's own character directory, so a pack cannot
+    reach past it even if its registry says otherwise.
+    """
+    return PIPELINE_DIR if context is None else Path(context.character_spec_path).parent.parent
+
+
+def _registry(context=None) -> dict:
+    spec = json.loads(_spec_path(context).read_text(encoding="utf-8"))
     return spec.get("pose_library", {}).get("registry", {})
 
 
-def list_poses(generic_only: bool = False) -> list[str]:
+def list_poses(generic_only: bool = False, *, context=None) -> list[str]:
     """Approved pose ids. With generic_only, excludes scene-bound tableaux."""
     out = []
-    for pid, e in _registry().items():
+    for pid, e in _registry(context).items():
         if e.get("status") not in (APPROVED, APPROVED_SCENE_BOUND):
             continue
         if generic_only and not e.get("generic_compositing_allowed", False):
@@ -44,14 +88,15 @@ def list_poses(generic_only: bool = False) -> list[str]:
     return sorted(out)
 
 
-def metadata(pose_id: str) -> dict:
-    reg = _registry()
+def metadata(pose_id: str, *, context=None) -> dict:
+    reg = _registry(context)
     if pose_id not in reg:
-        raise PoseError(f"unknown pose {pose_id!r}; registered: {sorted(reg)}")
+        where = f" in {context.channel_id}" if context is not None else ""
+        raise PoseError(f"unknown pose {pose_id!r}{where}; registered: {sorted(reg)}")
     return reg[pose_id]
 
 
-def resolve(pose_id: str, scene_bound: bool = False) -> Path:
+def resolve(pose_id: str, scene_bound: bool = False, *, context=None) -> Path:
     """Absolute path to an approved pose asset.
 
     `scene_bound` must be set explicitly to use a tableau such as the seated
@@ -59,7 +104,7 @@ def resolve(pose_id: str, scene_bound: bool = False) -> Path:
     it is only valid where the scene already calls for that setting. Defaulting
     it to False keeps a router from dropping a desk into an unrelated shot.
     """
-    e = metadata(pose_id)
+    e = metadata(pose_id, context=context)
     status = e.get("status")
     if status not in (APPROVED, APPROVED_SCENE_BOUND):
         raise PoseError(f"{pose_id}: status is {status!r}, not approved")
@@ -77,8 +122,8 @@ def resolve(pose_id: str, scene_bound: bool = False) -> Path:
     if Path(raw).is_absolute() or ".." in Path(raw).parts:
         raise PoseError(f"{pose_id}: registered path {raw!r} is absolute or traverses upward")
 
-    poses_root = (PIPELINE_DIR / "character" / "poses").resolve()
-    path = (PIPELINE_DIR / raw)
+    poses_root = _poses_root(context)
+    path = (_asset_base(context) / raw)
     resolved = path.resolve()
     if not resolved.is_relative_to(poses_root):
         raise PoseError(f"{pose_id}: resolved path escapes {poses_root} "
@@ -97,7 +142,7 @@ def resolve(pose_id: str, scene_bound: bool = False) -> Path:
     return path
 
 
-def audit() -> dict:
+def audit(*, context=None) -> dict:
     """Every approved asset checked for presence and hash integrity.
 
     Unapproved entries are reported separately rather than as problems. A pose
@@ -106,12 +151,12 @@ def audit() -> dict:
     operation channel-wide for the duration of one review.
     """
     ok, problems, unapproved = [], [], []
-    for pid, e in _registry().items():
+    for pid, e in _registry(context).items():
         if e.get("status") not in (APPROVED, APPROVED_SCENE_BOUND):
             unapproved.append(f"{pid} ({e.get('status')})")
             continue
         try:
-            resolve(pid, scene_bound=True)
+            resolve(pid, scene_bound=True, context=context)
             ok.append(pid)
         except PoseError as err:
             problems.append(str(err))

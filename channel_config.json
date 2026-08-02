@@ -1,50 +1,7 @@
 {
-  "_comment": "Central config for The Interested Indian pipeline. Commit this file.",
-
-  "channel": {
-    "name": "The Interested Indian",
-    "handle": "@TheInterestedIndian",
-    "tagline": "India. Explained. Finally."
-  },
-
-  "mascot": {
-    "reference_url": "https://rqkumunldqvmynqxibca.supabase.co/storage/v1/object/public/generated-images/adhoc-1784824975374.png",
-    "reference_local": "mascot_reference.png",
-    "session_id": "d9d31dea-1095-4a70-b57e-9c0de7eaca7b",
-    "description": "Chubby round Indian cartoon mascot, amber round glasses, spiky black hair, warm tan skin, cream kurta, off-white pajama trousers, sandals. 4 expressions: NEUTRAL, SHOCKED, CONFUSED, SMUG.",
-    "locked_date": "2026-07-23"
-  },
-
-  "thumbnail_bases": {
-    "session_id": "ff68bd11-2791-4e85-9712-fbb7e2475769",
-    "light": {
-      "url": "https://rqkumunldqvmynqxibca.supabase.co/storage/v1/object/public/generated-images/adhoc-1785033137395.png",
-      "local": "common/thumbnails/base_light.png",
-      "description": "Cream bg (#FAF7F2), mascot right pointing up, India map left, amber footer bar. Even episodes."
-    },
-    "dark": {
-      "url": "https://rqkumunldqvmynqxibca.supabase.co/storage/v1/object/public/generated-images/adhoc-1785033172185.png",
-      "local": "common/thumbnails/base_dark.png",
-      "description": "Navy bg (#0C1828), mascot left pointing up, India silhouette right, amber footer bar. Odd episodes."
-    },
-    "generated_date": "2026-07-26"
-  },
-
-  "thumbnail": {
-    "themes": {
-      "auto": "odd episodes = dark, even episodes = light",
-      "dark": "deep navy #0C1828 bg, white text, amber accent",
-      "light": "warm cream #FAF7F2 bg, dark brown text, crimson accent"
-    }
-  },
-
-  "image_pipeline": {
-    "mascot_scenes": "generate_images_aibmm.py (GPT Image 2 + mascot reference)",
-    "map_scenes":    "generate_india_map.py (geopandas)",
-    "chart_scenes":  "generate_chart.py (matplotlib)",
-    "photo_scenes":  "search_pexels.py (Pexels API)"
-  },
-
+  "_do_not_edit": "GENERATED FILE — DO NOT EDIT. Change the channel pack and re-run render_channel_dna.py. Hand edits are detected and refused at load time.",
+  "_generated_from": "channels/interested_indian/channel.json",
+  "_source_sha256": "331bbe8c9f9571ed882dc7dbae23aaa1acd4f0ff7cdeb27536c2e30cc7180374",
   "voice": {
     "provider": "edge",
     "gemini_voice": "Iapetus",
@@ -78,14 +35,8 @@
     "edge_note": "Switched 2026-07-31 from grok to edge (free, no API key). Reason: Naksh (grok) pronounced lakh/crore/MBBS/city-names correctly but the accent itself leans American, not Indian — a bigger problem for a channel called 'The Interested Indian' than any pronunciation quirk. edge-tts's en-IN locale has only 3 voices total (NeerjaNeural, NeerjaExpressiveNeural — both female — and PrabhatNeural, the only male one), so there's no alternative en-IN male voice to compare against. Prabhat confirmed via live test: correct lakh/crore/M.B.B.S./city-name pronunciation, genuinely Indian-accented (not a compromise like gemini_cloudtts's deliberate Indian-American hybrid above). rate=+12%/pitch=+15Hz chosen after local A/B against the default and a more/less punchy pass. KNOWN LIMITATION #1, confirmed via a direct A/B against en-US-GuyNeural on the same 5 test sentences: Prabhat does not produce rising intonation on question-mark sentences (flat delivery even on genuine yes-no questions like 'Was he really on the ground?') — en-US-GuyNeural rose correctly on the same text, so this is specific to the en-IN voice model's prosody training, not an edge-tts-wide limitation, and not fixable via rate/pitch. Worked around by rephrasing the script's rhetorical questions as declaratives. edge-tts also has no bracket-tag speech-control system like Grok's [pause]/<soft>/<emphasis> (confirmed working with Naksh) — Azure's engine uses SSML instead, which edge-tts's Python API doesn't expose per-word, only global rate/pitch/volume — so that personability work doesn't carry over to this voice. KNOWN LIMITATION #2, found 2026-07-31 reviewing the first full pilot_neet_scandal render at this voice: 'NEET-UG' (the episode's actual subject) mispronounced 3/3 times in the all-caps hyphenated form (rendered as 'NETUG'/'an ETUG' — confirmed via WhisperX's own transcript of the real audio, not just a caption-text guess). Root-caused via isolated live tests: respelling as 'Neet U.G.' (mixed case) renders correctly — the all-caps hyphenated acronym form seems to confuse Prabhat's text normalizer. Separately, 'Pass' gets substituted with 'Ask' specifically when it's the first word of a sentence (confirmed 3/3 reproducible in isolated tests; 'If you pass it...' mid-sentence rendered correctly) — apply the same sentence-initial-avoidance workaround for any future 'Pass'-led sentence. Both fixes applied to pilot_neet_scandal's script 2026-07-31, but narration/split/images have NOT yet been regenerated against the fixed text as of this commit — see interesting_indian_session.md for pickup point.",
     "note": "Provider: 'gemini_cloudtts' (Indian-accented via Cloud TTS + en-IN locale + style prompt, needs gcloud auth, has a documented cross-chunk voice-drift issue on long scripts), 'gemini' (Gemini Developer API, simple API key, no locale/style control), 'elevenlabs' (commented out/inactive — see elevenlabs_note), 'grok' (xAI, correct pronunciation but Naksh's accent leans American — see edge_note), 'edge' (current default — free Microsoft Azure TTS via edge-tts, genuinely Indian-accented; see edge_note for the known question-intonation limitation). Switch provider here or pass --provider flag."
   },
-
   "stitch": {
-    "ken_burns_zoom": 1.05,
-    "note": "Zoom ratio for Ken Burns effect. 1.05 = 5% zoom (subtle). 1.0 = disabled. Max recommended: 1.10."
+    "ken_burns_zoom": 1.05
   },
-
-  "pexels": {
-    "api_key_env": "PEXELS_API_KEY",
-    "note": "Free API, no watermark, commercial use OK. Get key at pexels.com/api"
-  }
+  "image_pricing": {}
 }

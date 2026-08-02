@@ -27,6 +27,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
+import channel_context
 import generation_gate
 import route_failures
 import route_images
@@ -41,12 +42,17 @@ PLAN_MD = "visual_plan.md"
 PAID_TYPES = {"CARTOON", "REENACTMENT"}
 
 
-def _pricing(entry: str) -> dict | None:
-    cfg = PIPELINE_DIR / "channel_config.json"
-    if not cfg.exists():
+def _pricing(entry: str, context=None) -> dict | None:
+    """Per-shot price, from the channel that is paying for it.
+
+    Read from the pack rather than a root-level file: what a shot costs is a
+    property of the channel's own arrangements, and two channels on different
+    plans must not read each other's figures.
+    """
+    if context is None:
         return None
-    return (json.loads(cfg.read_text(encoding="utf-8"))
-            .get("image_pricing", {}).get(entry))
+    return channel_context._thaw(
+        context.config.get("economics", {}).get("image_pricing", {})).get(entry)
 
 
 def _sha(path: Path) -> str:
@@ -102,8 +108,18 @@ def reconcile(shots: list[dict], scenes: list[dict]) -> list[dict]:
 
 
 def build_plan(project_dir: Path) -> dict:
+    # The channel decides the character, the poses, the renderers and the price,
+    # so the plan must record which one it was built against. Loaded without
+    # raising: a plan for an episode with no loadable channel is still worth
+    # writing, because the report is the diagnosis.
+    try:
+        context = channel_context.load_channel_for_project(project_dir)
+        channel_error = None
+    except channel_context.ChannelError as e:
+        context, channel_error = None, str(e)
+
     prompts = project_dir / route_images.PROMPTS_FILE
-    shots = route_images.parse_shots(prompts) if prompts.exists() else []
+    shots = route_images.parse_shots(prompts, context) if prompts.exists() else []
 
     manifest_path = project_dir / "manifest.json"
     manifest = (json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -163,15 +179,18 @@ def build_plan(project_dir: Path) -> dict:
     host_shots = [s for s in shots if s["type"] == "HOST"]
     host_pct = round(100 * len(host_shots) / len(shots), 1) if shots else 0.0
 
+    if channel_error:
+        needs_review.append({"shot": None, "reason": channel_error})
+
     paid = [s for s in shots if s["type"] in PAID_TYPES]
-    price = _pricing("episode_shot")
+    price = _pricing("episode_shot", context)
     cost = ({"unit_usd": price["cost_usd"], "shots": len(paid),
              "estimate_usd": round(price["cost_usd"] * len(paid), 2),
              "basis": price}
             if price else
             {"shots": len(paid),
              "estimate_usd": None,
-             "basis": "no image_pricing entry in channel_config.json — any figure "
+             "basis": "no image_pricing entry in the channel pack — any figure "
                       "here would be invented, so none is given"})
 
     return {
@@ -191,6 +210,11 @@ def build_plan(project_dir: Path) -> dict:
             "prompts_sha256": _sha(prompts) if prompts.exists() else None,
             "manifest_sha256": _sha(manifest_path) if manifest_path.exists() else None,
         },
+        # Which channel's DNA, character and voice this plan was built under.
+        # Bound by the gate and copied into the approval, so a plan for one
+        # channel can never be approved or dispatched under another, and a change
+        # to either invalidates work approved before it.
+        "channel": context.plan_binding() if context else None,
         "failure_revision": route_failures.revision(project_dir),
         "auto_resolved_failures": [f["visual_asset_id"] for f in auto_resolved],
         "identity": {
@@ -248,7 +272,19 @@ def render_md(plan: dict) -> str:
           f"- **generated**: {plan.get('generated_at')}",
           f"- **schema**: {plan.get('schema_version')}",
           f"- **routing input**: `{str(plan.get('inputs', {}).get('prompts_sha256'))[:16]}…`",
-          f"- **failure revision**: {plan.get('failure_revision')}", ""]
+          f"- **failure revision**: {plan.get('failure_revision')}"]
+    ch = plan.get("channel")
+    if ch:
+        L += [f"- **channel**: `{ch['channel_id']}` (DNA v{ch['channel_dna_version']}, "
+              f"pack `{str(ch['channel_json_sha256'])[:16]}…`)",
+              f"- **character spec**: `{str(ch.get('character_spec_sha256'))[:16]}…`",
+              f"- **voice profile**: "
+              + (f"`{str(ch['voice_profile_sha256'])[:16]}…`"
+                 if ch.get("voice_profile_sha256")
+                 else "_none approved — paid generation is blocked until one is_")]
+    else:
+        L += ["- **channel**: _not resolved_ — this plan cannot be approved"]
+    L += [""]
     ident = plan["identity"]
     L += [f"**Identity**: `{ident['state']}`"]
     for r in ident["reasons"]:
