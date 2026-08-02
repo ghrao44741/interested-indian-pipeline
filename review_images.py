@@ -48,6 +48,7 @@ except ImportError:
 # it was ACTUALLY routed/generated as, not just a raw TYPE field guess.
 sys.path.insert(0, str(Path(__file__).parent))
 import route_images
+from generation_gate import GateBlocked, require_generation_ready
 
 # ── constants ──────────────────────────────────────────────────────────────────
 PROMPTS_FILE = "image_prompts_one_line_per_prompt.md"
@@ -745,6 +746,16 @@ def main():
     )
     if not project_dir.is_dir():
         print(f"❌ Project folder not found: {project_dir}")
+        sys.exit(1)
+
+    # Vision QA is billed per image. Same gate as generation: reviewing artwork
+    # that is attached to uncertain words produces a confident verdict about the
+    # wrong thing, and pays for the privilege.
+    try:
+        require_generation_ready(project_dir, "review_images (vision QA)")
+    except GateBlocked as e:
+        print(f"\n{e}")
+        print("\nNo images were reviewed and no API client was created.")
         sys.exit(1)
 
     prompts_path = project_dir / PROMPTS_FILE

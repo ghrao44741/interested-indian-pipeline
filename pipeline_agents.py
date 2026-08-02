@@ -2105,6 +2105,17 @@ class OrchestratorAgent:
         self._run_cmd([sys.executable, str(gen), "--project", str(self.project_dir)], label="generate_image_prompts.py")
 
     def _stage_images(self):
+        # The same gate the scripts run themselves. Duplicated deliberately: it
+        # fails here before the user is asked to approve a spend, and the scripts
+        # still fail on their own when run directly, so neither path depends on
+        # the other having checked. Orchestrated and direct execution give the
+        # same verdict.
+        from generation_gate import GateBlocked, require_generation_ready
+        try:
+            require_generation_ready(self.project_dir, "orchestrated images stage")
+        except GateBlocked as e:
+            raise RuntimeError(f"images stage blocked before any spend:\n{e}") from None
+
         router = PIPELINE_DIR / "route_images.py"    # MAP→GeoJSON, rest→xAI
         gen    = PIPELINE_DIR / "generate_images_flux.py"  # used for FAIL regen only
         review = PIPELINE_DIR / "review_images.py"

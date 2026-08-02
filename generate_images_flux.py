@@ -56,6 +56,8 @@ from pathlib import Path
 
 import requests
 
+from generation_gate import GateBlocked, require_generation_ready
+
 try:
     from openai import OpenAI as _OpenAI
     _OPENAI_AVAILABLE = True
@@ -332,6 +334,17 @@ def main():
     prompts_path = project_dir / PROMPTS_FILE
     if not prompts_path.exists():
         print(f"❌ Prompts file not found: {prompts_path}")
+        sys.exit(1)
+
+    # Preflight before the API client is built, before the images directory is
+    # created and before any key is read. --from-report and --shot are retry
+    # paths and go through the same gate: a retry spends exactly as much as a
+    # first attempt.
+    try:
+        require_generation_ready(project_dir, f"generate_images_flux ({args.backend})")
+    except GateBlocked as e:
+        print(f"\n{e}")
+        print("\nNo images were generated and no API client was created.")
         sys.exit(1)
 
     images_dir = project_dir / "images"

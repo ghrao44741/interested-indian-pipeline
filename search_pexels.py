@@ -38,6 +38,8 @@ import re
 import sys
 from pathlib import Path
 
+from generation_gate import GateBlocked, require_generation_ready
+
 PIPELINE_DIR = Path(__file__).parent
 PEXELS_API   = "https://api.pexels.com/v1"
 
@@ -234,6 +236,17 @@ def main():
     parser.add_argument("--preview", action="store_true",
                         help="Print search results without downloading")
     args = parser.parse_args()
+
+    # Preflight before the key is read or anything is fetched. A bare --query has
+    # no project to check, so it runs the character-scope subset — the router
+    # always passes --project, and that is the path that can attach a photo to a
+    # scene, which is the case identity actually protects.
+    try:
+        require_generation_ready(args.project, "search_pexels")
+    except GateBlocked as e:
+        print(f"\n{e}")
+        print("\nNothing was fetched.")
+        sys.exit(1)
 
     api_key = _get_api_key()
     if not api_key:

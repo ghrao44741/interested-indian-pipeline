@@ -1050,14 +1050,17 @@
       "proven": [
         "resolve() rejects unknown, pending, hash-mismatched, missing and scene-bound-without-permission assets",
         "raw sources are unregistered and unreachable",
-        "replay preserves provenance with zero generation calls"
+        "replay preserves provenance with zero generation calls",
+        "the router records pose ids only and the compositor resolves them through pose_registry.resolve(); the globbing regression check now has positive assertions, so it can no longer pass by nothing consuming the resolver (tests/test_no_runtime_globbing.py, tests/test_generation_gate.py)",
+        "every registered paid entry point calls require_generation_ready() before constructing a client, opening references, writing output or retrying (generation_gate.PAID_ENTRY_POINTS, asserted in tests/test_generation_gate.py)"
       ],
-      "NOT_yet_proven": "that globbing is impossible throughout runtime — the router and compositor are not written yet, so nothing currently consumes the resolver. This becomes true only when Task 6 wires them and the regression check below passes.",
       "task_6_acceptance": [
         "router and compositor resolve poses exclusively via pose_registry.resolve()",
         "regression check rejects glob or direct character/poses/ access outside generation, validation and registry modules",
         "pending, raw or hash-mismatched files can never reach a render"
-      ]
+      ],
+      "task_6_status": "complete — acceptance criteria above are asserted by tests",
+      "NOT_yet_proven": "that a pose chosen for a shot is the *right* pose for it. The gate proves an asset is approved and unaltered; whether it suits the scene is semantic routing (Task 3) and the Checkpoint 3 review."
     },
     "replacement_workflow": {
       "command": "python generate_poses.py --replacement-candidate <pose_id>",

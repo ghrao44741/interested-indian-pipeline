@@ -98,20 +98,30 @@ def resolve(pose_id: str, scene_bound: bool = False) -> Path:
 
 
 def audit() -> dict:
-    """Every registered asset checked for presence and hash integrity."""
-    ok, problems = [], []
-    for pid in _registry():
+    """Every approved asset checked for presence and hash integrity.
+
+    Unapproved entries are reported separately rather than as problems. A pose
+    awaiting promotion is a normal state — it is already unreachable, because
+    resolve() refuses it — and treating it as a fault would block every paid
+    operation channel-wide for the duration of one review.
+    """
+    ok, problems, unapproved = [], [], []
+    for pid, e in _registry().items():
+        if e.get("status") not in (APPROVED, APPROVED_SCENE_BOUND):
+            unapproved.append(f"{pid} ({e.get('status')})")
+            continue
         try:
             resolve(pid, scene_bound=True)
             ok.append(pid)
-        except PoseError as e:
-            problems.append(str(e))
-    return {"ok": ok, "problems": problems}
+        except PoseError as err:
+            problems.append(str(err))
+    return {"ok": ok, "problems": problems, "unapproved": unapproved}
 
 
 if __name__ == "__main__":
     a = audit()
-    print(f"registered : {len(a['ok']) + len(a['problems'])}")
+    print(f"registered : {len(a['ok']) + len(a['problems']) + len(a['unapproved'])}")
     print(f"verified   : {a['ok']}")
     print(f"problems   : {a['problems'] or 'none'}")
+    print(f"unapproved : {a['unapproved'] or 'none'}")
     print(f"generic    : {list_poses(generic_only=True)}")

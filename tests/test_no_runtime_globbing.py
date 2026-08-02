@@ -8,12 +8,14 @@ Scans recursively — the previous version globbed only top-level *.py and would
 have missed a router placed in a subpackage, which is exactly where one would
 normally live.
 
-Task 6 must extend this with positive assertions that the router and compositor
-import and call pose_registry.resolve().
+The negative check alone would pass trivially if nothing resolved poses at all,
+which was exactly the state before Task 6. So it is paired with positive
+assertions that the router and the compositor do consume the resolver.
 
 Run:  python tests/test_no_runtime_globbing.py
 """
 
+import ast
 import re
 import sys
 import tempfile
@@ -94,6 +96,26 @@ for rel in fixtures:
 
 check("nested files are reached at all (rglob, not glob)",
       any("deep/" in f for f in found), str(found))
+
+print("\nthe resolver is actually consumed (the negative check is not vacuous)")
+
+
+def calls_in(path: Path) -> set:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    return {ast.unparse(n.func) for n in ast.walk(tree) if isinstance(n, ast.Call)}
+
+
+comp = ROOT / "composite_character.py"
+router = ROOT / "route_images.py"
+check("compositor exists", comp.exists())
+check("router exists", router.exists())
+comp_calls = calls_in(comp)
+check("compositor calls pose_registry.resolve()", "pose_registry.resolve" in comp_calls)
+check("compositor calls pose_registry.metadata()", "pose_registry.metadata" in comp_calls)
+check("router delegates rendering to the compositor",
+      "composite_character.composite" in calls_in(router))
+check("router reads pose ids from the registry, not from disk",
+      "pose_registry.list_poses" in calls_in(router))
 
 print("\n" + "=" * 58)
 print(f"FAILED ({len(failures)}): {failures}" if failures else "ALL PASS")

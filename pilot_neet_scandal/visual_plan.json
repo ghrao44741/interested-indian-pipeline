@@ -1,0 +1,1213 @@
+{
+  "project": "pilot_neet_scandal",
+  "generated_by": "plan_visuals.py",
+  "read_only": true,
+  "identity": {
+    "state": "blocked",
+    "reasons": [
+      "1 scene(s) not matched to the script: SCENE-066"
+    ],
+    "gate_blockers": [
+      "manifest identity is ok: manifest identity is blocked — 1 scene(s) not matched to the script: SCENE-066",
+      "no scene awaits identity review: 1 scene(s): SCENE-066"
+    ]
+  },
+  "manifest_identity": {
+    "scenes": 135,
+    "shot_instance_ids": [
+      "SRC-001-I01",
+      "SRC-002-I01",
+      "SRC-003-I01",
+      "SRC-003-I02",
+      "SRC-004-I01",
+      "SRC-005-I01",
+      "SRC-006-I01",
+      "SRC-006-I02",
+      "SRC-007-I01",
+      "SRC-008-I01",
+      "SRC-009-I01",
+      "SRC-010-I01",
+      "SRC-011-I01",
+      "SRC-012-I01",
+      "SRC-013-I01",
+      "SRC-013-I02",
+      "SRC-014-I01",
+      "SRC-015-I01",
+      "SRC-016-I01",
+      "SRC-017-I01",
+      "SRC-018-I01",
+      "SRC-019-I01",
+      "SRC-019-I02",
+      "SRC-020-I01",
+      "SRC-021-I01",
+      "SRC-022-I01",
+      "SRC-023-I01",
+      "SRC-024-I01",
+      "SRC-025-I01",
+      "SRC-026-I01",
+      "SRC-026-I02",
+      "SRC-027-I01",
+      "SRC-028-I01",
+      "SRC-030-I01",
+      "SRC-030-I02",
+      "SRC-030-I03",
+      "SRC-031-I01",
+      "SRC-032-I01",
+      "SRC-033-I01",
+      "SRC-034-I01",
+      "SRC-035-I01",
+      "SRC-035-I02",
+      "SRC-035-I03",
+      "SRC-035-I04",
+      "SRC-035-I05",
+      "SRC-035-I06",
+      "SRC-036-I01",
+      "SRC-037-I01",
+      "SRC-038-I01",
+      "SRC-039-I01",
+      "SRC-040-I01",
+      "SRC-040-I02",
+      "SRC-041-I01",
+      "SRC-042-I01",
+      "SRC-042-I02",
+      "SRC-043-I01",
+      "SRC-043-I02",
+      "SRC-043-I03",
+      "SRC-044-I01",
+      "SRC-045-I01",
+      "SRC-046-I01",
+      "SRC-047-I01",
+      "SRC-047-I02",
+      "SRC-047-I03",
+      "SRC-048-I01",
+      "SRC-049-I01",
+      "SRC-049-I02",
+      "SRC-050-I01",
+      "SRC-051-I01",
+      "SRC-052-I01",
+      "SRC-052-I02",
+      "SRC-052-I03",
+      "SRC-053-I01",
+      "SRC-054-I01",
+      "SRC-055-I01",
+      "SRC-056-I01",
+      "SRC-057-I01",
+      "SRC-057-I02",
+      "SRC-058-I01",
+      "SRC-059-I01",
+      "SRC-059-I02",
+      "SRC-060-I01",
+      "SRC-061-I01",
+      "SRC-062-I01",
+      "SRC-064-I01",
+      "SRC-065-I01",
+      "SRC-066-I01",
+      "SRC-066-I02",
+      "SRC-067-I01",
+      "SRC-068-I01",
+      "SRC-068-I02",
+      "SRC-068-I03",
+      "SRC-069-I01",
+      "SRC-069-I02",
+      "SRC-069-I03",
+      "SRC-070-I01",
+      "SRC-071-I01",
+      "SRC-072-I01",
+      "SRC-072-I02",
+      "SRC-073-I01",
+      "SRC-073-I02",
+      "SRC-074-I01",
+      "SRC-075-I01",
+      "SRC-075-I02",
+      "SRC-075-I03",
+      "SRC-076-I01",
+      "SRC-077-I01",
+      "SRC-077-I02",
+      "SRC-077-I03",
+      "SRC-077-I04",
+      "SRC-078-I01",
+      "SRC-079-I01",
+      "SRC-080-I01",
+      "SRC-081-I01",
+      "SRC-082-I01",
+      "SRC-082-I02",
+      "SRC-083-I01",
+      "SRC-084-I01",
+      "SRC-084-I02",
+      "SRC-085-I01",
+      "SRC-086-I01",
+      "SRC-087-I01",
+      "SRC-088-I01",
+      "SRC-089-I01",
+      "SRC-090-I01",
+      "SRC-091-I01",
+      "SRC-091-I02",
+      "SRC-092-I01",
+      "SRC-093-I01",
+      "SRC-094-I01",
+      "SRC-094-I02",
+      "SRC-095-I01",
+      "SRC-096-I01",
+      "SRC-097-I01",
+      "SRC-098-I01"
+    ]
+  },
+  "shots": [
+    {
+      "shot": 1,
+      "file": "SCENE-001.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 2,
+      "file": "SCENE-002.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 3,
+      "file": "SCENE-003.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 4,
+      "file": "SCENE-004.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 5,
+      "file": "SCENE-005.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 6,
+      "file": "SCENE-006.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 7,
+      "file": "SCENE-007.png",
+      "visual_type": "CHART",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": false
+    },
+    {
+      "shot": 8,
+      "file": "SCENE-008.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 9,
+      "file": "SCENE-009.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 10,
+      "file": "SCENE-012.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 11,
+      "file": "SCENE-013.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 12,
+      "file": "SCENE-014.png",
+      "visual_type": "CHART",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": false
+    },
+    {
+      "shot": 13,
+      "file": "SCENE-015.png",
+      "visual_type": "CHART",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": false
+    },
+    {
+      "shot": 14,
+      "file": "SCENE-016.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 15,
+      "file": "SCENE-017.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 16,
+      "file": "SCENE-018.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 17,
+      "file": "SCENE-020.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 18,
+      "file": "SCENE-021.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 19,
+      "file": "SCENE-022.png",
+      "visual_type": "PHOTO",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": false
+    },
+    {
+      "shot": 20,
+      "file": "SCENE-023.png",
+      "visual_type": "CHART",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": false
+    },
+    {
+      "shot": 21,
+      "file": "SCENE-024.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 22,
+      "file": "SCENE-027.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 23,
+      "file": "SCENE-028.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 24,
+      "file": "SCENE-029.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 25,
+      "file": "SCENE-030.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 26,
+      "file": "SCENE-032.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 27,
+      "file": "SCENE-033.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 28,
+      "file": "SCENE-034.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 29,
+      "file": "SCENE-035.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 30,
+      "file": "SCENE-036.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 31,
+      "file": "SCENE-038.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 32,
+      "file": "SCENE-039.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 33,
+      "file": "SCENE-040.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 34,
+      "file": "SCENE-041.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 35,
+      "file": "SCENE-042.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 36,
+      "file": "SCENE-043.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 37,
+      "file": "SCENE-044.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 38,
+      "file": "SCENE-045.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 39,
+      "file": "SCENE-046.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 40,
+      "file": "SCENE-047.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 41,
+      "file": "SCENE-049.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 42,
+      "file": "SCENE-050.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 43,
+      "file": "SCENE-051.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 44,
+      "file": "SCENE-053.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 45,
+      "file": "SCENE-054.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 46,
+      "file": "SCENE-055.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 47,
+      "file": "SCENE-056.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 48,
+      "file": "SCENE-057.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 49,
+      "file": "SCENE-058.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 50,
+      "file": "SCENE-059.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 51,
+      "file": "SCENE-060.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 52,
+      "file": "SCENE-061.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 53,
+      "file": "SCENE-062.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 54,
+      "file": "SCENE-063.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 55,
+      "file": "SCENE-064.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 56,
+      "file": "SCENE-065.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 57,
+      "file": "SCENE-066.png",
+      "visual_type": "PHOTO",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": false
+    },
+    {
+      "shot": 58,
+      "file": "SCENE-067.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 59,
+      "file": "SCENE-068.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 60,
+      "file": "SCENE-069.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 61,
+      "file": "SCENE-071.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 62,
+      "file": "SCENE-072.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 63,
+      "file": "SCENE-075.png",
+      "visual_type": "CHART",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": false
+    },
+    {
+      "shot": 64,
+      "file": "SCENE-076.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 65,
+      "file": "SCENE-078.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 66,
+      "file": "SCENE-079.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 67,
+      "file": "SCENE-080.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 68,
+      "file": "SCENE-081.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 69,
+      "file": "SCENE-082.png",
+      "visual_type": "PHOTO",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": false
+    },
+    {
+      "shot": 70,
+      "file": "SCENE-084.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 71,
+      "file": "SCENE-085.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 72,
+      "file": "SCENE-086.png",
+      "visual_type": "PHOTO",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": false
+    },
+    {
+      "shot": 73,
+      "file": "SCENE-087.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 74,
+      "file": "SCENE-088.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 75,
+      "file": "SCENE-089.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 76,
+      "file": "SCENE-090.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 77,
+      "file": "SCENE-091.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 78,
+      "file": "SCENE-092.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 79,
+      "file": "SCENE-093.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 80,
+      "file": "SCENE-094.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 81,
+      "file": "SCENE-095.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 82,
+      "file": "SCENE-096.png",
+      "visual_type": "PHOTO",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": false
+    },
+    {
+      "shot": 83,
+      "file": "SCENE-097.png",
+      "visual_type": "PHOTO",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": false
+    },
+    {
+      "shot": 84,
+      "file": "SCENE-098.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 85,
+      "file": "SCENE-099.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 86,
+      "file": "SCENE-100.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 87,
+      "file": "SCENE-101.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 88,
+      "file": "SCENE-102.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 89,
+      "file": "SCENE-103.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 90,
+      "file": "SCENE-104.png",
+      "visual_type": "CHART",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": false
+    },
+    {
+      "shot": 91,
+      "file": "SCENE-105.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 92,
+      "file": "SCENE-106.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 93,
+      "file": "SCENE-108.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 94,
+      "file": "SCENE-109.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 95,
+      "file": "SCENE-110.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 96,
+      "file": "SCENE-111.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 97,
+      "file": "SCENE-112.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 98,
+      "file": "SCENE-113.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 99,
+      "file": "SCENE-114.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 100,
+      "file": "SCENE-115.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 101,
+      "file": "SCENE-116.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 102,
+      "file": "SCENE-117.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 103,
+      "file": "SCENE-118.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 104,
+      "file": "SCENE-119.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 105,
+      "file": "SCENE-120.png",
+      "visual_type": "CHART",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": false
+    },
+    {
+      "shot": 106,
+      "file": "SCENE-121.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 107,
+      "file": "SCENE-123.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 108,
+      "file": "SCENE-124.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 109,
+      "file": "SCENE-125.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 110,
+      "file": "SCENE-126.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 111,
+      "file": "SCENE-127.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 112,
+      "file": "SCENE-129.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 113,
+      "file": "SCENE-130.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 114,
+      "file": "SCENE-131.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 115,
+      "file": "SCENE-132.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    },
+    {
+      "shot": 116,
+      "file": "SCENE-133.png",
+      "visual_type": "CARTOON",
+      "host_present": false,
+      "pose_id": "",
+      "scene_bound": false,
+      "paid": true
+    }
+  ],
+  "mix": {
+    "CARTOON": 103,
+    "CHART": 7,
+    "PHOTO": 6
+  },
+  "host_presence_pct": 0.0,
+  "paid_generation": {
+    "shots": 103,
+    "estimate_usd": null,
+    "basis": "no image_pricing entry in channel_config.json — any figure here would be invented, so none is given"
+  },
+  "needs_review": []
+}

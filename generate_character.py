@@ -32,6 +32,8 @@ import json
 import sys
 from pathlib import Path
 
+from generation_gate import GateBlocked, require_generation_ready
+
 PIPELINE_DIR = Path(__file__).parent
 SPEC_PATH = PIPELINE_DIR / "character" / "character_spec.json"
 MODEL = "gpt-image-2"
@@ -486,6 +488,16 @@ def main():
     if args.contact_sheet and not (args.master or args.views or args.face_master):
         build_contact_sheet(spec)
         return 0
+
+    # Preflight before the client exists. Character scope: masters must still hash
+    # to what was approved and the pose registry must audit clean, or a generation
+    # anchored to a drifted reference would silently redefine the character.
+    try:
+        require_generation_ready(None, "character asset generation")
+    except GateBlocked as e:
+        print(f"\n{e}")
+        print("\nNo client was created and nothing was generated.")
+        return 1
 
     client = get_client()
     if args.master:

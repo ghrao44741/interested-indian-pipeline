@@ -8,8 +8,17 @@ and calls the appropriate generator:
   CARTOON → generate_images_flux.py (xAI Grok)
   CHART  → generate_chart.py        (matplotlib)
   PHOTO  → search_pexels.py         (Pexels API, falls back to generate_images_flux.py)
+  HOST   → composite_character.py   (approved pose composited over a background)
 
 Scenes without a TYPE field are classified by keyword matching (legacy prompts).
+
+HOST shots carry `HOST_POSE: <pose_id>` — an id, never a file path. The router
+records the id and hands it to the compositor, which resolves it through
+pose_registry. Nothing here ever touches character/poses/ directly, so an
+unapproved, raw or tampered asset has no route into a render.
+
+Routing runs behind require_generation_ready(), so a project whose identity is
+blocked cannot reach any generator, paid or free.
 
 SETUP:
     No extra dependencies — calls existing pipeline scripts as subprocesses.
@@ -27,6 +36,10 @@ import shlex
 import subprocess
 import sys
 from pathlib import Path
+
+import composite_character
+import pose_registry
+from generation_gate import GateBlocked, require_generation_ready
 
 PIPELINE_DIR = Path(__file__).parent
 PROMPTS_FILE = "image_prompts_one_line_per_prompt.md"
@@ -114,9 +127,11 @@ def parse_shots(prompts_path: Path) -> list[dict]:
             continue
 
         # TYPE field (new prompts)
-        raw_type = _field(line, "TYPE", ["MAP_ARGS", "CHART_ARGS", "NARRATION", "PROMPT", "OVERLAY", "CUE"])
+        raw_type = _field(line, "TYPE", ["MAP_ARGS", "CHART_ARGS", "HOST_POSE",
+                                         "SCENE_BOUND", "NARRATION", "PROMPT",
+                                         "OVERLAY", "CUE"])
         raw_type = raw_type.upper() if raw_type else ""
-        if raw_type not in ("CARTOON", "MAP", "CHART", "PHOTO"):
+        if raw_type not in ("CARTOON", "MAP", "CHART", "PHOTO", "HOST"):
             raw_type = _classify_by_keywords(line)
 
         # MAP_ARGS field (only meaningful for MAP type)
@@ -145,6 +160,22 @@ def parse_shots(prompts_path: Path) -> list[dict]:
                 raw_type = "CARTOON"
                 chart_args = ""
 
+        # HOST_POSE carries a registry id — the router deliberately has no way to
+        # name a file. An id that is not registered and approved is left in place
+        # rather than silently dropped, so plan_visuals.py can queue it for review
+        # instead of the shot quietly turning into a generic AI illustration.
+        pose_id = ""
+        scene_bound = False
+        if raw_type == "HOST":
+            pose_id = _field(line, "HOST_POSE",
+                             ["SCENE_BOUND", "NARRATION", "PROMPT", "OVERLAY", "CUE"])
+            scene_bound = _field(line, "SCENE_BOUND",
+                                 ["NARRATION", "PROMPT", "OVERLAY", "CUE"]).lower() \
+                in ("true", "yes", "1")
+            if not pose_id:
+                print(f"  !  SHOT {m_shot.group(1)}: HOST type but no HOST_POSE — "
+                      f"needs review, not generating")
+
         # Parse narration for Pexels keyword extraction
         m_narr = re.search(r'NARRATION:\s*"([^"]+)"', line)
         narration = m_narr.group(1) if m_narr else ""
@@ -155,13 +186,46 @@ def parse_shots(prompts_path: Path) -> list[dict]:
             "type":     raw_type,
             "map_args": map_args,
             "chart_args": chart_args,
+            "pose_id":  pose_id,        # id only — never a filesystem path
+            "scene_bound": scene_bound,
             "narration": narration,
         })
 
     return shots
 
 
+def approved_pose_ids() -> set[str]:
+    """Pose ids the router may reference, from the registry — never from disk."""
+    return set(pose_registry.list_poses())
+
+
 # ── Generators ─────────────────────────────────────────────────────────────────
+
+def run_host(shot: dict, images_dir: Path, script_dir: Path) -> bool:
+    """Composite one HOST shot from its pose id.
+
+    In-process rather than a subprocess: the compositor is the code that must be
+    shown to resolve through the registry, and a subprocess boundary would make
+    that harder to assert, not safer. Any refusal from the registry — unknown id,
+    unapproved status, hash mismatch, scene-bound without permission — surfaces
+    here as a failed shot rather than a wrong render.
+    """
+    out_path = images_dir / shot["file"]
+    background = out_path if out_path.exists() else None
+    if background is None:
+        print("!  no background rendered for this shot yet — "
+              "generate the background before compositing the host")
+        return False
+    try:
+        rec = composite_character.composite(
+            shot["pose_id"], background, out_path,
+            scene_bound=shot.get("scene_bound", False))
+    except (pose_registry.PoseError, ValueError) as e:
+        print(f"x  {e}")
+        return False
+    shot["placement"] = rec
+    return True
+
 
 def run_map(shot: dict, images_dir: Path, script_dir: Path) -> bool:
     """Call generate_india_map.py for one MAP shot. Returns True on success."""
@@ -214,6 +278,7 @@ def run_pexels(shot: dict, images_dir: Path, script_dir: Path) -> bool:
     query = shot.get("narration", "") or shot["file"]
     cmd = [sys.executable, str(pexels_script),
            "--query", query,
+           "--project", str(images_dir.parent),
            "--out", str(out_path)]
 
     result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -278,6 +343,17 @@ def main():
         print(f"❌ {PROMPTS_FILE} not found in: {project_dir}")
         sys.exit(1)
 
+    # Preflight before anything is created or dispatched. --dry-run still runs it
+    # (reporting the verdict is the point of a dry run) but does not fail on it.
+    try:
+        require_generation_ready(project_dir, "route_images")
+    except GateBlocked as e:
+        print(f"\n{e}")
+        if not args.dry_run:
+            print("\nNothing was generated. Resolve the blockers above, then re-run.")
+            sys.exit(1)
+        print("\n(dry run — reporting only)")
+
     images_dir = project_dir / "images"
     images_dir.mkdir(exist_ok=True)
 
@@ -287,6 +363,7 @@ def main():
     map_shots     = []
     chart_shots   = []
     photo_shots   = []
+    host_shots    = []
     ai_shot_files = []   # filenames for AI batch (flux handles skip-existing itself)
     skipped       = 0
 
@@ -295,10 +372,14 @@ def main():
             (images_dir / f"{Path(shot['file']).stem}{ext}").exists()
             for ext in (".png", ".jpg", ".jpeg", ".webp")
         )
-        if already and not args.overwrite:
+        # A HOST shot composites onto its own background, so an existing file is
+        # the input, not a reason to skip.
+        if already and not args.overwrite and shot["type"] != "HOST":
             skipped += 1
             continue
-        if shot["type"] == "MAP":
+        if shot["type"] == "HOST":
+            host_shots.append(shot)
+        elif shot["type"] == "MAP":
             map_shots.append(shot)
         elif shot["type"] == "CHART":
             chart_shots.append(shot)
@@ -315,6 +396,7 @@ def main():
     print(f"  MAP         : {len(map_shots)} → generate_india_map.py (GeoJSON)")
     print(f"  CHART       : {len(chart_shots)} → generate_chart.py (matplotlib)")
     print(f"  PHOTO       : {len(photo_shots)} → search_pexels.py (Pexels API)")
+    print(f"  HOST        : {len(host_shots)} → composite_character.py (approved poses)")
     print(f"  AI (Grok)   : {len(ai_shot_files)} → generate_images_flux.py")
     print(f"{'═'*58}\n")
 
@@ -326,11 +408,14 @@ def main():
             print(f"  CHART SHOT {s['shot_num']:02d}  {s['file']}  args: {s['chart_args'] or '(none)'}")
         for s in photo_shots:
             print(f"  PHOTO SHOT {s['shot_num']:02d}  {s['file']}  narration: {s['narration'][:60]}...")
+        for s in host_shots:
+            print(f"  HOST  SHOT {s['shot_num']:02d}  {s['file']}  pose: {s['pose_id'] or '(none)'}"
+                  f"{'  scene-bound' if s['scene_bound'] else ''}")
         for f in ai_shot_files:
             print(f"  AI    {f}")
         return
 
-    if not map_shots and not chart_shots and not ai_shot_files:
+    if not map_shots and not chart_shots and not host_shots and not ai_shot_files:
         print("✓ Nothing to generate — all images already exist.")
         return
 
@@ -389,6 +474,22 @@ def main():
                     ai_shot_files.append(shot["file"])
                     photo_fail += 1
 
+    # ── composite HOST shots ──────────────────────────────────────────────────
+    host_ok = host_fail = 0
+    if host_shots:
+        print(f"\nCompositing {len(host_shots)} host shot(s) from approved poses...\n")
+        for shot in host_shots:
+            print(f"  [{shot['shot_num']:02d}] {shot['file']}  pose={shot['pose_id'] or '(none)'}",
+                  end="  ", flush=True)
+            if shot["pose_id"] and run_host(shot, images_dir, script_dir):
+                print(f"✓  ({shot['placement']['side']})")
+                host_ok += 1
+            else:
+                if not shot["pose_id"]:
+                    print("✗  no HOST_POSE id")
+                host_fail += 1
+        print(f"\n  Host shots done: {host_ok} ✓  {host_fail} ✗")
+
     # ── generate AI shots ─────────────────────────────────────────────────────
     ai_batch_ok = True
     if ai_shot_files:
@@ -409,6 +510,10 @@ def main():
         print(f"    Tip: python generate_chart.py --type bar --example")
     if photo_shots:
         print(f"  Photos : {photo_ok} ✓  {photo_fail} ✗ (failed → AI fallback)")
+    if host_fail:
+        print(f"  ⚠ {host_fail} host shot(s) failed — the pose was refused by the "
+              f"registry or had no id. Nothing was rendered for them.")
+        print(f"    Tip: python composite_character.py --list-poses")
     print(f"\nNext step:")
     print(f"  python add_text_overlays.py --project {project_dir.name}")
     print(f"{'═'*58}\n")

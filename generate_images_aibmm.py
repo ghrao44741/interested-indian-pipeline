@@ -35,6 +35,8 @@ import sys
 import time
 from pathlib import Path
 
+from generation_gate import GateBlocked, require_generation_ready
+
 PIPELINE_DIR = Path(__file__).parent
 
 # ── Mascot reference ───────────────────────────────────────────────────────────
@@ -293,6 +295,26 @@ def main():
                              "instead of routing to dedicated generators")
     args = parser.parse_args()
 
+    # Resolve the project and run preflight BEFORE the key is read and before the
+    # client exists. --test has no project, so it runs the character-scope subset:
+    # it still spends money, and it still must not run against drifted masters.
+    project_dir = None
+    if not args.test:
+        if not args.project:
+            parser.error("Provide --project ep01 (or --test to verify setup)")
+        project_dir = Path(args.project)
+        if not project_dir.is_absolute():
+            project_dir = PIPELINE_DIR / args.project
+        if not project_dir.exists():
+            print(f"❌ Project folder not found: {project_dir}")
+            sys.exit(1)
+    try:
+        require_generation_ready(project_dir, "generate_images_aibmm (gpt-image-2)")
+    except GateBlocked as e:
+        print(f"\n{e}")
+        print("\nNo images were generated and no API client was created.")
+        sys.exit(1)
+
     api_key = _get_api_key()
     if not api_key:
         print("❌ OPENAI_API_KEY not set. Add it to .env: OPENAI_API_KEY=sk-...")
@@ -322,16 +344,6 @@ def main():
         else:
             print("\n  ✗ Test failed — check OPENAI_API_KEY and try again.")
         return
-
-    if not args.project:
-        parser.error("Provide --project ep01 (or --test to verify setup)")
-
-    project_dir = Path(args.project)
-    if not project_dir.is_absolute():
-        project_dir = PIPELINE_DIR / args.project
-    if not project_dir.exists():
-        print(f"❌ Project folder not found: {project_dir}")
-        sys.exit(1)
 
     generate_images(project_dir, args.scene_type, args.overwrite, client,
                     force_general=args.force_general)
