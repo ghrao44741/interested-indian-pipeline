@@ -21,7 +21,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# Narrowed: only modules that genuinely create or verify pose files.
+# Repository-relative, not filename-only: a "pose_registry.py" dropped into a
+# subpackage must not inherit the real module's exemption.
 ALLOWED = {"generate_poses.py", "validate_poses.py", "pose_registry.py"}
 
 SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", ".claude", "node_modules",
@@ -29,7 +30,11 @@ SKIP_DIRS = {".git", ".venv", "venv", "__pycache__", ".claude", "node_modules",
 
 PATTERNS = [
     (r"[\"']character[/\\]poses", "literal character/poses path"),
-    (r"Path\(\s*[\"']character[\"']\s*\)\s*/\s*[\"']poses[\"']", 'Path("character") / "poses"'),
+    # optional ")" so both Path("character") / "poses" and ROOT / "character" /
+    # "poses" are caught — the second is the more natural construction and the
+    # earlier pattern missed it entirely
+    (r"[\"']character[\"']\s*\)?\s*/\s*[\"']poses[\"']",
+     'path built as ... "character" / "poses"'),
     (r"\.r?glob\(\s*[\"'][^\"']*host_[^\"']*[\"']", "glob over host_* assets"),
     (r"os\.listdir\([^)]*poses", "os.listdir over the pose directory"),
     (r"os\.scandir\([^)]*poses", "os.scandir over the pose directory"),
@@ -43,7 +48,8 @@ def scan(root: Path, allowed: set):
     for py in sorted(root.rglob("*.py")):
         if any(part in SKIP_DIRS for part in py.parts):
             continue
-        if py.name in allowed:
+        rel = py.relative_to(root).as_posix()
+        if rel in allowed:
             continue
         scanned += 1
         src = py.read_text(encoding="utf-8", errors="ignore")

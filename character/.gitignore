@@ -2,3 +2,7 @@
 # export_character_package.py, and large. The masters, the spec and the
 # archives are tracked; the derived sheets are not.
 exports/
+
+# Replacement candidates — unreviewed generation output, promoted only by an
+# explicit approval step. Never a runtime asset.
+pose_candidates/

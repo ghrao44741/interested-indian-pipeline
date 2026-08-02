@@ -1058,6 +1058,20 @@
         "regression check rejects glob or direct character/poses/ access outside generation, validation and registry modules",
         "pending, raw or hash-mismatched files can never reach a render"
       ]
+    },
+    "replacement_workflow": {
+      "command": "python generate_poses.py --replacement-candidate <pose_id>",
+      "scope": "exactly one approved pose, exactly one paid call",
+      "layout": "character/pose_candidates/<pose_id>/vNN/{raw.png,asset.png,candidate.json}",
+      "never_writes": [
+        "character/poses/",
+        "character/pose_sources/",
+        "approved registry entries",
+        "approved batch results"
+      ],
+      "verification": "the processed candidate runs through the shared verify_asset(); a failure exits nonzero and is not registered, though the raw response is kept in the version directory for diagnosis",
+      "batch_force": "rejected outright for approved batches",
+      "promotion": "a separate explicit act; candidates are never auto-promoted"
     }
   },
   "references": {

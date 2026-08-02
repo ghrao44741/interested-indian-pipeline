@@ -155,58 +155,17 @@ check("opaque image fails corners and transparency",
 ok5, probs5, _ = gp.verify_asset(Path("nope.png"), rec)
 check("missing file reported", not ok5 and "missing" in probs5[0])
 
-print("\n7. approved --force writes a candidate, never the canonical file")
-calls = {"n": 0}
-
-
-class FakeGen:
-    class images:
-        @staticmethod
-        def edit(**kw):
-            calls["n"] += 1
-            import base64
-            import io
-            buf = io.BytesIO()
-            im = Image.new("RGB", (1024, 1024), (250, 247, 242))
-            im.paste(Image.new("RGB", (300, 600), (60, 60, 60)), (360, 200))
-            im.save(buf, format="PNG")
-
-            class R:
-                data = [type("D", (), {"b64_json": base64.b64encode(buf.getvalue()).decode()})]
-            return R()
-
-
-cand_dir = ROOT / "character" / "pose_candidates"
-before_spec = SPEC.read_bytes()
-with mock.patch.object(sys, "argv",
-                       ["generate_poses.py", "--batch", "2", "--force"]), \
-     mock.patch.object(gp, "get_client", lambda: FakeGen()):
-    try:
-        gp.main()
-    except SystemExit:
-        pass
-check("canonical bytes untouched by --force", sha(VICTIM) == ORIGINAL)
-cands = sorted(cand_dir.glob("host_*_v*.png")) if cand_dir.exists() else []
-check("replacement written to a candidate path", bool(cands), str(cands))
-check("candidates live outside character/poses/",
-      all("pose_candidates" in str(c) for c in cands))
-after = json.loads(SPEC.read_text(encoding="utf-8"))["pose_library"]
-prior = json.loads(before_spec.decode("utf-8"))["pose_library"]
-check("approved registry unchanged by --force", after["registry"] == prior["registry"])
-check("approved batch results unchanged by --force",
-      after.get("batch_2_results") == prior.get("batch_2_results"))
-check("candidates recorded separately, pending approval",
-      bool(after.get("batch_2_candidates")) and
-      all(c.get("status") == "pending-approval" for c in after["batch_2_candidates"]),
-      str([c.get("status") for c in after.get("batch_2_candidates", [])]))
-# leave no trace: candidate files and their spec records are test artifacts
-for c in cands:
-    c.unlink()
-_restore = json.loads(before_spec.decode("utf-8"))
-SPEC.write_text(json.dumps(_restore, indent=2, ensure_ascii=False), encoding="utf-8")
-check("spec restored to its pre-test state", SPEC.read_bytes() == before_spec)
-if cand_dir.exists() and not any(cand_dir.iterdir()):
-    cand_dir.rmdir()
+print("\n7. batch-wide --force over approved poses is rejected")
+# The old candidate-on-force behaviour is gone: it spent one paid call per pose
+# and overwrote each pose's own raw provenance. Replacement is now a single-pose
+# command, covered non-destructively in test_replacement_candidate.py.
+code, unchanged = run_cli(["--batch", "2", "--force"])
+check("exits nonzero", code != 0 and not str(code).startswith("API_CALLED"), f"exit={code}")
+check("zero API calls", not str(code).startswith("API_CALLED"))
+check("spec unchanged", unchanged)
+check("canonical bytes untouched", sha(VICTIM) == ORIGINAL)
+check("no pose_candidates directory created in the repo",
+      not (ROOT / "character" / "pose_candidates").exists())
 
 print("\n8. final audit")
 a = pr.audit()

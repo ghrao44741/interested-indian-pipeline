@@ -230,28 +230,23 @@ def generate_batch(spec: dict, client, batch: int = 1, force: bool = False) -> l
     prior = {r["id"]: r for r in pl.get(f"{poses_key}_results", []) if r.get("ok")}
     registry = pl.get("registry", {})
 
-    cand_dir = PIPELINE_DIR / "character" / "pose_candidates"
     approved_ids = {pid for pid, e in registry.items()
                     if e.get("status", "").startswith("approved")}
 
+    # A batch-wide --force over approved poses would spend one paid generation per
+    # pose and overwrite each one's raw provenance. Replacement is deliberately a
+    # single-pose, single-call operation instead.
+    if force:
+        clash = sorted({p["id"] for p in pl[poses_key]} & approved_ids)
+        if clash:
+            sys.exit(
+                f"  refusing batch-wide --force over {len(clash)} APPROVED pose(s): "
+                f"{', '.join(clash[:4])}{' …' if len(clash) > 4 else ''}\n"
+                f"  Replacement is one pose at a time:\n"
+                f"      python generate_poses.py --replacement-candidate <pose_id>")
+
     for pose in pl[poses_key]:
         out = out_dir / f"host_{pose['id']}.png"
-
-        if pose["id"] in approved_ids and force:
-            # An approved asset is never replaced in place. Regeneration writes a
-            # separate pending candidate; promotion is a deliberate, separate act.
-            if not out.exists():
-                print(f"  ✗ {out.name} is APPROVED but missing — restore it from git "
-                      f"before creating a replacement candidate")
-                results.append({"id": pose["id"], "ok": False,
-                                "error": "approved asset missing; restore from git"})
-                continue
-            cand_dir.mkdir(parents=True, exist_ok=True)
-            n = 2
-            while (cand_dir / f"host_{pose['id']}_v{n}.png").exists():
-                n += 1
-            out = cand_dir / f"host_{pose['id']}_v{n}.png"
-            print(f"  approved asset — generating candidate {out.name} instead")
 
         if out.exists() and not force:
             # Preserve the existing record rather than skipping it. Skipping
@@ -384,12 +379,144 @@ def generate_batch(spec: dict, client, batch: int = 1, force: bool = False) -> l
     return results
 
 
+def generate_replacement_candidate(spec: dict, client, pose_id: str) -> int:
+    """One approved pose, one paid call, one self-contained candidate version.
+
+    Everything a replacement produces — raw response, processed asset and its
+    record — lives under character/pose_candidates/<id>/vNN/. Nothing is written
+    to character/poses/ or character/pose_sources/, so neither the approved asset
+    nor its original raw provenance can be overwritten: the previous behaviour
+    routed the processed file to a candidate path but still wrote the raw over
+    the approved pose's own source.
+    """
+    pl = spec["pose_library"]
+    registry = pl.get("registry", {})
+
+    # Validate before spending anything.
+    entry = registry.get(pose_id)
+    if entry is None:
+        print(f"  ✗ unknown pose {pose_id!r}; registered: {sorted(registry)}")
+        return 2
+    if not entry.get("status", "").startswith("approved"):
+        print(f"  ✗ {pose_id} is {entry.get('status')!r}, not approved — "
+              f"replacement applies to approved assets only")
+        return 2
+    approved_file = PIPELINE_DIR / entry["path"]
+    if not approved_file.exists():
+        print(f"  ✗ approved asset missing at {approved_file} — restore it from git "
+              f"before creating a replacement candidate")
+        return 2
+
+    body = PIPELINE_DIR / spec["references"]["body_master"]
+    face = PIPELINE_DIR / spec["references"]["face_master"]
+    for p in (body, face):
+        if not p.exists():
+            print(f"  ✗ approved master missing: {p}")
+            return 2
+
+    brief_src = next((p for b in (1, 2) for p in pl.get(f"batch_{b}", [])
+                      if p["id"] == pose_id), None)
+    if brief_src is None:
+        print(f"  ✗ no brief recorded for {pose_id}")
+        return 2
+
+    root = PIPELINE_DIR / "character" / "pose_candidates" / pose_id
+    n = 1
+    while (root / f"v{n:02d}").exists():
+        n += 1
+    vdir = root / f"v{n:02d}"
+    vdir.mkdir(parents=True, exist_ok=True)
+
+    auth = spec["master_authority"]
+    brief = (
+        f"Reference 1 (body master, APPROVED): authority for "
+        f"{', '.join(auth['body_master'])}.\n"
+        f"Reference 2 (face master v3, APPROVED): authority for "
+        f"{', '.join(auth['face_master'])}.\n"
+        f"Pose: {brief_src['brief']}.\n"
+        "Both hands must be fully visible, anatomically correct, five fingers each. "
+        "Carry no prop other than any the pose itself requires. "
+        "Leave clear empty space around the gesture. "
+        "Isolated character on a plain uniform background, no scenery, no shadow."
+    )
+    prompt = build_prompt(spec, brief,
+                          expression=brief_src.get("expression", "neutral, relaxed mouth"),
+                          framing="full_body")
+
+    print(f"  replacement candidate for {pose_id} -> {vdir.relative_to(PIPELINE_DIR)}")
+    handles = []
+    try:
+        handles = [open(body, "rb"), open(face, "rb")]
+        resp = client.images.edit(model=MODEL, image=handles, prompt=prompt,
+                                  size=SIZE, n=1)     # exactly one call
+        data = _extract(resp)
+    except Exception as e:
+        print(f"  ✗ generation failed ({e})")
+        return 1
+    finally:
+        for h in handles:
+            h.close()
+    if not data:
+        print("  ✗ no image returned")
+        return 1
+
+    raw = vdir / "raw.png"
+    raw.write_bytes(data)
+    img = Image.open(raw).convert("RGBA")
+    check = validate_alpha(img)
+    if not check["has_alpha"] or not check["corners_transparent"]:
+        img, _removal = remove_flat_background(img)
+    asset = vdir / "asset.png"
+    img.save(asset)
+
+    ok, problems, observed = verify_asset(asset, {"dimensions": entry.get("dimensions")})
+    record = {
+        "id": pose_id, "version": n, "status": "pending-approval",
+        "path": str(asset.relative_to(PIPELINE_DIR)).replace("\\", "/"),
+        "raw": str(raw.relative_to(PIPELINE_DIR)).replace("\\", "/"),
+        "sha256": hashlib.sha256(asset.read_bytes()).hexdigest(),
+        "dimensions": observed.get("dimensions"),
+        "model": MODEL,
+        "generation_mode": "images.edit (dual reference: body_master + face_master)",
+        "references": [str(body.relative_to(PIPELINE_DIR)).replace("\\", "/"),
+                       str(face.relative_to(PIPELINE_DIR)).replace("\\", "/")],
+        "replaces": {"pose_id": pose_id, "approved_sha256": entry.get("sha256")},
+        "created": date.today().isoformat(),
+        "verification": {"ok": ok, "problems": problems, "alpha": observed.get("alpha")},
+    }
+    (vdir / "candidate.json").write_text(json.dumps(record, indent=2), encoding="utf-8")
+
+    if not ok:
+        # The raw response stays in the version directory for diagnosis, but an
+        # unverified candidate is never registered.
+        print(f"  ✗ candidate failed verification: {'; '.join(problems)}")
+        print(f"     kept at {vdir.relative_to(PIPELINE_DIR)} for diagnosis; NOT registered")
+        return 1
+
+    fresh = load_spec()
+    fresh["pose_library"].setdefault("replacement_candidates", []).append(record)
+    _write_spec_atomic(fresh)
+    print(f"  ✓ candidate v{n:02d} verified and recorded as pending-approval")
+    print(f"    approved asset untouched: {entry['path']}")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description="Generate transparent pose assets")
     ap.add_argument("--batch", type=int, default=1, help="Which authorized batch to generate")
+    ap.add_argument("--replacement-candidate", metavar="POSE_ID", default=None,
+                    help="Generate ONE replacement candidate for a single approved pose. "
+                         "Writes only under character/pose_candidates/<id>/vNN/.")
     ap.add_argument("--force", action="store_true")
     args = ap.parse_args()
     spec = load_spec()
+    if args.replacement_candidate:
+        if args.force:
+            ap.error("--force is meaningless with --replacement-candidate; "
+                     "each request creates a new version")
+        return generate_replacement_candidate(spec, get_client(),
+                                              args.replacement_candidate)
+
     results = generate_batch(spec, get_client(), batch=args.batch, force=args.force)
 
     # Whole-set validation: a short, duplicated or partly-failing result list is
