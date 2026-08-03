@@ -392,30 +392,85 @@ def empty_route_args() -> dict:
 
 # ── manifest coverage (identity-keyed, not scene_id-keyed) ──────────────────
 
+def _is_placeholder_identity(value) -> bool:
+    """True for missing/null/blank/synthesized identities — never a real,
+    persistent identity a route or manifest scene can be honestly matched on.
+    A route or scene carrying one of these is excluded from the coverage
+    comparison entirely and reported directly — even if the exact same
+    placeholder string happens to appear on both sides, since coincidence of
+    a synthetic sentinel is not identity."""
+    if not isinstance(value, str):
+        return True
+    if not value.strip():
+        return True
+    if value.startswith("UNRESOLVED-"):
+        return True
+    return False
+
+
 def check_manifest_coverage(routes: list[dict], manifest: dict) -> list[str]:
     """Every manifest scene with a persistent identity must have exactly one
-    route, and every route must correspond to exactly one manifest scene.
-    Lookup and equality are both keyed on visual_asset_id — the persistent
-    identity — never on scene_id, which is display metadata that moves
-    whenever narration is re-split."""
+    route, and every route must correspond to exactly one manifest scene —
+    regardless of route status. Lookup and equality are both keyed on
+    visual_asset_id — the persistent identity — never on scene_id, which is
+    display metadata that moves whenever narration is re-split.
+
+    Exact coverage does not depend on route status: a NEEDS_REVIEW route
+    carrying a synthesized placeholder identity is not exempt — it is
+    rejected directly by the placeholder check below, and (independently)
+    can never satisfy manifest coverage even if a manifest scene happens to
+    carry an identically malformed identity. Duplicates are counted via
+    Counter, not detected by comparing set sizes, so they cannot be hidden
+    by set collapse."""
     problems: list[str] = []
     scenes = manifest.get("scenes", [])
 
-    manifest_vids = [s.get("visual_asset_id") for s in scenes if s.get("visual_asset_id")]
-    seen = set()
-    for vid in manifest_vids:
-        if vid in seen:
+    manifest_vid_counts: Counter = Counter()
+    manifest_sid_counts: Counter = Counter()
+    for s in scenes:
+        label = s.get("id") or s.get("image") or "<unnamed manifest scene>"
+        vid = s.get("visual_asset_id")
+        sid = s.get("shot_instance_id")
+        if _is_placeholder_identity(vid):
+            problems.append(f"manifest scene {label!r} has a missing/empty/placeholder "
+                            f"visual_asset_id ({vid!r})")
+        else:
+            manifest_vid_counts[vid] += 1
+        if _is_placeholder_identity(sid):
+            problems.append(f"manifest scene {label!r} has a missing/empty/placeholder "
+                            f"shot_instance_id ({sid!r})")
+        else:
+            manifest_sid_counts[sid] += 1
+
+    for vid, n in manifest_vid_counts.items():
+        if n > 1:
             problems.append(f"manifest identity {vid!r} appears more than once in the manifest")
-        seen.add(vid)
-    manifest_vid_set = set(manifest_vids)
+    for sid, n in manifest_sid_counts.items():
+        if n > 1:
+            problems.append(f"manifest shot_instance_id {sid!r} appears more than once in "
+                            f"the manifest")
+    manifest_vid_set = set(manifest_vid_counts)
 
     if manifest_vid_set and not routes:
         problems.append(
             f"routing document has no routes, but the manifest has "
             f"{len(manifest_vid_set)} scene(s) with a persistent identity")
 
-    route_vids = [r.get("visual_asset_id") for r in routes]
-    for vid, n in Counter(route_vids).items():
+    route_vid_counts: Counter = Counter()
+    valid_route_vids: set = set()
+    for r in routes:
+        vid = r.get("visual_asset_id")
+        if _is_placeholder_identity(vid):
+            problems.append(
+                f"route {r.get('output_file')!r} has a missing/empty/placeholder "
+                f"visual_asset_id ({vid!r}) — a synthesized identity can never satisfy "
+                f"exact manifest coverage, even if the manifest happens to carry the same "
+                f"placeholder string")
+        else:
+            route_vid_counts[vid] += 1
+            valid_route_vids.add(vid)
+
+    for vid, n in route_vid_counts.items():
         if n > 1:
             problems.append(f"duplicate visual_asset_id {vid!r} across {n} routes")
     for sid, n in Counter(r.get("shot_instance_id") for r in routes).items():
@@ -425,19 +480,15 @@ def check_manifest_coverage(routes: list[dict], manifest: dict) -> list[str]:
         if n > 1:
             problems.append(f"duplicate output_file {f!r} across {n} routes")
 
-    for vid in sorted(manifest_vid_set - set(route_vids)):
+    for vid in sorted(manifest_vid_set - valid_route_vids):
         problems.append(f"manifest identity {vid!r} has no corresponding route")
 
-    # "Extra route" is only meaningful for a route that CLAIMS to be
-    # dispatchable (READY) but names an identity the manifest doesn't have.
-    # A NEEDS_REVIEW route carrying a synthetic placeholder id (because its
-    # own identity genuinely could not be resolved — see
-    # MANIFEST_IDENTITY_UNRESOLVED) already says so honestly; re-flagging it
-    # here as a second, differently-worded problem would make it impossible
-    # to ever write an artifact that surfaces that exact ambiguity for
-    # review, which is the whole reason NEEDS_REVIEW exists.
-    ready_vids = {r.get("visual_asset_id") for r in routes if r.get("status") == "READY"}
-    for vid in sorted(v for v in (ready_vids - manifest_vid_set) if v):
+    # Unlike the previous round, this is no longer scoped to status=="READY":
+    # exact coverage means every route — READY or NEEDS_REVIEW — must
+    # correspond to a real manifest identity. A route whose own identity
+    # could not be resolved is caught above by the placeholder check, not
+    # exempted here.
+    for vid in sorted(valid_route_vids - manifest_vid_set):
         problems.append(f"route {vid!r} does not correspond to any manifest identity")
 
     return problems
@@ -445,29 +496,17 @@ def check_manifest_coverage(routes: list[dict], manifest: dict) -> list[str]:
 
 # ── approved-asset resolution (real registry vocabulary, real I/O) ─────────
 
-def _verify_approved_asset(asset_id, record, *, asset_base, root, kind: str,
-                           require_scene_bound: bool | None) -> list[str]:
-    """Mirrors pose_registry.resolve()'s exact contract: status must be
-    approved or approved_scene_bound, the registered path must be relative,
-    non-traversing and free of NON_RENDERABLE_DIRS components, must resolve
-    (after following any symlink) inside `root`, must exist, and its live
-    SHA-256 must match the registered one. A missing expected hash is a
-    failure in its own right — never silently skipped."""
+def _verify_asset_path_and_hash(asset_id, record, *, asset_base, root, kind: str) -> list[str]:
+    """Path/existence/hash verification shared by pose and reference
+    resolution. Assumes the caller already checked status (and, for poses,
+    the scene-bound metadata contradictions) -- this only ever verifies that
+    the registered path is safe and that the bytes on disk are the approved
+    ones. The registered path must be relative, non-traversing and free of
+    NON_RENDERABLE_DIRS components, must resolve (after following any
+    symlink) inside `root`, must exist, and its live SHA-256 must match the
+    registered one. A missing expected hash is a failure in its own right --
+    never silently skipped."""
     problems = []
-    if record is None:
-        problems.append(f"{kind} {asset_id!r} is not a registered asset in the "
-                        f"governing channel")
-        return problems
-    status = record.get("status")
-    if status not in ("approved", "approved_scene_bound"):
-        problems.append(f"{kind} {asset_id!r} has status {status!r}, not approved")
-        return problems
-    if status == "approved_scene_bound" and not require_scene_bound:
-        problems.append(
-            f"{kind} {asset_id!r} is a scene-bound tableau — the route must pass "
-            f"scene_bound=true to use it")
-        return problems
-
     raw = record.get("path")
     if not raw or not isinstance(raw, str):
         problems.append(f"{kind} {asset_id!r} has no registered path")
@@ -480,7 +519,7 @@ def _verify_approved_asset(asset_id, record, *, asset_base, root, kind: str,
     forbidden = [part for part in p.parts if part in channel_context.NON_RENDERABLE_DIRS]
     if forbidden:
         problems.append(f"{kind} {asset_id!r} registered path {raw!r} passes through "
-                        f"{forbidden} — not approved output")
+                        f"{forbidden} -- not approved output")
         return problems
     if asset_base is None or root is None:
         problems.append(f"{kind} {asset_id!r}: no asset base/containment root supplied "
@@ -505,9 +544,84 @@ def _verify_approved_asset(asset_id, record, *, asset_base, root, kind: str,
     live_hash = hashlib.sha256(resolved.read_bytes()).hexdigest()
     if live_hash != expected_hash:
         problems.append(
-            f"{kind} {asset_id!r}: hash mismatch — the file has changed since approval "
-            f"(expected {expected_hash[:12]}\u2026, found {live_hash[:12]}\u2026)")
+            f"{kind} {asset_id!r}: hash mismatch -- the file has changed since approval "
+            f"(expected {expected_hash[:12]}..., found {live_hash[:12]}...)")
     return problems
+
+
+def _verify_approved_pose(pose_id, record, *, asset_base, root, host_scene_bound) -> list[str]:
+    """Enforces the registry record's own internal honesty as well as the
+    route's fit for it -- stricter than pose_registry.resolve(), which only
+    checks status against scene_bound. `host_scene_bound` is passed through
+    UNCOERCED: a malformed value (None, a string, anything other than the
+    exact bool the record's status requires) is itself a failure and must
+    never be normalised with bool(...) before this check runs.
+
+    status=approved requires generic_compositing_allowed is exactly True,
+    includes_geometry absent or an empty list, and host_scene_bound is
+    exactly False. status=approved_scene_bound requires
+    generic_compositing_allowed is exactly False, includes_geometry a
+    non-empty list, and host_scene_bound is exactly True. Any deviation --
+    missing, null, string-valued, or merely truthy/falsy instead of the
+    exact required value -- is a contradictory record or a route/record
+    mismatch, and is rejected before any path/hash verification runs."""
+    if record is None:
+        return [f"pose {pose_id!r} is not a registered asset in the governing channel"]
+    status = record.get("status")
+    if status not in ("approved", "approved_scene_bound"):
+        return [f"pose {pose_id!r} has status {status!r}, not approved"]
+
+    gca = record.get("generic_compositing_allowed")
+    geometry = record.get("includes_geometry")
+    problems: list[str] = []
+
+    if status == "approved":
+        if gca is not True:
+            problems.append(
+                f"pose {pose_id!r} is status=approved but generic_compositing_allowed is "
+                f"{gca!r}, not exactly true -- contradictory record")
+        if not (geometry is None or (isinstance(geometry, list) and len(geometry) == 0)):
+            problems.append(
+                f"pose {pose_id!r} is status=approved but includes_geometry is {geometry!r} "
+                f"-- contradictory record: must be absent or an empty list; baked-in "
+                f"geometry requires approved_scene_bound")
+        if host_scene_bound is not False:
+            problems.append(
+                f"pose {pose_id!r} is a generic approved pose -- the route must pass "
+                f"host_scene_bound exactly false to use it (got {host_scene_bound!r})")
+    else:  # approved_scene_bound
+        if gca is not False:
+            problems.append(
+                f"pose {pose_id!r} is status=approved_scene_bound but "
+                f"generic_compositing_allowed is {gca!r}, not exactly false -- contradictory "
+                f"record")
+        if not (isinstance(geometry, list) and len(geometry) > 0):
+            problems.append(
+                f"pose {pose_id!r} is status=approved_scene_bound but includes_geometry is "
+                f"{geometry!r} -- must be a non-empty list")
+        if host_scene_bound is not True:
+            problems.append(
+                f"pose {pose_id!r} is a scene-bound tableau -- the route must pass "
+                f"host_scene_bound exactly true to use it (got {host_scene_bound!r})")
+
+    if problems:
+        return problems
+    return _verify_asset_path_and_hash(pose_id, record, asset_base=asset_base, root=root,
+                                       kind="pose")
+
+
+def _verify_approved_reference(ref_id, record, *, asset_base, root) -> list[str]:
+    """References carry no generic_compositing_allowed/includes_geometry
+    vocabulary -- that is pose-specific. Any approved or approved_scene_bound
+    status is accepted equally; only path/existence/hash integrity (via the
+    shared helper) is checked beyond the status itself."""
+    if record is None:
+        return [f"reference {ref_id!r} is not a registered asset in the governing channel"]
+    status = record.get("status")
+    if status not in ("approved", "approved_scene_bound"):
+        return [f"reference {ref_id!r} has status {status!r}, not approved"]
+    return _verify_asset_path_and_hash(ref_id, record, asset_base=asset_base, root=root,
+                                       kind="reference")
 
 
 # ── pure contract validator (library only — not wired into any dispatcher) ──
@@ -518,6 +632,7 @@ def validate_contract(
     manifest: dict,
     manifest_sha256: str,
     governing_channel_binding: dict,
+    expected_project_id: str,
     renderer_capabilities: dict,
     renderer_registry: dict,
     approved_poses: dict | None = None,
@@ -546,6 +661,11 @@ def validate_contract(
     approved_references = approved_references or {}
 
     # ── top-level hashes and bindings ────────────────────────────────────
+    if doc.get("project_id") != expected_project_id:
+        problems.append(
+            f"project_id {doc.get('project_id')!r} != expected {expected_project_id!r} — "
+            f"this routing artifact does not belong to the project being validated")
+
     if doc.get("inputs", {}).get("manifest_sha256") != manifest_sha256:
         problems.append(
             f"inputs.manifest_sha256 {doc.get('inputs', {}).get('manifest_sha256')!r} != "
@@ -654,10 +774,10 @@ def validate_contract(
                     problems.append(f"{rid}: HOST_COMPOSITE renderer "
                                     f"{host_renderer_id!r} is unavailable")
 
-            problems.extend(_verify_approved_asset(
+            problems.extend(_verify_approved_pose(
                 route.get("host_pose_id"), approved_poses.get(route.get("host_pose_id")),
-                asset_base=poses_asset_base, root=poses_root, kind="pose",
-                require_scene_bound=bool(route.get("host_scene_bound"))))
+                asset_base=poses_asset_base, root=poses_root,
+                host_scene_bound=route.get("host_scene_bound")))
 
         elif route.get("host_present") and host_method == "reference_anchored_generation":
             if route.get("host_renderer_id") is not None:
@@ -682,25 +802,80 @@ def validate_contract(
                     f"renderer declaring supports_reference_input")
 
             for ref_id in (route.get("host_reference_asset_ids") or []):
-                problems.extend(_verify_approved_asset(
+                problems.extend(_verify_approved_reference(
                     ref_id, approved_references.get(ref_id),
-                    asset_base=references_asset_base, root=references_root,
-                    kind="reference", require_scene_bound=True))
+                    asset_base=references_asset_base, root=references_root))
 
     return problems
 
 
-def execution_blockers(doc: dict) -> list[str]:
-    """Every route that is not execution-ready, independent of whether the
-    artifact is otherwise fully integral. A NEEDS_REVIEW route always blocks
-    — that is what the status means. Non-empty means "do not dispatch"."""
+def _status_only_blockers(doc: dict) -> list[str]:
+    """Every route that is not execution-ready by status alone, independent
+    of whether the artifact is otherwise fully integral. A NEEDS_REVIEW
+    route always blocks — that is what the status means. Private: this is
+    only one ingredient of execution_blockers() below, never a complete
+    answer to "is this executable" on its own — a status-only check cannot
+    see a schema violation or a stale/mismatched binding."""
     return [f"{r.get('visual_asset_id')}: status {r.get('status')!r} blocks execution "
             f"— NEEDS_REVIEW routes are never dispatchable"
             for r in doc.get("routes", []) if r.get("status") != STATUS_READY]
 
 
-def is_executable(doc: dict) -> bool:
-    return not execution_blockers(doc)
+def execution_blockers(
+    doc: dict,
+    *,
+    manifest: dict,
+    manifest_sha256: str,
+    governing_channel_binding: dict,
+    expected_project_id: str,
+    renderer_capabilities: dict,
+    renderer_registry: dict,
+    approved_poses: dict | None = None,
+    poses_asset_base=None,
+    poses_root=None,
+    approved_references: dict | None = None,
+    references_asset_base=None,
+    references_root=None,
+) -> list[str]:
+    """The ONLY function allowed to answer "is this artifact safe to
+    dispatch." There is deliberately no bare-`doc` variant: a document's
+    route statuses alone say nothing about whether those statuses can be
+    trusted — a hand-built or corrupted dict claiming `status: "READY",
+    renderer_id: null` is schema-invalid, and a status-only check would
+    still report it as having zero blockers.
+
+    Runs, in order: schema_errors(doc) (a schema-invalid document is not
+    safe to reason about further, so its problems are returned immediately);
+    validate_contract(doc, ...) against the full supplied governing state
+    (integrity: hashes, bindings, manifest coverage, renderer/host
+    resolution); and finally the per-route NEEDS_REVIEW status check. Any
+    problem from any of the three blocks execution. Integrity being clean is
+    necessary but not sufficient — see the module docstring.
+    """
+    problems = schema_errors(doc)
+    if problems:
+        return problems
+    problems = list(validate_contract(
+        doc,
+        manifest=manifest,
+        manifest_sha256=manifest_sha256,
+        governing_channel_binding=governing_channel_binding,
+        expected_project_id=expected_project_id,
+        renderer_capabilities=renderer_capabilities,
+        renderer_registry=renderer_registry,
+        approved_poses=approved_poses,
+        poses_asset_base=poses_asset_base,
+        poses_root=poses_root,
+        approved_references=approved_references,
+        references_asset_base=references_asset_base,
+        references_root=references_root,
+    ))
+    problems += _status_only_blockers(doc)
+    return problems
+
+
+def is_executable(doc: dict, **kwargs) -> bool:
+    return not execution_blockers(doc, **kwargs)
 
 
 # ── provenance sidecar (structural validation only — no writer, no I/O) ─────

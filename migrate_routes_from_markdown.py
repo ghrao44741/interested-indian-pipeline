@@ -342,14 +342,25 @@ def migrate(legacy_md, project, *, dry_run: bool = False) -> dict:
             f"{project_dir} — migration refuses to overwrite an existing canonical "
             f"artifact")
 
-    target_channel_id, _ = channel_context.read_manifest_channel(project_dir)
-    if legacy_project_dir != project_dir:
-        src_channel_id, _ = channel_context.read_manifest_channel(legacy_project_dir)
-        if src_channel_id and target_channel_id and src_channel_id != target_channel_id:
-            raise MigrationError(
-                f"{legacy_path} belongs to channel {src_channel_id!r} but "
-                f"{project_dir.name} belongs to {target_channel_id!r} — refusing a "
-                f"cross-channel migration target")
+    def _blank(v) -> bool:
+        return v is None or (isinstance(v, str) and not v.strip())
+
+    src_channel_id, src_dna_version = channel_context.read_manifest_channel(legacy_project_dir)
+    target_channel_id, target_dna_version = channel_context.read_manifest_channel(project_dir)
+    if _blank(src_channel_id) or src_dna_version is None:
+        raise MigrationError(
+            f"{legacy_path} has no channel_id/channel_dna_version recorded in its "
+            f"manifest — a missing source channel binding is not evidence of a matching "
+            f"channel, refusing before any parsing or output creation")
+    if _blank(target_channel_id) or target_dna_version is None:
+        raise MigrationError(
+            f"{project_dir.name} has no channel_id/channel_dna_version recorded in its "
+            f"manifest — cannot verify a channel match without a complete target binding")
+    if src_channel_id != target_channel_id or src_dna_version != target_dna_version:
+        raise MigrationError(
+            f"{legacy_path} belongs to channel {src_channel_id!r} v{src_dna_version} but "
+            f"{project_dir.name} belongs to {target_channel_id!r} v{target_dna_version} — "
+            f"refusing a cross-channel or cross-version migration target")
 
     try:
         ctx = channel_context.load_channel_for_project(project_dir)
@@ -402,6 +413,7 @@ def migrate(legacy_md, project, *, dry_run: bool = False) -> dict:
         manifest=manifest,
         manifest_sha256=manifest_sha256,
         governing_channel_binding=ctx.plan_binding(),
+        expected_project_id=project_dir.name,
         renderer_capabilities=renderer_capabilities,
         renderer_registry=renderers.RENDERERS,
     )

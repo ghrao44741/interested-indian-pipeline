@@ -296,14 +296,16 @@
       },
       "allOf": [
         {
-          "description": "host_present=false: every host-method/pose/reference field is null.",
+          "description": "host_present=false: every host-method/pose/reference/renderer/placement field is null.",
           "if": { "properties": { "host_present": { "const": false } } },
           "then": {
             "properties": {
               "host_method": { "const": null },
               "host_pose_id": { "const": null },
               "host_scene_bound": { "const": null },
-              "host_reference_asset_ids": { "const": null }
+              "host_reference_asset_ids": { "const": null },
+              "host_renderer_id": { "const": null },
+              "host_placement": { "const": null }
             }
           }
         },
