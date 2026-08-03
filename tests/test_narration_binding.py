@@ -1007,6 +1007,32 @@ def s22_split_audio_traversal_refused():
           json.loads((proj / "manifest.json").read_text(encoding="utf-8")).get("scenes") == [])
 
 
+def s24_preview_relative_out_resolves_from_pipeline_root_not_project():
+    """Micro-fix regression: a RELATIVE --out during --preview must resolve
+    from the pipeline root (gsa.SCRIPT_DIR), never from the project's
+    source_audio/ — the production bare-filename shorthand must not apply to
+    an explicit preview destination. Reproduced: `--preview 1 --out
+    voice_previews/candidate.mp3` was rewriting to
+    `{project}/source_audio/voice_previews/candidate.mp3`, contradicting both
+    the CLI help and "an explicit --out is honored exactly"."""
+    root = temp_root()
+    make_pack(root / "channels", "beacon", voice_approved=False)
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+
+    with World(root), mock.patch.object(gsa, "SCRIPT_DIR", root):
+        code = _run_main_ex(["--project", str(proj), "--script", str(script),
+                             "--preview", "1", "--out",
+                             "voice_previews/relative_candidate.mp3",
+                             "--provider", "edge", "--voice", "CandidateRel"])
+    check("relative preview --out succeeds", code == 0, f"exit={code}")
+    expected = root / "voice_previews" / "relative_candidate.mp3"
+    check("relative --out resolved from the pipeline root, not the project",
+          expected.is_file())
+    check("nothing was created under the project's source_audio/",
+          not (proj / "source_audio").exists())
+
+
 def s23_split_audio_symlink_escape_refused():
     root = temp_root()
     proj = root / "symlink_proj"
@@ -1095,6 +1121,8 @@ def main() -> int:
             s22_split_audio_traversal_refused)
         run("23. split-stage --audio symlink escape is refused",
             s23_split_audio_symlink_escape_refused)
+        run("24. relative preview --out resolves from the pipeline root",
+            s24_preview_relative_out_resolves_from_pipeline_root_not_project)
     finally:
         for td in _temps:
             import shutil

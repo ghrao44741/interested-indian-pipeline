@@ -61,8 +61,13 @@ from pathlib import Path
 
 import channel_context
 
+# The pipeline root — mockable in tests (mock.patch.object(gsa, "SCRIPT_DIR", ...))
+# so a relative --out can be proven to resolve against it rather than against a
+# project directory, without needing the real repository layout.
+SCRIPT_DIR = Path(__file__).parent
+
 # ── Auto-load .env ─────────────────────────────────────────────────────────────
-_env_path = Path(__file__).parent / ".env"
+_env_path = SCRIPT_DIR / ".env"
 if _env_path.exists():
     for _line in _env_path.read_text(encoding="utf-8").splitlines():
         _line = _line.strip()
@@ -71,7 +76,7 @@ if _env_path.exists():
             os.environ.setdefault(_k.strip(), _v.strip().strip('"').strip("'"))
 
 # ── Load channel config ────────────────────────────────────────────────────────
-_cfg_path = Path(__file__).parent / "channel_config.json"
+_cfg_path = SCRIPT_DIR / "channel_config.json"
 _voice_cfg: dict = {}
 if _cfg_path.exists():
     try:
@@ -1107,7 +1112,7 @@ async def main():
     # Resolve the channel BEFORE choosing a default output — the preview
     # default destination is the channel's own preview directory, so the
     # channel has to exist first.
-    project_root = (Path(__file__).parent / args.project) if args.project else None
+    project_root = (SCRIPT_DIR / args.project) if args.project else None
     try:
         channel = channel_context.channel_for_voice(project_dir=project_root,
                                                      requested=args.channel)
@@ -1119,21 +1124,30 @@ async def main():
     # ── Output path resolution ───────────────────────────────────────────────
     # An explicit --out is honored EXACTLY as given, preview or not — it is
     # never silently rewritten or redirected, and never has project/
-    # source_audio/ prepended behind the operator's back (that used to happen
-    # unconditionally for a bare filename; it still does for a bare filename,
-    # but only when that's genuinely the default, not when --out was typed).
-    # Only an OMITTED --out gets a default, and the default depends on mode:
-    # a full-script run defaults to {project}/source_audio/narration.mp3 (the
-    # existing bare-filename shorthand); a --preview run with no --out
-    # defaults into the channel's own preview directory, so the natural way
-    # to run a preview lands somewhere evaluation is actually allowed.
+    # source_audio/ prepended behind the operator's back. Only an OMITTED
+    # --out gets a default, and the default depends on mode: a full-script
+    # run defaults to {project}/source_audio/narration.mp3 (the existing
+    # bare-filename shorthand); a --preview run with no --out defaults into
+    # the channel's own preview directory, so the natural way to run a
+    # preview lands somewhere evaluation is actually allowed.
     if args.out is not None:
         output_filename = args.out
         out_path = Path(output_filename)
-        if out_path.is_absolute() or not args.project:
+        if out_path.is_absolute():
+            intended = out_path
+        elif args.preview:
+            # A relative --out during --preview resolves from the pipeline
+            # root, NEVER from the project's source_audio/ — the whole point
+            # of an explicit destination is that it is exact, not a
+            # production shorthand. Prepending project/source_audio/ here
+            # (as production's bare-filename shorthand does) would silently
+            # redirect a candidate preview into a path that looks production-
+            # adjacent, contradicting "honored exactly".
+            intended = SCRIPT_DIR / out_path
+        elif not args.project:
             intended = out_path
         else:
-            intended = Path(__file__).parent / args.project / "source_audio" / output_filename
+            intended = SCRIPT_DIR / args.project / "source_audio" / output_filename
     elif args.preview:
         rate_tag = f"_rate{int(args.speaking_rate * 100)}" if args.speaking_rate is not None else ""
         output_filename = f"preview_{voice[:20].replace('/', '_')}{rate_tag}.mp3"
@@ -1141,7 +1155,7 @@ async def main():
     else:
         output_filename = "narration.mp3"
         if args.project:
-            intended = Path(__file__).parent / args.project / "source_audio" / output_filename
+            intended = SCRIPT_DIR / args.project / "source_audio" / output_filename
         else:
             intended = Path(output_filename)
 
