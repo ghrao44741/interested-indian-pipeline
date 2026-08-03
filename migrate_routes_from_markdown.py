@@ -342,8 +342,16 @@ def migrate(legacy_md, project, *, dry_run: bool = False) -> dict:
             f"{project_dir} — migration refuses to overwrite an existing canonical "
             f"artifact")
 
-    def _blank(v) -> bool:
-        return v is None or (isinstance(v, str) and not v.strip())
+    def _valid_channel_id(v) -> bool:
+        """True only for a canonical channel identifier: a str, non-empty,
+        with no leading/trailing whitespace of its own (stripping changes
+        nothing), and matching the repository's CHANNEL_ID_RE contract via
+        fullmatch (never a partial/prefix match). A non-str value (int,
+        bool, None) or a string containing separators, whitespace, or
+        uppercase characters is rejected outright -- never normalised or
+        coerced into something that happens to match."""
+        return (isinstance(v, str) and v != "" and v == v.strip()
+                and bool(channel_context.CHANNEL_ID_RE.fullmatch(v)))
 
     def _valid_dna_version(v) -> bool:
         """True only for a real, positive integer channel_dna_version. bool
@@ -367,19 +375,19 @@ def migrate(legacy_md, project, *, dry_run: bool = False) -> dict:
         raise MigrationError(
             f"cannot read {project_dir.name}'s manifest channel binding: {e}") from e
 
-    if _blank(src_channel_id) or not _valid_dna_version(src_dna_version):
+    if not _valid_channel_id(src_channel_id) or not _valid_dna_version(src_dna_version):
         raise MigrationError(
-            f"{legacy_path} has no channel_id, or no valid (positive integer) "
-            f"channel_dna_version, recorded in its manifest (channel_id={src_channel_id!r}, "
-            f"channel_dna_version={src_dna_version!r}) — a missing or malformed source "
-            f"channel binding is not evidence of a matching channel, refusing before any "
-            f"parsing or output creation")
-    if _blank(target_channel_id) or not _valid_dna_version(target_dna_version):
+            f"{legacy_path} has no channel_id, or not a canonical channel identifier, or "
+            f"no valid (positive integer) channel_dna_version, recorded in its manifest "
+            f"(channel_id={src_channel_id!r}, channel_dna_version={src_dna_version!r}) — a "
+            f"missing or malformed source channel binding is not evidence of a matching "
+            f"channel, refusing before any parsing or output creation")
+    if not _valid_channel_id(target_channel_id) or not _valid_dna_version(target_dna_version):
         raise MigrationError(
-            f"{project_dir.name} has no channel_id, or no valid (positive integer) "
-            f"channel_dna_version, recorded in its manifest (channel_id={target_channel_id!r}, "
-            f"channel_dna_version={target_dna_version!r}) — cannot verify a channel match "
-            f"without a complete target binding")
+            f"{project_dir.name} has no channel_id, or not a canonical channel identifier, "
+            f"or no valid (positive integer) channel_dna_version, recorded in its manifest "
+            f"(channel_id={target_channel_id!r}, channel_dna_version={target_dna_version!r}) "
+            f"— cannot verify a channel match without a complete target binding")
     if src_channel_id != target_channel_id or src_dna_version != target_dna_version:
         raise MigrationError(
             f"{legacy_path} belongs to channel {src_channel_id!r} v{src_dna_version} but "

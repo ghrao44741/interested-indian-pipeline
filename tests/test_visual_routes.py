@@ -57,6 +57,7 @@ sys.path.insert(0, str(ROOT))
 import channel_context as cc             # noqa: E402
 import migrate_routes_from_markdown as mig  # noqa: E402
 import render_channel_dna as rd          # noqa: E402
+import route_images                      # noqa: E402
 import renderers                         # noqa: E402
 import visual_routes as vr               # noqa: E402
 
@@ -1383,6 +1384,135 @@ def s5_asset_directory_path_malformed_hash_and_read_failure_pose_and_reference()
           len(blockers6) > 0, str(blockers6))
 
 
+def s5_pose_and_reference_path_resolution_exceptions_are_caught():
+    """Path.resolve() can raise, not just fail cleanly: a symlink loop raises
+    RuntimeError, and a registered path with an embedded NUL character raises
+    ValueError. Neither may escape validate_contract()/execution_blockers()/
+    is_executable() -- both must come back as ordinary blockers, exactly like
+    a missing file or a hash mismatch, and the asset must never be read."""
+    root = temp_root()
+    asset_base = root / "pack"
+    poses_root = asset_base / "poses"
+    poses_root.mkdir(parents=True, exist_ok=True)
+
+    def spying_read_bytes(self, *a, **kw):
+        raise AssertionError(f"read_bytes() was called on {self} -- resolution should have "
+                             f"failed before any read was attempted")
+
+    route = _base_route(host_present=True, host_method="approved_pose_composite",
+                        host_pose_id="neutral", host_scene_bound=False,
+                        host_renderer_id="approved_pose_compositor")
+    caps = {"MAP": "india_geojson", "HOST_COMPOSITE": "approved_pose_compositor"}
+    manifest = _manifest_for(route)
+    doc = _finalize(_doc([route]))
+    kwargs = dict(manifest=manifest, manifest_sha256=MANIFEST_SHA,
+                 governing_channel_binding=_channel_binding(), expected_project_id="p",
+                 renderer_capabilities=caps, renderer_registry=REGISTRY,
+                 poses_asset_base=asset_base, poses_root=poses_root)
+
+    # ── symlink loop ────────────────────────────────────────────────────
+    if hasattr(os, "symlink"):
+        loop_a = poses_root / "loop_a.png"
+        loop_b = poses_root / "loop_b.png"
+        try:
+            os.symlink(loop_b, loop_a)
+            os.symlink(loop_a, loop_b)
+        except OSError:
+            print("  SKIP  pose symlink-loop resolution — this account cannot create symlinks")
+        else:
+            loop_pose = {"neutral": {"status": "approved", "path": "poses/loop_a.png",
+                                     "sha256": "a" * 64, "generic_compositing_allowed": True,
+                                     "includes_geometry": []}}
+            with mock.patch.object(Path, "read_bytes", spying_read_bytes):
+                problems = vr.validate_contract(doc, approved_poses=loop_pose, **kwargs)
+                check("a symlink-loop pose path is rejected via validate_contract, not raised",
+                      len(problems) > 0, str(problems))
+                blockers = vr.execution_blockers(doc, approved_poses=loop_pose, **kwargs)
+                check("execution_blockers also returns a blocker (not a raise) for a "
+                      "symlink-loop pose path", len(blockers) > 0, str(blockers))
+                check("is_executable is False for a symlink-loop pose path",
+                      vr.is_executable(doc, approved_poses=loop_pose, **kwargs) is False)
+            check("no routing artifact was created by a symlink-loop pose failure",
+                  not (root / vr.ROUTES_NAME).exists())
+
+    # ── embedded NUL byte in the registered path ───────────────────────
+    nul_pose = {"neutral": {"status": "approved", "path": "poses/bad\x00asset.png",
+                            "sha256": "a" * 64, "generic_compositing_allowed": True,
+                            "includes_geometry": []}}
+    with mock.patch.object(Path, "read_bytes", spying_read_bytes):
+        problems2 = vr.validate_contract(doc, approved_poses=nul_pose, **kwargs)
+        check("a pose path with an embedded NUL byte is rejected via validate_contract, "
+              "not raised", len(problems2) > 0, str(problems2))
+        blockers2 = vr.execution_blockers(doc, approved_poses=nul_pose, **kwargs)
+        check("execution_blockers also returns a blocker (not a raise) for an embedded-NUL "
+              "pose path", len(blockers2) > 0, str(blockers2))
+        check("is_executable is False for an embedded-NUL pose path",
+              vr.is_executable(doc, approved_poses=nul_pose, **kwargs) is False)
+    check("no routing artifact was created by an embedded-NUL pose failure",
+          not (root / vr.ROUTES_NAME).exists())
+
+    # ── the same two failure modes, for reference resolution ───────────
+    ref_base = root / "refs"
+    refs_root = ref_base / "reference"
+    refs_root.mkdir(parents=True, exist_ok=True)
+    ref_route = _base_route(visual_type="ILLUSTRATION", renderer_id="flux_illustration",
+                            cost_category="paid_api", paid=True,
+                            route_args={"map": None, "chart": None, "timeline": None,
+                                        "document": None, "photo": None,
+                                        "illustration": {"prompt": "x", "style_tags": []},
+                                        "reenactment": None},
+                            host_present=True, host_method="reference_anchored_generation",
+                            host_reference_asset_ids=["ref1"])
+    ref_manifest = _manifest_for(ref_route)
+    ref_caps = {"ILLUSTRATION": "flux_illustration"}
+    ref_doc = _finalize(_doc([ref_route]))
+    ref_kwargs = dict(manifest=ref_manifest, manifest_sha256=MANIFEST_SHA,
+                      governing_channel_binding=_channel_binding(), expected_project_id="p",
+                      renderer_capabilities=ref_caps, renderer_registry=REGISTRY,
+                      references_asset_base=ref_base, references_root=refs_root)
+
+    if hasattr(os, "symlink"):
+        rloop_a = refs_root / "rloop_a.png"
+        rloop_b = refs_root / "rloop_b.png"
+        try:
+            os.symlink(rloop_b, rloop_a)
+            os.symlink(rloop_a, rloop_b)
+        except OSError:
+            print("  SKIP  reference symlink-loop resolution — this account cannot create "
+                 "symlinks")
+        else:
+            loop_ref = {"ref1": {"status": "approved", "path": "reference/rloop_a.png",
+                                 "sha256": "a" * 64}}
+            with mock.patch.object(Path, "read_bytes", spying_read_bytes):
+                problems3 = vr.validate_contract(ref_doc, approved_references=loop_ref,
+                                                 **ref_kwargs)
+                check("a symlink-loop reference path is rejected via validate_contract, "
+                      "not raised", len(problems3) > 0, str(problems3))
+                blockers3 = vr.execution_blockers(ref_doc, approved_references=loop_ref,
+                                                  **ref_kwargs)
+                check("execution_blockers also returns a blocker (not a raise) for a "
+                      "symlink-loop reference path", len(blockers3) > 0, str(blockers3))
+                check("is_executable is False for a symlink-loop reference path",
+                      vr.is_executable(ref_doc, approved_references=loop_ref,
+                                       **ref_kwargs) is False)
+            check("no routing artifact was created by a symlink-loop reference failure",
+                  not (ref_base / vr.ROUTES_NAME).exists())
+
+    nul_ref = {"ref1": {"status": "approved", "path": "reference/bad\x00ref.png",
+                        "sha256": "a" * 64}}
+    with mock.patch.object(Path, "read_bytes", spying_read_bytes):
+        problems4 = vr.validate_contract(ref_doc, approved_references=nul_ref, **ref_kwargs)
+        check("a reference path with an embedded NUL byte is rejected via validate_contract, "
+              "not raised", len(problems4) > 0, str(problems4))
+        blockers4 = vr.execution_blockers(ref_doc, approved_references=nul_ref, **ref_kwargs)
+        check("execution_blockers also returns a blocker (not a raise) for an embedded-NUL "
+              "reference path", len(blockers4) > 0, str(blockers4))
+        check("is_executable is False for an embedded-NUL reference path",
+              vr.is_executable(ref_doc, approved_references=nul_ref, **ref_kwargs) is False)
+    check("no routing artifact was created by an embedded-NUL reference failure",
+          not (ref_base / vr.ROUTES_NAME).exists())
+
+
 def s5_pose_contradictory_records_rejected():
     """A registry record that contradicts itself is rejected before any
     path/hash check runs, independent of whether the route's own
@@ -1900,6 +2030,78 @@ def s6_refuses_matching_channel_id_but_mismatched_dna_version():
                   True)
 
 
+def s6_refuses_malformed_channel_id():
+    """channel_id must be a canonical channel identifier -- a str, non-empty,
+    with no leading/trailing whitespace, matching CHANNEL_ID_RE via a full
+    match. A non-str value (int, bool) is neither None nor blank so a naive
+    _blank()-style check would wave it through; a string with internal
+    whitespace or separators is non-empty after stripping the ends but is
+    still not a real identifier. Tested on BOTH the source and the target
+    manifest, independently, for every malformed shape, and in every case:
+    load_channel_for_project/parse_shots are never called and nothing is
+    written."""
+    for bad in (123, True, "", "   ", " testchan ", "test/chan", "../evil"):
+        root = temp_root()
+        make_pack(root / "channels", "testchan")
+        proj = make_project(root, "proj", "testchan")
+        bad_src = root / "bad_src"
+        bad_src.mkdir(parents=True, exist_ok=True)
+        src_manifest = {"episode": "bad_src", "identity_state": "ok", "identity_reasons": [],
+                        "scenes": [], "channel_id": bad, "channel_dna_version": 1}
+        (bad_src / "manifest.json").write_text(json.dumps(src_manifest, indent=2), encoding="utf-8")
+        (bad_src / "image_prompts_one_line_per_prompt.md").write_text(LEGACY_PROMPTS,
+                                                                       encoding="utf-8")
+        with World(root), \
+             mock.patch.object(cc, "load_channel_for_project") as m_load, \
+             mock.patch.object(route_images, "parse_shots") as m_parse:
+            try:
+                mig.migrate(bad_src / "image_prompts_one_line_per_prompt.md", proj)
+                check(f"a source channel_id of {bad!r} is refused", False, "it succeeded")
+            except mig.MigrationError:
+                check(f"a source channel_id of {bad!r} is refused", True)
+            check(f"load_channel_for_project was never called for source channel_id {bad!r}",
+                  not m_load.called)
+            check(f"parse_shots was never called for source channel_id {bad!r}",
+                  not m_parse.called)
+        check(f"nothing was written when source channel_id was {bad!r}",
+              not (proj / vr.ROUTES_NAME).exists() and not (proj / vr.ROUTES_MD_NAME).exists())
+
+        root2 = temp_root()
+        make_pack(root2 / "channels", "testchan")
+        good_src_proj = make_project(root2, "good_src", "testchan")
+        bad_target = root2 / "bad_target"
+        bad_target.mkdir(parents=True, exist_ok=True)
+        target_manifest = {"episode": "bad_target", "identity_state": "ok",
+                           "identity_reasons": [], "scenes": [],
+                           "channel_id": bad, "channel_dna_version": 1}
+        (bad_target / "manifest.json").write_text(json.dumps(target_manifest, indent=2),
+                                                   encoding="utf-8")
+        with World(root2), \
+             mock.patch.object(cc, "load_channel_for_project") as m_load2, \
+             mock.patch.object(route_images, "parse_shots") as m_parse2:
+            try:
+                mig.migrate(good_src_proj / "image_prompts_one_line_per_prompt.md", bad_target)
+                check(f"a target channel_id of {bad!r} is refused", False, "it succeeded")
+            except mig.MigrationError:
+                check(f"a target channel_id of {bad!r} is refused", True)
+            check(f"load_channel_for_project was never called for target channel_id {bad!r}",
+                  not m_load2.called)
+            check(f"parse_shots was never called for target channel_id {bad!r}",
+                  not m_parse2.called)
+        check(f"nothing was written when target channel_id was {bad!r}",
+              not (bad_target / vr.ROUTES_NAME).exists()
+              and not (bad_target / vr.ROUTES_MD_NAME).exists())
+
+    # the legitimate path must still work with a valid canonical channel_id
+    root3 = temp_root()
+    make_pack(root3 / "channels", "testchan")
+    proj3 = make_project(root3, "proj", "testchan")
+    with World(root3):
+        result = mig.migrate(proj3 / "image_prompts_one_line_per_prompt.md", proj3)
+    check("a valid canonical channel_id on both sides still migrates successfully",
+          result.get("written") is True, str(result))
+
+
 def s6_refuses_blank_or_malformed_dna_version():
     """channel_dna_version must be a real positive integer, not merely
     'truthy'. A digit-only string, a bool, zero, or blank/whitespace all
@@ -2160,6 +2362,9 @@ def main() -> int:
         run("5m1b. directory path / malformed hash / simulated read failure rejected for "
             "pose AND reference, without raising",
             s5_asset_directory_path_malformed_hash_and_read_failure_pose_and_reference)
+        run("5m1c. symlink-loop and embedded-NUL path resolution is caught, not raised, "
+            "for pose AND reference",
+            s5_pose_and_reference_path_resolution_exceptions_are_caught)
         run("5m2. contradictory pose registry records are rejected",
             s5_pose_contradictory_records_rejected)
         run("5m3. host validation is never silently skipped when context is omitted",
@@ -2194,6 +2399,9 @@ def main() -> int:
         run("6d8. blank/whitespace/digit-string/bool/zero channel_dna_version is refused "
             "on both source and target, nothing written",
             s6_refuses_blank_or_malformed_dna_version)
+        run("6d9. non-str/blank/padded/separator-bearing channel_id is refused on both "
+            "source and target before load_channel_for_project/parse_shots, nothing written",
+            s6_refuses_malformed_channel_id)
         run("6e. migration never creates a missing project directory",
             s6_never_creates_a_missing_project_directory)
         run("6f. migration refuses an existing artifact; neither file changes",

@@ -543,16 +543,30 @@ def _verify_asset_path_and_hash(asset_id, record, *, asset_base, root, kind: str
                         f"to verify against")
         return problems
 
-    resolved = (Path(asset_base) / p).resolve()
-    root_resolved = Path(root).resolve()
-    if not resolved.is_relative_to(root_resolved):
+    try:
+        resolved = (Path(asset_base) / p).resolve()
+        root_resolved = Path(root).resolve()
+        escapes = not resolved.is_relative_to(root_resolved)
+        exists = resolved.exists()
+        is_file = exists and resolved.is_file()
+    except (OSError, RuntimeError, ValueError) as e:
+        # RuntimeError: a symlink loop during resolution. ValueError: an
+        # embedded NUL (or other value the OS path APIs reject outright) in
+        # the registered path. Either way, the path never gets to prove
+        # anything about containment or the file it might point at -- this
+        # is a blocker, not a crash.
+        problems.append(f"{kind} {asset_id!r}: could not resolve/stat the registered path "
+                        f"{raw!r}: {e}")
+        return problems
+
+    if escapes:
         problems.append(f"{kind} {asset_id!r} resolved path escapes {root_resolved} "
                         f"(resolved to {resolved})")
         return problems
-    if not resolved.exists():
+    if not exists:
         problems.append(f"{kind} {asset_id!r}: registered asset missing at {resolved}")
         return problems
-    if not resolved.is_file():
+    if not is_file:
         problems.append(f"{kind} {asset_id!r}: registered path resolves to {resolved}, "
                         f"which is not a regular file (directory, symlink target, or other "
                         f"non-file object) -- refusing rather than attempting to read it")
