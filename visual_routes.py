@@ -49,6 +49,7 @@ NEEDS_REVIEW routes, which are execution blockers by definition. Use
 import argparse
 import hashlib
 import json
+import re
 import sys
 import uuid
 from collections import Counter
@@ -398,12 +399,18 @@ def _is_placeholder_identity(value) -> bool:
     A route or scene carrying one of these is excluded from the coverage
     comparison entirely and reported directly — even if the exact same
     placeholder string happens to appear on both sides, since coincidence of
-    a synthetic sentinel is not identity."""
+    a synthetic sentinel is not identity.
+
+    Surrounding whitespace is stripped before either test: a padded sentinel
+    (" UNRESOLVED-x", "UNRESOLVED-x\\t") is exactly as synthetic as the
+    unpadded form, and must not sneak past the prefix check by carrying
+    leading/trailing whitespace."""
     if not isinstance(value, str):
         return True
-    if not value.strip():
+    stripped = value.strip()
+    if not stripped:
         return True
-    if value.startswith("UNRESOLVED-"):
+    if stripped.startswith("UNRESOLVED-"):
         return True
     return False
 
@@ -496,6 +503,9 @@ def check_manifest_coverage(routes: list[dict], manifest: dict) -> list[str]:
 
 # ── approved-asset resolution (real registry vocabulary, real I/O) ─────────
 
+_SHA256_HEX_RE = re.compile(r"^[0-9a-fA-F]{64}$")
+
+
 def _verify_asset_path_and_hash(asset_id, record, *, asset_base, root, kind: str) -> list[str]:
     """Path/existence/hash verification shared by pose and reference
     resolution. Assumes the caller already checked status (and, for poses,
@@ -503,9 +513,16 @@ def _verify_asset_path_and_hash(asset_id, record, *, asset_base, root, kind: str
     the registered path is safe and that the bytes on disk are the approved
     ones. The registered path must be relative, non-traversing and free of
     NON_RENDERABLE_DIRS components, must resolve (after following any
-    symlink) inside `root`, must exist, and its live SHA-256 must match the
-    registered one. A missing expected hash is a failure in its own right --
-    never silently skipped."""
+    symlink) inside `root`, must exist, and must be a regular file -- a
+    directory, FIFO, socket or other non-file object at that path is a
+    blocker, not something `read_bytes()` is ever allowed to be attempted
+    against. Its live SHA-256 must match the registered one, and the
+    registered sha256 evidence itself must be a well-formed 64-character hex
+    string -- missing, blank, or malformed evidence is a failure in its own
+    right, never silently skipped. A filesystem error while reading the file
+    (permissions, race, transient I/O failure) is reported as a problem, not
+    raised -- this function's contract is "return blockers," never "crash
+    the caller."""
     problems = []
     raw = record.get("path")
     if not raw or not isinstance(raw, str):
@@ -535,13 +552,24 @@ def _verify_asset_path_and_hash(asset_id, record, *, asset_base, root, kind: str
     if not resolved.exists():
         problems.append(f"{kind} {asset_id!r}: registered asset missing at {resolved}")
         return problems
+    if not resolved.is_file():
+        problems.append(f"{kind} {asset_id!r}: registered path resolves to {resolved}, "
+                        f"which is not a regular file (directory, symlink target, or other "
+                        f"non-file object) -- refusing rather than attempting to read it")
+        return problems
 
     expected_hash = record.get("sha256")
-    if not expected_hash:
-        problems.append(f"{kind} {asset_id!r}: registry record has no sha256 evidence "
-                        f"to verify against")
+    if not isinstance(expected_hash, str) or not _SHA256_HEX_RE.match(expected_hash):
+        problems.append(f"{kind} {asset_id!r}: registry record has no valid sha256 evidence "
+                        f"to verify against (expected a 64-character hex string, got "
+                        f"{expected_hash!r})")
         return problems
-    live_hash = hashlib.sha256(resolved.read_bytes()).hexdigest()
+    try:
+        live_hash = hashlib.sha256(resolved.read_bytes()).hexdigest()
+    except OSError as e:
+        problems.append(f"{kind} {asset_id!r}: could not read the registered asset at "
+                        f"{resolved} to verify its hash: {e}")
+        return problems
     if live_hash != expected_hash:
         problems.append(
             f"{kind} {asset_id!r}: hash mismatch -- the file has changed since approval "

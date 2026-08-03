@@ -345,17 +345,41 @@ def migrate(legacy_md, project, *, dry_run: bool = False) -> dict:
     def _blank(v) -> bool:
         return v is None or (isinstance(v, str) and not v.strip())
 
-    src_channel_id, src_dna_version = channel_context.read_manifest_channel(legacy_project_dir)
-    target_channel_id, target_dna_version = channel_context.read_manifest_channel(project_dir)
-    if _blank(src_channel_id) or src_dna_version is None:
+    def _valid_dna_version(v) -> bool:
+        """True only for a real, positive integer channel_dna_version. bool
+        is rejected even though Python's bool is technically an int subclass
+        -- True/False are never a legitimate DNA version. Strings (even
+        digit-only ones like "1"), floats, zero and negative numbers are all
+        refused too: a version number that needed coercion was never really
+        validated in the first place."""
+        return isinstance(v, int) and not isinstance(v, bool) and v >= 1
+
+    try:
+        src_channel_id, src_dna_version = channel_context.read_manifest_channel(
+            legacy_project_dir)
+    except channel_context.ChannelError as e:
         raise MigrationError(
-            f"{legacy_path} has no channel_id/channel_dna_version recorded in its "
-            f"manifest — a missing source channel binding is not evidence of a matching "
-            f"channel, refusing before any parsing or output creation")
-    if _blank(target_channel_id) or target_dna_version is None:
+            f"cannot read {legacy_project_dir.name}'s manifest channel binding: {e}") from e
+    try:
+        target_channel_id, target_dna_version = channel_context.read_manifest_channel(
+            project_dir)
+    except channel_context.ChannelError as e:
         raise MigrationError(
-            f"{project_dir.name} has no channel_id/channel_dna_version recorded in its "
-            f"manifest — cannot verify a channel match without a complete target binding")
+            f"cannot read {project_dir.name}'s manifest channel binding: {e}") from e
+
+    if _blank(src_channel_id) or not _valid_dna_version(src_dna_version):
+        raise MigrationError(
+            f"{legacy_path} has no channel_id, or no valid (positive integer) "
+            f"channel_dna_version, recorded in its manifest (channel_id={src_channel_id!r}, "
+            f"channel_dna_version={src_dna_version!r}) — a missing or malformed source "
+            f"channel binding is not evidence of a matching channel, refusing before any "
+            f"parsing or output creation")
+    if _blank(target_channel_id) or not _valid_dna_version(target_dna_version):
+        raise MigrationError(
+            f"{project_dir.name} has no channel_id, or no valid (positive integer) "
+            f"channel_dna_version, recorded in its manifest (channel_id={target_channel_id!r}, "
+            f"channel_dna_version={target_dna_version!r}) — cannot verify a channel match "
+            f"without a complete target binding")
     if src_channel_id != target_channel_id or src_dna_version != target_dna_version:
         raise MigrationError(
             f"{legacy_path} belongs to channel {src_channel_id!r} v{src_dna_version} but "

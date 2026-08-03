@@ -1008,6 +1008,66 @@ def s5_manifest_coverage_rejects_synthetic_identities_even_if_matching_on_both_s
           len(problems) >= 2, str(problems))  # both the route AND the manifest scene flagged
 
 
+def s5_manifest_coverage_rejects_padded_placeholder_identities():
+    """A padded UNRESOLVED-* sentinel (leading space, tab, or trailing
+    spaces) is exactly as synthetic as the unpadded form and must not
+    bypass the placeholder check merely by carrying whitespace.
+    visual_asset_id and shot_instance_id are tested independently, on both
+    the manifest side and the route side, for three distinct padding shapes."""
+    for padded in ("  UNRESOLVED-shot.png", "\tUNRESOLVED-shot.png", "UNRESOLVED-shot.png  "):
+        manifest_vid = {"scenes": [{"id": "SCENE-001", "image": "shot.png",
+                                    "visual_asset_id": padded,
+                                    "source_ids": [], "shot_instance_id": "SRC-001-I01"}]}
+        problems = vr.check_manifest_coverage([], manifest_vid)
+        check(f"a manifest scene with padded placeholder visual_asset_id {padded!r} is rejected",
+              any("visual_asset_id" in p for p in problems), str(problems))
+
+        manifest_sid = {"scenes": [{"id": "SCENE-001", "image": "shot.png",
+                                    "visual_asset_id": "VIS-001-A",
+                                    "source_ids": [], "shot_instance_id": padded}]}
+        problems2 = vr.check_manifest_coverage([], manifest_sid)
+        check(f"a manifest scene with padded placeholder shot_instance_id {padded!r} is rejected",
+              any("shot_instance_id" in p for p in problems2), str(problems2))
+
+        route_vid = _base_route(visual_asset_id=padded, source_ids=[])
+        problems3 = vr.check_manifest_coverage([route_vid], {"scenes": []})
+        check(f"a route with padded placeholder visual_asset_id {padded!r} is rejected",
+              any("visual_asset_id" in p and "placeholder" in p for p in problems3), str(problems3))
+
+
+def s5_full_path_padded_placeholder_visual_asset_id_blocks_execution():
+    """The reproduction from the review: a manifest and route both carrying
+    the same padded UNRESOLVED-* sentinel. Proves the full path, not just
+    check_manifest_coverage in isolation: schema validation alone may accept
+    the string (minLength:1 says nothing about content), but
+    validate_contract must report the identity problem and
+    execution_blockers/is_executable must both refuse to call it safe."""
+    for padded in ("  UNRESOLVED-shot.png", "\tUNRESOLVED-shot.png"):
+        route = _base_route(visual_asset_id=padded)
+        manifest = {"scenes": [{"id": route["scene_id"], "image": route["output_file"],
+                                "visual_asset_id": padded,
+                                "source_ids": route["source_ids"],
+                                "shot_instance_id": route["shot_instance_id"]}]}
+        doc = _finalize(_doc([route]))
+
+        schema_errs = vr.schema_errors(doc)
+        check(f"schema validation alone accepts a padded UNRESOLVED- visual_asset_id {padded!r}",
+              schema_errs == [], str(schema_errs))
+
+        kwargs = dict(manifest=manifest, manifest_sha256=MANIFEST_SHA,
+                      governing_channel_binding=_channel_binding(), expected_project_id="p",
+                      renderer_capabilities={"MAP": "india_geojson"}, renderer_registry=REGISTRY)
+        problems = vr.validate_contract(doc, **kwargs)
+        check(f"validate_contract reports the identity problem for padded {padded!r}",
+              len(problems) > 0, str(problems))
+
+        blockers = vr.execution_blockers(doc, **kwargs)
+        check(f"execution_blockers is non-empty for padded {padded!r}",
+              len(blockers) > 0, str(blockers))
+        check(f"is_executable is false for padded {padded!r}",
+              vr.is_executable(doc, **kwargs) is False)
+
+
 def s5_manifest_coverage_rejects_missing_or_blank_identities():
     manifest = {"scenes": [{"id": "SCENE-001", "image": "shot-01.png",
                             "visual_asset_id": None, "shot_instance_id": "SRC-001-I01"}]}
@@ -1169,7 +1229,7 @@ def s5_host_pose_missing_file_missing_hash_evidence_and_hash_mismatch():
         renderer_registry=REGISTRY, approved_poses=missing_hash,
         poses_asset_base=asset_base, poses_root=poses_root)
     check("a pose record with no sha256 evidence is rejected outright, not silently skipped",
-          any("no sha256 evidence" in p for p in problems2), str(problems2))
+          any("no valid sha256 evidence" in p for p in problems2), str(problems2))
 
     wrong_hash = {"neutral": {"status": "approved", "path": "poses/neutral.png",
                              "sha256": "0" * 64, "generic_compositing_allowed": True,
@@ -1202,6 +1262,125 @@ def s5_host_pose_missing_file_missing_hash_evidence_and_hash_mismatch():
                 poses_asset_base=asset_base, poses_root=poses_root)
             check("a symlinked pose escaping poses_root is rejected",
                   any("escapes" in p for p in problems4), str(problems4))
+
+
+def s5_asset_directory_path_malformed_hash_and_read_failure_pose_and_reference():
+    """Registry paths can identify things that are not regular files, hash
+    evidence can be malformed rather than merely absent, and the filesystem
+    can fail mid-read — none of these may raise out of validate_contract or
+    execution_blockers; each must come back as a blocker string instead.
+    Pose and reference verification share _verify_asset_path_and_hash, so
+    both are exercised independently rather than assuming the shared
+    helper's behaviour carries over untested."""
+    root = temp_root()
+    asset_base = root / "pack"
+    poses_root = asset_base / "poses"
+    (poses_root / "a_directory").mkdir(parents=True, exist_ok=True)
+    _, real_hash = _write_asset(asset_base, "poses/neutral.png")
+
+    route = _base_route(host_present=True, host_method="approved_pose_composite",
+                        host_pose_id="neutral", host_scene_bound=False,
+                        host_renderer_id="approved_pose_compositor")
+    caps = {"MAP": "india_geojson", "HOST_COMPOSITE": "approved_pose_compositor"}
+    manifest = _manifest_for(route)
+    doc = _finalize(_doc([route]))
+    kwargs = dict(manifest=manifest, manifest_sha256=MANIFEST_SHA,
+                 governing_channel_binding=_channel_binding(), expected_project_id="p",
+                 renderer_capabilities=caps, renderer_registry=REGISTRY,
+                 poses_asset_base=asset_base, poses_root=poses_root)
+
+    dir_pose = {"neutral": {"status": "approved", "path": "poses/a_directory",
+                            "sha256": real_hash, "generic_compositing_allowed": True,
+                            "includes_geometry": []}}
+    problems = vr.validate_contract(doc, approved_poses=dir_pose, **kwargs)
+    check("a pose whose registered path resolves to a directory is rejected, not crashed on",
+          any("not a regular file" in p for p in problems), str(problems))
+    blockers = vr.execution_blockers(doc, approved_poses=dir_pose, **kwargs)
+    check("execution_blockers also returns a blocker (not a raise) for a directory pose path",
+          len(blockers) > 0, str(blockers))
+
+    for bad_hash in (12345, "not-a-hex-string", "0" * 63, ""):
+        malformed = {"neutral": {"status": "approved", "path": "poses/neutral.png",
+                                 "sha256": bad_hash, "generic_compositing_allowed": True,
+                                 "includes_geometry": []}}
+        problems2 = vr.validate_contract(doc, approved_poses=malformed, **kwargs)
+        check(f"a pose with malformed sha256 evidence {bad_hash!r} is rejected, not crashed on",
+              any("no valid sha256 evidence" in p for p in problems2), str(problems2))
+
+    good_pose = {"neutral": {"status": "approved", "path": "poses/neutral.png",
+                             "sha256": real_hash, "generic_compositing_allowed": True,
+                             "includes_geometry": []}}
+    real_read_bytes = Path.read_bytes
+
+    def failing_read_bytes(self, *a, **kw):
+        if self.name == "neutral.png":
+            raise OSError("simulated filesystem read failure")
+        return real_read_bytes(self, *a, **kw)
+
+    with mock.patch.object(Path, "read_bytes", failing_read_bytes):
+        problems3 = vr.validate_contract(doc, approved_poses=good_pose, **kwargs)
+    check("a simulated read failure on an otherwise-valid pose is caught as a problem, "
+          "not raised out of validate_contract",
+          any("could not read" in p for p in problems3), str(problems3))
+    with mock.patch.object(Path, "read_bytes", failing_read_bytes):
+        blockers3 = vr.execution_blockers(doc, approved_poses=good_pose, **kwargs)
+    check("execution_blockers does not raise on a simulated read failure either",
+          len(blockers3) > 0, str(blockers3))
+
+    # ── the same three failure modes, for reference resolution ──────────
+    ref_base = root / "refs"
+    refs_root = ref_base / "reference"
+    (refs_root / "a_dir").mkdir(parents=True, exist_ok=True)
+    _, ref_hash = _write_asset(ref_base, "reference/ref1.png")
+
+    ref_route = _base_route(visual_type="ILLUSTRATION", renderer_id="flux_illustration",
+                            cost_category="paid_api", paid=True,
+                            route_args={"map": None, "chart": None, "timeline": None,
+                                        "document": None, "photo": None,
+                                        "illustration": {"prompt": "x", "style_tags": []},
+                                        "reenactment": None},
+                            host_present=True, host_method="reference_anchored_generation",
+                            host_reference_asset_ids=["ref1"])
+    ref_manifest = _manifest_for(ref_route)
+    ref_caps = {"ILLUSTRATION": "flux_illustration"}
+    ref_doc = _finalize(_doc([ref_route]))
+    ref_kwargs = dict(manifest=ref_manifest, manifest_sha256=MANIFEST_SHA,
+                      governing_channel_binding=_channel_binding(), expected_project_id="p",
+                      renderer_capabilities=ref_caps, renderer_registry=REGISTRY,
+                      references_asset_base=ref_base, references_root=refs_root)
+
+    dir_ref = {"ref1": {"status": "approved", "path": "reference/a_dir", "sha256": ref_hash}}
+    problems4 = vr.validate_contract(ref_doc, approved_references=dir_ref, **ref_kwargs)
+    check("a reference whose registered path resolves to a directory is rejected, not crashed on",
+          any("not a regular file" in p for p in problems4), str(problems4))
+    blockers4 = vr.execution_blockers(ref_doc, approved_references=dir_ref, **ref_kwargs)
+    check("execution_blockers also returns a blocker (not a raise) for a directory reference path",
+          len(blockers4) > 0, str(blockers4))
+
+    for bad_hash in (12345, "not-a-hex-string", "0" * 63, ""):
+        malformed_ref = {"ref1": {"status": "approved", "path": "reference/ref1.png",
+                                  "sha256": bad_hash}}
+        problems5 = vr.validate_contract(ref_doc, approved_references=malformed_ref, **ref_kwargs)
+        check(f"a reference with malformed sha256 evidence {bad_hash!r} is rejected, not "
+              f"crashed on", any("no valid sha256 evidence" in p for p in problems5),
+              str(problems5))
+
+    good_ref = {"ref1": {"status": "approved", "path": "reference/ref1.png", "sha256": ref_hash}}
+
+    def failing_read_bytes_ref(self, *a, **kw):
+        if self.name == "ref1.png":
+            raise OSError("simulated filesystem read failure")
+        return real_read_bytes(self, *a, **kw)
+
+    with mock.patch.object(Path, "read_bytes", failing_read_bytes_ref):
+        problems6 = vr.validate_contract(ref_doc, approved_references=good_ref, **ref_kwargs)
+    check("a simulated read failure on an otherwise-valid reference is caught as a problem, "
+          "not raised out of validate_contract",
+          any("could not read" in p for p in problems6), str(problems6))
+    with mock.patch.object(Path, "read_bytes", failing_read_bytes_ref):
+        blockers6 = vr.execution_blockers(ref_doc, approved_references=good_ref, **ref_kwargs)
+    check("execution_blockers does not raise on a simulated reference read failure either",
+          len(blockers6) > 0, str(blockers6))
 
 
 def s5_pose_contradictory_records_rejected():
@@ -1721,6 +1900,57 @@ def s6_refuses_matching_channel_id_but_mismatched_dna_version():
                   True)
 
 
+def s6_refuses_blank_or_malformed_dna_version():
+    """channel_dna_version must be a real positive integer, not merely
+    'truthy'. A digit-only string, a bool, zero, or blank/whitespace all
+    look superficially plausible but must be refused before
+    load_channel_for_project/parse_shots/any output — not left to crash
+    later with int('') or silently coerced. Tested on BOTH the source and
+    the target manifest, independently, for every malformed shape, and in
+    every case no visual_routes.json/.md is written."""
+    for bad in ("", "   ", "1", True, 0):
+        root = temp_root()
+        make_pack(root / "channels", "testchan")
+        proj = make_project(root, "proj", "testchan")
+        bad_src = root / "bad_src"
+        bad_src.mkdir(parents=True, exist_ok=True)
+        src_manifest = {"episode": "bad_src", "identity_state": "ok", "identity_reasons": [],
+                        "scenes": [], "channel_id": "testchan", "channel_dna_version": bad}
+        (bad_src / "manifest.json").write_text(json.dumps(src_manifest, indent=2), encoding="utf-8")
+        (bad_src / "image_prompts_one_line_per_prompt.md").write_text(LEGACY_PROMPTS,
+                                                                       encoding="utf-8")
+        with World(root):
+            try:
+                mig.migrate(bad_src / "image_prompts_one_line_per_prompt.md", proj)
+                check(f"a source channel_dna_version of {bad!r} is refused", False,
+                      "it succeeded")
+            except mig.MigrationError:
+                check(f"a source channel_dna_version of {bad!r} is refused", True)
+        check(f"nothing was written when source channel_dna_version was {bad!r}",
+              not (proj / vr.ROUTES_NAME).exists() and not (proj / vr.ROUTES_MD_NAME).exists())
+
+        root2 = temp_root()
+        make_pack(root2 / "channels", "testchan")
+        good_src_proj = make_project(root2, "good_src", "testchan")
+        bad_target = root2 / "bad_target"
+        bad_target.mkdir(parents=True, exist_ok=True)
+        target_manifest = {"episode": "bad_target", "identity_state": "ok",
+                           "identity_reasons": [], "scenes": [],
+                           "channel_id": "testchan", "channel_dna_version": bad}
+        (bad_target / "manifest.json").write_text(json.dumps(target_manifest, indent=2),
+                                                   encoding="utf-8")
+        with World(root2):
+            try:
+                mig.migrate(good_src_proj / "image_prompts_one_line_per_prompt.md", bad_target)
+                check(f"a target channel_dna_version of {bad!r} is refused", False,
+                      "it succeeded")
+            except mig.MigrationError:
+                check(f"a target channel_dna_version of {bad!r} is refused", True)
+        check(f"nothing was written when target channel_dna_version was {bad!r}",
+              not (bad_target / vr.ROUTES_NAME).exists()
+              and not (bad_target / vr.ROUTES_MD_NAME).exists())
+
+
 def s6_never_creates_a_missing_project_directory():
     root = temp_root()
     make_pack(root / "channels", "testchan")
@@ -1913,6 +2143,12 @@ def main() -> int:
             s5_manifest_coverage_empty_missing_extra_duplicates)
         run("5j2. synthesized UNRESOLVED-* identities are rejected even if matching on "
             "both sides", s5_manifest_coverage_rejects_synthetic_identities_even_if_matching_on_both_sides)
+        run("5j2b. padded UNRESOLVED-* placeholder identities are rejected "
+            "(visual_asset_id and shot_instance_id independently)",
+            s5_manifest_coverage_rejects_padded_placeholder_identities)
+        run("5j2c. full path: a padded placeholder visual_asset_id blocks execution "
+            "even though schema alone accepts it",
+            s5_full_path_padded_placeholder_visual_asset_id_blocks_execution)
         run("5j3. manifest scenes with missing/blank identities are rejected",
             s5_manifest_coverage_rejects_missing_or_blank_identities)
         run("5k. real approved/approved_scene_bound pose vocabulary resolves correctly",
@@ -1921,6 +2157,9 @@ def main() -> int:
             s5_host_pose_missing_record_and_bad_status_and_traversal)
         run("5m. missing file / missing hash evidence / hash mismatch rejected",
             s5_host_pose_missing_file_missing_hash_evidence_and_hash_mismatch)
+        run("5m1b. directory path / malformed hash / simulated read failure rejected for "
+            "pose AND reference, without raising",
+            s5_asset_directory_path_malformed_hash_and_read_failure_pose_and_reference)
         run("5m2. contradictory pose registry records are rejected",
             s5_pose_contradictory_records_rejected)
         run("5m3. host validation is never silently skipped when context is omitted",
@@ -1952,6 +2191,9 @@ def main() -> int:
             s6_refuses_source_channel_id_present_but_dna_version_missing)
         run("6d7. matching channel_id but mismatched channel_dna_version is refused",
             s6_refuses_matching_channel_id_but_mismatched_dna_version)
+        run("6d8. blank/whitespace/digit-string/bool/zero channel_dna_version is refused "
+            "on both source and target, nothing written",
+            s6_refuses_blank_or_malformed_dna_version)
         run("6e. migration never creates a missing project directory",
             s6_never_creates_a_missing_project_directory)
         run("6f. migration refuses an existing artifact; neither file changes",
