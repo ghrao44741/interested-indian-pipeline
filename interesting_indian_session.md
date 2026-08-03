@@ -1713,3 +1713,184 @@ Eight suites, run twice, identical, all green: `test_source_ids`,
    provenance for every PHOTO and DOCUMENT.
 4. **Semantic visual dry-run** → Checkpoint 3 approval → only then paid pilot
    generation.
+
+---
+
+## Session — 2026-08-02: Channel Pack foundation (Task 2A) + follow-up
+
+Two reviewed commits, `280f809` then `7194355`, both starting from a fresh
+review pass rather than a rubber stamp — the follow-up review found six real
+defects in the first commit, several of them exactly the "check reads the
+wrong thing, or nothing" pattern this whole project keeps rediscovering.
+
+### `280f809` — the Channel Pack itself (Task 2A)
+
+Before this, the engine *was* The Interested Indian: `generate_image_prompts.py`
+hardcoded the mascot description and palette, `channel_config.json` had nine
+top-level keys and only two were ever read, and `auto_split_scenes_v1_stage3_export.py`'s
+`BRAND_CORRECTIONS` table mixed pronunciation fixes for three different
+channels in one dict — proof the split script really is shared with sibling
+repos and had no way to say which channel an episode belonged to.
+
+New: `channels/<id>/channel.json` (schema-validated, `channels/schema/channel.schema.json`)
+is the single source of truth — brand, audience, editorial rules, narrative
+structure, host policy, character reference, voice status, renderer
+capabilities, safety rules, economics. `channel_context.py` is the only
+loader; `CHANNEL_DNA.md` and (for `interested_indian` only) the root
+`channel_config.json`/`brand.json` are generated from it and refused if they
+drift from a fresh render.
+
+Three corrected assumptions, each caught before landing:
+
+- **Containment under the pipeline root is not a boundary.** Every other
+  channel pack and every episode folder sits beneath it too, so a naive
+  check would accept `channels/other/...`. `legacy_pipeline_root` resolves
+  against an explicit allowlist of approved subtrees instead.
+- **A pending voice needs enforcement, not description.** `voice.selection_status`
+  starts `"pending"`; while pending, planning stays reachable but
+  `approve_checkpoint.py` refuses Checkpoint 3, `require_generation_ready()`
+  blocks independently as defense in depth, and production narration is
+  confined to `voice_previews/`.
+- **`--channel` is never silently dropped.** Four cases (pack present × flag
+  given), and a repo with no Channel Pack support that receives an explicit
+  `--channel` refuses rather than quietly ignoring it.
+
+Plan/approval schema bumped to v2 (deliberately not `{1, 2}` — a v1 record
+carries no channel binding at all). Both existing manifests migrated
+(`channel_id`, `channel_dna_version`), every persistent id preserved. Only
+`test_2min` was re-planned to schema 2; the pilot's stale v1 plan was left
+alone on purpose, since re-planning it would have meant clearing `SCENE-066`
+without authority to do so.
+
+Ten suites, run twice, all green; `requirements.txt`/`requirements-optional.txt`
+added as the repo's first declared dependencies, checked in both directions.
+
+### `7194355` — six defects found by independent review
+
+1. **The voice gate opened a path but never bound the content.** Once
+   *any* profile was approved, `generate_source_audio.py` would still
+   synthesise with whatever `--provider`/`--voice` was passed — the gate
+   only ever checked where the file landed. Fixed by classifying
+   **destination**, not `--preview` (which only truncates text and must
+   never confer evaluation privileges): output under the approved preview
+   root is evaluation, output under the project's `source_audio/` is
+   production and must match the approved profile exactly, anywhere else is
+   refused outright — even when approved, which the old code let through
+   unconditionally. `approved_profile` became provider-discriminated in the
+   schema (`edge`/`gemini`/`gemini_cloudtts`/`elevenlabs`/`grok`, each with
+   every field that provider's synthesis call needs) so production never
+   falls through to `legacy_config`.
+2. **Nothing proved the audio was actually produced by the approved
+   voice.** Production narration now writes a full-binding sidecar
+   (`schema_version`, `channel_id`, `voice_profile_sha256`, `effective_profile`,
+   `audio_sha256`), atomically, fatal on write failure. The split stage
+   requires and verifies it — channel, profile hash, audio hash — before
+   transcription, and derives manifest voice fields from the verified
+   sidecar rather than a free-form `--voice` claim (`manifest["voice"]`
+   keeps its existing string meaning; the full profile and hashes live in
+   new `narration_*` fields). One shared `generation_gate.narration_binding_problems()`
+   is called by both `require_generation_ready()` and
+   `approve_checkpoint.write_approval()` — approval can no longer be
+   granted over unverifiable audio only to fail later at dispatch. A late
+   amendment closed the gap a hash-only check would still have left: a
+   recorded hash can be the *correct, current* one while
+   `effective_profile` sitting next to it has been edited to different
+   settings — so every verification also recomputes
+   `canonical_sha256(effective_profile)` and requires it to equal both the
+   recorded hash and the channel's current one, and requires
+   `effective_profile` to equal the canonical `approved_profile` exactly,
+   not merely hash-match it.
+3. **`--channel` could override a manifest's own assignment.**
+   Reproduced: a project whose manifest said `alpha` resolved narration
+   under `beta` because `channel_for_voice()` checked the CLI flag first.
+   Reordered — the manifest wins outright; an explicit flag may confirm it
+   but never override it.
+4. **The preview directory itself had no containment check.**
+   `preview_dir: "../outside"` loaded and resolved outside the pipeline.
+   Given the same `{path, path_kind}` treatment as `character.spec_path`,
+   against its own allowlist (`voice_previews/`) — separate from the
+   character tree's, so neither can resolve into the other.
+5. **The split script's refusals didn't reach the process exit code.**
+   `main()` returning 2 with a bare `if __name__ == "__main__": main()`
+   meant automation saw exit 0. Now `sys.exit(main())`.
+6. **Master/reference containment was checked against the wrong root.**
+   The plan's own draft would have checked `_asset_base(context)`, which
+   turned out to be the *pipeline root* for a legacy-kind channel — every
+   episode and every other pack sit beneath that too, so a cross-channel
+   master reference would have passed as long as the hash also matched.
+   Corrected to `context.character_spec_path.parent`, the channel's actual
+   character directory. Also added: rejection of forbidden subdirectories
+   (`archive/`, `pose_candidates/`, `pose_sources/`) even though they sit
+   under an otherwise-approved tree, and cross-checking the top-level
+   `references.body_master`/`references.face_master` pointers against
+   their `masters.*` counterparts by path and hash — `generate_poses.py`
+   reads the former, the gate read only the latter, and nothing previously
+   required them to agree.
+
+Two bugs the new tests caught mid-implementation, fixed in the same commit:
+an `UnboundLocalError` when a production write's provider left
+`args_speaking_rate`/`args_speed` unset (only the active provider's own
+branch initialised them); and `_check_masters`/`_check_pose_registry`
+crashing outright on a host-disabled channel, surfaced by the new
+host-disabled narration fixtures — both now skip cleanly when
+`context.host_enabled` is false.
+
+Two reporting corrections, both addressed without a code change:
+`interesting_indian_session.md` was verified absent from `280f809` (`git
+diff a607130 280f809 -- interesting_indian_session.md` — it landed earlier,
+in `a607130` itself); `anthropic`/`matplotlib`/`mutagen`/`pydub` are in
+`requirements-optional.txt` rather than core, which should have been
+disclosed at the time it happened rather than left implicit — the
+classification itself is accurate (nothing on the test/gate/plan path
+imports them) and is now commented as such in both requirement files.
+
+New suite `tests/test_narration_binding.py`; three existing suites updated
+for the new `approved_profile` shape. Split-stage subprocess regressions run
+against stub `whisperx`/`torch` modules (`tests/fixtures/stub_modules/`) —
+this environment has neither installed and the script imports both
+unconditionally, so the stubs are required just to run the process at all,
+and double as the "transcription never reached" sentinel via a
+`WHISPERX_STUB_SENTINEL`-named file.
+
+### State
+
+Eleven suites, run twice, identical, all green: the ten Task 1/2A suites
+(`test_source_ids`, `test_pose_registry`, `test_pose_cli_hardening`,
+`test_replacement_candidate`, `test_no_runtime_globbing`,
+`test_generation_gate`, `test_approval_gate`, `test_route_binding`,
+`test_channel_context`, `test_dependencies`) plus
+`test_narration_binding`.
+
+- **pilot_neet_scandal** — blocked on `SCENE-066` at both gates, independently
+  of its stale schema-1 plan (the gate reports both, so neither masks the
+  other). Not re-planned; not to be cleared by hand.
+- **test_2min** — identity-ready; generation blocked on missing approval and,
+  now, the narration-binding gap (no narration has ever been produced through
+  the new channel-bound path).
+- Both projects' `channel.json`-derived state: `interested_indian`, DNA v1,
+  voice `selection_status: "pending"` — the voice decision remains the actual
+  blocker underneath all of this.
+
+### Pending — next session, in order
+
+1. **Voice decision — still the blocker.** Thirteen candidates in
+   `voice_previews/`. Nothing downstream moves without it — and now, once
+   chosen, the decision must be recorded as `voice.approved_profile` in
+   `channels/interested_indian/channel.json` (provider + full settings) for
+   any of the new production machinery to accept it.
+2. **Re-narrate** through `generate_source_audio.py`'s production path (not a
+   manually supplied file) → produces a verified sidecar → **re-split**
+   through `auto_split_scenes_v1_stage3_export.py`, which now verifies that
+   sidecar and records the binding into the manifest → clears the
+   `SCENE-066` identity block along the way if the re-narration also fixes
+   the underlying alignment gap.
+3. **Task 2B (unauthorized)** — structured `visual_routes.json` replacing the
+   one-line prompts markdown; semantic routing rules (MAP/CHART/TIMELINE/
+   DOCUMENT/PHOTO/REENACTMENT/ILLUSTRATION) with `host_present`/`host_mode`
+   kept independent of `visual_type`; strip the hardcoded mascot description
+   and channel-specific prose out of `generate_image_prompts.py`/
+   `generate_images_flux.py`/`review_images.py` in favour of reading the
+   Channel Pack; deterministic DOCUMENT/TIMELINE renderers; provenance for
+   every PHOTO and DOCUMENT.
+4. **Semantic visual dry-run** → Checkpoint 3 approval → only then paid pilot
+   generation.
