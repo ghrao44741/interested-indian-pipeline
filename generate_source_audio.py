@@ -1147,12 +1147,14 @@ async def main():
     parser.add_argument("--script",    help="Path to narration .txt file")
     parser.add_argument("--provider",  default=None,
                         choices=["gemini_cloudtts", "gemini", "elevenlabs", "grok", "edge"],
-                        help=f"TTS provider (default from channel_config: {DEFAULT_PROVIDER}). "
-                             f"For a production write, must match the approved profile, "
-                             f"or be omitted.")
+                        help="TTS provider. For an evaluation write, defaults to the "
+                             "selected Channel Pack's voice.working_default and must "
+                             "match its provider, or be omitted. For a production write, "
+                             "must match the approved profile, or be omitted.")
     parser.add_argument("--voice",     default=None,
-                        help="Voice ID (ElevenLabs) or voice name (Edge TTS). Defaults from "
-                             "channel_config.json for evaluation; must match the approved "
+                        help="Voice ID (ElevenLabs/Grok) or voice name (everything else). "
+                             "For an evaluation write, defaults to the selected Channel "
+                             "Pack's voice.working_default; must match the approved "
                              "profile, or be omitted, for a production write.")
     parser.add_argument("--out",       default=None,
                         help="Explicit output path. Honored exactly as given — preview "
@@ -1266,6 +1268,7 @@ async def main():
     # bare-filename shorthand); a --preview run with no --out defaults into
     # the channel's own preview directory, so the natural way to run a
     # preview lands somewhere evaluation is actually allowed.
+    _cached_evaluation_effective = None
     if args.out is not None:
         output_filename = args.out
         out_path = Path(output_filename)
@@ -1285,8 +1288,23 @@ async def main():
         else:
             intended = SCRIPT_DIR / args.project / "source_audio" / output_filename
     elif args.preview:
+        # The default filename must name the voice this run will ACTUALLY use
+        # — the channel's own resolved evaluation profile (working_default,
+        # with any applicable same-provider CLI override already applied) —
+        # never this module's legacy DEFAULT_PROVIDER/DEFAULT_VOICE_*
+        # constants, which describe Interested Indian's generated legacy
+        # adapter regardless of which channel actually governs this run. An
+        # omitted --out during --preview always resolves into the channel's
+        # OWN preview directory (right below), so this destination is always
+        # evaluation — resolving the profile here rather than after mode
+        # classification only moves an already-required refusal (null
+        # working_default / a mismatched --provider) earlier, never later.
+        # Cached so the mode-branch resolution further down reuses it
+        # instead of resolving twice.
+        _cached_evaluation_effective = _resolve_evaluation_voice(args, channel)
+        preview_voice_label = _unpack_effective_profile(_cached_evaluation_effective)["voice"]
         rate_tag = f"_rate{int(args.speaking_rate * 100)}" if args.speaking_rate is not None else ""
-        output_filename = f"preview_{voice[:20].replace('/', '_')}{rate_tag}.mp3"
+        output_filename = f"preview_{preview_voice_label[:20].replace('/', '_')}{rate_tag}.mp3"
         intended = channel.voice_preview_dir / output_filename
     else:
         output_filename = "narration.mp3"
@@ -1370,8 +1388,12 @@ async def main():
         # this module's DEFAULT_* constants, which describe Interested
         # Indian's generated legacy adapter specifically. Refuses before
         # mkdir/credentials/clients if there is no working_default, or if an
-        # explicit --provider conflicts with it.
-        effective = _resolve_evaluation_voice(args, channel)
+        # explicit --provider conflicts with it. Reuses the resolution
+        # already done above for the default preview filename, if that ran —
+        # same args/channel, so recomputing it would only be redundant, never
+        # different.
+        effective = (_cached_evaluation_effective if _cached_evaluation_effective is not None
+                    else _resolve_evaluation_voice(args, channel))
         unpacked = _unpack_effective_profile(effective)
         cli_provider = requested_provider = unpacked["provider"]
         voice = unpacked["voice"]

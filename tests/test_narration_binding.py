@@ -1369,6 +1369,168 @@ def s33_schema_rejects_malformed_working_default():
     check("a genuinely complete working_default validates", True)
 
 
+# ── 12. Task 2B-A final micro-fix: the default --preview filename reflects ─
+# ── the resolved channel profile, not this module's legacy constants ───────
+
+def s34_preview_default_filename_reflects_second_channel_edge_profile():
+    """Reproduced before this fix: dispatch already used the channel's own
+    working_default voice, but an omitted --preview --out still built its
+    default filename from DEFAULT_VOICE_EDGE ('en-US-GuyNeural') — misleading,
+    and a cross-channel collision risk when preview roots are shared."""
+    root = temp_root()
+    wd = {"provider": "edge",
+         "settings": {"voice": "SecondChannelVoice", "rate": "+22%", "pitch": "+4Hz"},
+         "approved": False}
+    make_pack(root / "channels", "beacon", voice_approved=False, working_default=wd)
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+
+    captured = {}
+
+    async def _capturing_edge(text, voice, output_path, rate=None, pitch=None):
+        captured["voice"], captured["rate"], captured["pitch"] = voice, rate, pitch
+        Path(output_path).write_bytes(b"ID3fake mp3 bytes for a test\n")
+
+    with World(root):
+        code = _run_main_ex(["--project", str(proj), "--script", str(script),
+                             "--preview", "1"], edge_fn=_capturing_edge)
+    check("preview with no --provider/--voice/--out succeeds", code == 0, f"exit={code}")
+    check("dispatch received the channel's working_default voice",
+          captured.get("voice") == "SecondChannelVoice", captured)
+    check("dispatch received the channel's working_default rate",
+          captured.get("rate") == "+22%", captured)
+    check("dispatch received the channel's working_default pitch",
+          captured.get("pitch") == "+4Hz", captured)
+
+    written = list((root / "voice_previews").glob("preview_*.mp3"))
+    check("exactly one preview file was written under the channel's preview dir",
+          len(written) == 1, written)
+    filename = written[0].name if written else ""
+    check("the default filename contains the channel's effective voice",
+          "SecondChannelVoice" in filename, filename)
+    check("the default filename does NOT contain the legacy module default voice",
+          gsa.DEFAULT_VOICE_EDGE not in filename, filename)
+
+    sidecar = json.loads(Path(f"{written[0]}.voice.json").read_text(encoding="utf-8"))
+    check("sidecar names the channel", sidecar.get("channel_id") == "beacon", sidecar)
+    check("sidecar's voice matches what actually ran",
+          sidecar.get("voice") == "SecondChannelVoice", sidecar)
+
+
+def s35_preview_default_filename_voice_id_provider():
+    """Same proof for a voice_id-keyed provider (elevenlabs) — the default
+    filename must use the provider-discriminated label (voice_id, not
+    voice), not just get it right in dispatch."""
+    root = temp_root()
+    wd = {"provider": "elevenlabs",
+         "settings": {"voice_id": "SecondChannelElevenId", "model": "wd-model",
+                     "stability": 0.4, "similarity_boost": 0.6, "speed": 1.0},
+         "approved": False}
+    make_pack(root / "channels", "beacon", voice_approved=False, working_default=wd)
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+
+    call = mock.Mock(return_value=b"raw-mp3-bytes")
+    with mock.patch.dict(os.environ, {"ELEVENLABS_API_KEY": "test-key"}):
+        with World(root):
+            code = _run_main_ex(
+                ["--project", str(proj), "--script", str(script), "--preview", "1"],
+                patches=[mock.patch.object(gsa, "_elevenlabs_call", call)])
+    check("preview with no --out succeeds for a voice_id provider", code == 0, f"exit={code}")
+    args = call.call_args.args
+    check("dispatch received the channel's working_default voice_id",
+          args[1] == "SecondChannelElevenId", args)
+
+    written = list((root / "voice_previews").glob("preview_*.mp3"))
+    check("exactly one preview file was written", len(written) == 1, written)
+    filename = written[0].name if written else ""
+    check("the default filename contains the voice_id-provider's effective voice "
+         "(truncated to 20 chars, same as the preserved filename format)",
+          "SecondChannelElevenId"[:20] in filename, filename)
+    check("the default filename does NOT contain the legacy module default voice",
+          gsa.DEFAULT_VOICE_EL not in filename, filename)
+
+
+def s36_preview_default_filename_respects_same_provider_voice_override():
+    root = temp_root()
+    wd = {"provider": "edge",
+         "settings": {"voice": "WdVoice", "rate": "+0%", "pitch": "+0Hz"},
+         "approved": False}
+    make_pack(root / "channels", "beacon", voice_approved=False, working_default=wd)
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+
+    captured = {}
+
+    async def _capturing_edge(text, voice, output_path, rate=None, pitch=None):
+        captured["voice"] = voice
+        Path(output_path).write_bytes(b"ID3fake mp3 bytes for a test\n")
+
+    with World(root):
+        code = _run_main_ex(["--project", str(proj), "--script", str(script),
+                             "--preview", "1", "--provider", "edge",
+                             "--voice", "OverriddenVoice"], edge_fn=_capturing_edge)
+    check("preview with a same-provider --voice override succeeds", code == 0, f"exit={code}")
+    check("dispatch used the OVERRIDE voice, not the working_default's",
+          captured.get("voice") == "OverriddenVoice", captured)
+
+    written = list((root / "voice_previews").glob("preview_*.mp3"))
+    check("exactly one preview file was written", len(written) == 1, written)
+    filename = written[0].name if written else ""
+    check("the default filename names the OVERRIDE voice, not the working_default's",
+          "OverriddenVoice" in filename and "WdVoice" not in filename, filename)
+
+
+def s37_preview_default_no_out_null_working_default_refused_early():
+    """F: the null-working_default refusal must still fire — and still
+    before mkdir/credentials/clients/writes — even through the NEW code path
+    (an omitted --preview --out), not only through an explicit --out."""
+    root = temp_root()
+    make_pack(root / "channels", "beacon", voice_approved=True, working_default=None)
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+
+    called = {"n": 0}
+
+    async def _tracking_edge(*a, **k):
+        called["n"] += 1
+        return await _fake_edge_generate(*a, **k)
+
+    with World(root):
+        code = _run_main_ex(["--project", str(proj), "--script", str(script),
+                             "--preview", "1"], edge_fn=_tracking_edge)
+    check("a null working_default is refused even for the default preview filename path",
+          code != 0, f"exit={code}")
+    check("nothing was synthesised", called["n"] == 0)
+    check("no preview directory was created", not (root / "voice_previews").exists())
+
+
+def s38_preview_default_no_out_mismatched_provider_refused_early():
+    """F: same, for the mismatched---provider refusal."""
+    root = temp_root()
+    wd = {"provider": "edge",
+         "settings": {"voice": "WdVoice", "rate": "+0%", "pitch": "+0Hz"},
+         "approved": False}
+    make_pack(root / "channels", "beacon", voice_approved=False, working_default=wd)
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+
+    called = {"n": 0}
+
+    async def _tracking_edge(*a, **k):
+        called["n"] += 1
+        return await _fake_edge_generate(*a, **k)
+
+    with World(root):
+        code = _run_main_ex(["--project", str(proj), "--script", str(script),
+                             "--preview", "1", "--provider", "grok"],
+                            edge_fn=_tracking_edge)
+    check("a mismatched --provider is refused even for the default preview filename path",
+          code != 0, f"exit={code}")
+    check("nothing was synthesised", called["n"] == 0)
+    check("no preview directory was created", not (root / "voice_previews").exists())
+
+
 def s23_split_audio_symlink_escape_refused():
     root = temp_root()
     proj = root / "symlink_proj"
@@ -1477,6 +1639,16 @@ def main() -> int:
             s32_evaluation_null_working_default_refused)
         run("33. the schema rejects malformed working_default shapes",
             s33_schema_rejects_malformed_working_default)
+        run("34. the default preview filename reflects the channel's edge profile",
+            s34_preview_default_filename_reflects_second_channel_edge_profile)
+        run("35. the default preview filename handles a voice_id provider",
+            s35_preview_default_filename_voice_id_provider)
+        run("36. the default preview filename respects a same-provider --voice override",
+            s36_preview_default_filename_respects_same_provider_voice_override)
+        run("37. a null working_default is refused via the default preview filename path",
+            s37_preview_default_no_out_null_working_default_refused_early)
+        run("38. a mismatched --provider is refused via the default preview filename path",
+            s38_preview_default_no_out_mismatched_provider_refused_early)
     finally:
         for td in _temps:
             import shutil
