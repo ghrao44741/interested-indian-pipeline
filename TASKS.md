@@ -258,6 +258,17 @@ Post-upload (manual in YouTube Studio):
   Low urgency; more a habit to try on a photo-heavy episode than a code change (maybe a
   `--skip-photos` flag at most). From the VideoClaude/Arcads workflow-doc review (2026-07-28).
 
+- [ ] **#18** (Task 2B) Evaluation defaults should come from the Channel Pack, not module
+  `DEFAULT_*` constants — `generate_source_audio.py`'s evaluation path (an omitted
+  `--provider`/`--voice`) still falls back to `DEFAULT_PROVIDER`/`DEFAULT_VOICE_*`, which are
+  read from the root `channel_config.json` at import time — the generated legacy adapter for
+  `interested_indian` specifically, not the loaded Channel Pack's own `voice.working_default`.
+  A second channel with no legacy adapter would get Interested Indian's defaults instead of its
+  own, silently. Flagged during the second Task 2A follow-up review (2026-08-02) alongside the
+  `--preview`/full-profile-forwarding/cloudtts-fallback/split-containment fixes in `e8744f7` and
+  `5fdc828` — explicitly scoped OUT of that micro-fix and deferred to Task 2B, which already
+  owns migrating evaluation-path behavior onto the Channel Pack.
+
 ## Done
 
 - [x] Build `review_images.py` — AI image QA, 8-check rubric, Claude Haiku vision
