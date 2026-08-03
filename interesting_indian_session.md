@@ -2191,3 +2191,111 @@ producer, no dispatcher, no gate. The two intentional ZIP deletions
    writer (`generate_document.py`/`generate_timeline.py` don't exist yet;
    `visual_routes.validate_provenance_sidecar()` only validates shape, no
    writer exists until a dispatcher needs one).
+
+## Session — 2026-08-03 (continued): Task 2B-B1 final corrective follow-up
+
+`9abf6a6` (the corrective round above) was reviewed again and REJECTED with
+an 8-point list. Fixed in one more follow-up commit, same four files
+(`channels/schema/visual_routes.schema.json`, `visual_routes.py`,
+`migrate_routes_from_markdown.py`, `tests/test_visual_routes.py`) —
+`9abf6a6` and its ancestors untouched, nothing amended/rebased.
+
+### What changed
+
+- **Exact manifest coverage, no status exemption.** The previous round's
+  "extra route" check was scoped to `status == "READY"` only, so a
+  `NEEDS_REVIEW` route carrying a synthetic `UNRESOLVED-*` id could sit in a
+  written artifact forever without ever being caught. That scoping is gone:
+  every route, regardless of status, must correspond to a real manifest
+  identity now. `_is_placeholder_identity()` (new) rejects missing/null/
+  blank/`UNRESOLVED-*` values directly, on both the manifest and route side,
+  even when the exact same placeholder string coincidentally appears on
+  both — coincidence of a sentinel is not identity. Manifest scenes missing
+  `visual_asset_id` or `shot_instance_id` are now flagged directly instead of
+  silently excluded. Duplicate detection uses `Counter`s throughout, not set
+  sizes, so duplicates can't be hidden by set collapse. Consequence: the
+  migration fixture's "normal successful" case now needs a real manifest
+  identity for every legacy row (previously one row, `SCENE-009`, was left
+  deliberately unresolved) — that row now resolves like any other PHOTO
+  shot, and a genuinely unmatched row gets its own dedicated refusal test
+  instead of being tolerated as a `NEEDS_REVIEW` placeholder in a written
+  artifact.
+- **Executability can no longer be spoofed by a bare dict.** The old
+  `execution_blockers(doc)`/`is_executable(doc)` took only a document and
+  checked route status — so a hand-built or corrupted dict claiming
+  `status: "READY", renderer_id: null` (which is schema-invalid) reported
+  zero blockers. Both functions now require the full validation context
+  (manifest, hashes, channel binding, project id, renderer registry, host
+  asset registries) and run, in order: `schema_errors()` first (a
+  schema-invalid doc's problems are returned immediately, nothing further is
+  trustworthy), then `validate_contract()`, then the per-route
+  `NEEDS_REVIEW` status check folded in as the last ingredient. The old
+  status-only check survives only as a private `_status_only_blockers()`
+  helper — never exported as something that alone answers "is this
+  executable."
+- **Host-field leakage fully closed.** `host_present=false`'s schema
+  `then`-block previously nulled four of six host-dependent fields; it now
+  nulls `host_renderer_id` and `host_placement` too, with six independent
+  per-field regressions (one leak in isolation each).
+- **Real pose semantics, not just status/path/hash.** `_verify_approved_asset`
+  split into `_verify_asset_path_and_hash` (shared path/existence/hash logic)
+  plus two callers: `_verify_approved_pose` (new, strict) and
+  `_verify_approved_reference` (the old simpler behaviour, kept for
+  references only). `_verify_approved_pose` now enforces the registry
+  record's own internal honesty: `status=approved` requires
+  `generic_compositing_allowed is True` exactly and `includes_geometry`
+  absent or empty (contradictory record otherwise), plus the route's own
+  `host_scene_bound` must be exactly `False`; `status=approved_scene_bound`
+  requires `generic_compositing_allowed is False` exactly and a non-empty
+  `includes_geometry` list, plus `host_scene_bound` exactly `True`.
+  `host_scene_bound` is passed through **uncoerced** — a malformed value
+  (`None`, the string `"true"`, anything but the literal bool required) is
+  itself a rejection, never normalised with `bool(...)` first. This is
+  stricter than the real `pose_registry.resolve()`, deliberately: the
+  contract validator judges the record's truthfulness as well as the
+  route's fit for it. References carry none of this vocabulary — any
+  `approved`/`approved_scene_bound` status is accepted equally, unambiguously,
+  with only path/hash integrity checked beyond that.
+- **Host validation is never silently skipped when context is omitted.**
+  Confirmed (and now directly regression-tested) that omitting
+  `approved_poses`/`approved_references`/asset-base/root entirely still
+  blocks a route that requests `approved_pose_composite` or
+  `reference_anchored_generation` — a missing record or missing containment
+  root is itself a failure, never a silent pass.
+- **Provable source-channel identity.** Migration's cross-channel check
+  previously only fired when the legacy and target directories differed,
+  and silently passed if either channel id was `None`. It's now
+  unconditional: both the source and target manifests must carry a
+  non-blank `channel_id` **and** `channel_dna_version` before anything is
+  compared, and both fields must match exactly — a missing source binding
+  is refused outright, not treated as "presumably the same channel."
+- **`project_id` is now bound.** `validate_contract()` takes a required
+  `expected_project_id` and rejects a document whose own `project_id`
+  doesn't match — a routing artifact copied from another project now fails
+  even if its manifest and Channel Pack otherwise check out. Migration
+  passes `project_dir.name`.
+
+### State
+
+New commit verified against remote. `tests/test_visual_routes.py` passes
+twice, byte-identical, zero failures (now well over 60 individual checks).
+All eleven existing suites pass twice; `test_channel_context` and
+`test_narration_binding` show only the same pre-existing tempdir-name/
+set-order nondeterminism as every prior round. Clean-tree gate comparison
+(`git archive HEAD` before vs. the four files overlaid after, both run from
+a scratch checkout) is identical in both directions: **pilot_neet_scandal**
+identity `BLOCKED (2)`, generation `BLOCKED (9)`; **test_2min** identity
+`ready`, generation `BLOCKED (4)` — same as every prior round's measured
+numbers, still not the `BLOCKED (10)`/`BLOCKED (6)` the reviewer has stated
+as expected each time; flagged again rather than silently reconciled, since
+these four files still aren't wired into anything the gate reads. `git diff
+--check` clean. No `visual_routes.json`/`.md` in any real project. No real
+provider/API/TTS/gcloud/WhisperX/GPU call anywhere. Both ZIP deletions
+untouched.
+
+### Pending — unchanged from the section above
+
+Same six items — voice decision, re-narrate/re-split, Task 2B-B2 (still
+unauthorized), producer integration, semantic routing, deterministic
+DOCUMENT/TIMELINE renderers + provenance-sidecar writer. Nothing in this
+follow-up round touched that list.
