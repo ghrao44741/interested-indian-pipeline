@@ -107,6 +107,12 @@ DEFAULT_SPEED_GROK    = _voice_cfg.get("grok_speed", 1.0)         # generation-t
 GROK_TTS_URL = "https://api.x.ai/v1/tts"
 GROK_CHUNK_LIMIT = 14500  # xAI's documented hard limit is 15,000 chars/request; buffer for safety
 
+PRODUCTION_TARGET_LUFS = -14.0  # fixed pipeline invariant for every production write —
+                                  # deliberately NOT sourced from channel_config.json or
+                                  # any per-channel legacy adapter, so a channel cannot
+                                  # accidentally (or silently) loosen this by editing its
+                                  # generated compatibility file.
+
 TARGET_LUFS = _voice_cfg.get("target_lufs", -14.0)  # broadcast/streaming-standard loudness
                                                        # target — normalized once here, on the
                                                        # single master narration file, so every
@@ -657,21 +663,37 @@ def cloudtts_generate(text: str, voice: str, output_path: str,
                        model: str = DEFAULT_MODEL_CLOUDTTS,
                        locale: str = DEFAULT_LOCALE_CLOUDTTS,
                        style_prompt: str = DEFAULT_STYLE_CLOUDTTS,
-                       speaking_rate: float | None = None) -> list[float]:
+                       speaking_rate: float | None = None,
+                       strict: bool = False) -> tuple[list[float], str]:
     """Generate full narration via Cloud TTS (Gemini 3.1 + locale + style prompt),
     chunking long scripts and concatenating MP3 chunks via the same helper the
-    ElevenLabs path uses. Returns chunk-boundary timestamps (seconds), or [] if
-    the script fit in a single request, or [] if it fell back to 'gemini' provider
-    (which does its own chunking untracked).
+    ElevenLabs path uses. Returns (chunk-boundary timestamps in seconds — [] if
+    the script fit in a single request, provider actually used).
+
+    strict=True (production) refuses outright when no gcloud token is available,
+    rather than falling back to plain 'gemini' — an approved gemini_cloudtts
+    profile must never silently synthesize through a different provider that
+    drops its model/locale/style, with the sidecar still claiming Cloud TTS ran.
+    strict=False (evaluation) keeps the fallback; the caller must record the
+    returned provider in the sidecar rather than assuming it matches what was
+    requested.
     """
     access_token, project = _get_gcloud_access_token()
     if not access_token:
+        if strict:
+            print("❌ production narration requires gemini_cloudtts, but no gcloud "
+                  "access token is available (gcloud not installed, or not "
+                  "authenticated — run: gcloud auth login). Refusing rather than "
+                  "silently falling back to plain 'gemini', which would use the "
+                  "wrong model/locale/style under an approved Cloud TTS profile. "
+                  "Nothing was synthesised.")
+            sys.exit(1)
         print("⚠  Could not get a gcloud access token (gcloud not installed, or not")
         print("   authenticated — run: gcloud auth login). gemini_cloudtts needs gcloud;")
         print("   falling back to the 'gemini' provider (Gemini Developer API — no")
         print("   locale/style control, but works with just GEMINI_API_KEY).")
         gemini_generate(text, voice, output_path, speaking_rate=speaking_rate)
-        return []
+        return [], "gemini"
 
     rate_label = f"  speaking_rate={speaking_rate}" if speaking_rate is not None else ""
     chunks = _split_into_chunks(text, max_chars=CLOUDTTS_CHUNK_LIMIT)
@@ -685,7 +707,7 @@ def cloudtts_generate(text: str, voice: str, output_path: str,
                                       access_token, project, speaking_rate)
         Path(output_path).write_bytes(audio_bytes)
         print(f"  ✓ Chunk 1/1 done")
-        return []
+        return [], "gemini_cloudtts"
 
     tmp_dir = Path(output_path).parent / "_cloudtts_chunks"
     tmp_dir.mkdir(exist_ok=True)
@@ -708,7 +730,7 @@ def cloudtts_generate(text: str, voice: str, output_path: str,
         p.unlink(missing_ok=True)
     tmp_dir.rmdir()
     print(f"  ✓ Concatenation done")
-    return boundaries
+    return boundaries, "gemini_cloudtts"
 
 
 # ── Edge TTS provider ──────────────────────────────────────────────────────────
@@ -994,8 +1016,12 @@ async def main():
                         help="Voice ID (ElevenLabs) or voice name (Edge TTS). Defaults from "
                              "channel_config.json for evaluation; must match the approved "
                              "profile, or be omitted, for a production write.")
-    parser.add_argument("--out",       default="narration.mp3",
-                        help="Output filename inside {project}/source_audio/")
+    parser.add_argument("--out",       default=None,
+                        help="Explicit output path. Honored exactly as given — preview "
+                             "or not — never silently rewritten or redirected. Omit to "
+                             "get the default for the mode you're in: a full-script run "
+                             "defaults to {project}/source_audio/narration.mp3; a "
+                             "--preview run defaults to the channel's preview directory.")
     parser.add_argument("--preview",   type=int, metavar="N", default=None,
                         help="Synthesize only the first N sentences (for quick A/B voice testing)")
     parser.add_argument("--list-voices", action="store_true",
@@ -1074,19 +1100,50 @@ async def main():
 
     if args.preview:
         text = first_n_sentences(text, args.preview)
-        rate_tag = f"_rate{int(args.speaking_rate * 100)}" if args.speaking_rate is not None else ""
-        output_filename = f"preview_{voice[:20].replace('/', '_')}{rate_tag}.mp3"
         print(f"\nGenerating voice preview ({args.preview} sentence(s))")
     else:
-        output_filename = args.out
         print(f"\nGenerating full-script voiceover")
 
-    # If --out is absolute or no --project given, use it directly; else put in project/source_audio/
-    out_path = Path(output_filename)
-    if out_path.is_absolute() or not args.project:
-        intended = out_path
+    # Resolve the channel BEFORE choosing a default output — the preview
+    # default destination is the channel's own preview directory, so the
+    # channel has to exist first.
+    project_root = (Path(__file__).parent / args.project) if args.project else None
+    try:
+        channel = channel_context.channel_for_voice(project_dir=project_root,
+                                                     requested=args.channel)
+    except channel_context.ChannelError as e:
+        print(f"\ncannot determine the channel governing this narration: {e}",
+              file=sys.stderr)
+        sys.exit(1)
+
+    # ── Output path resolution ───────────────────────────────────────────────
+    # An explicit --out is honored EXACTLY as given, preview or not — it is
+    # never silently rewritten or redirected, and never has project/
+    # source_audio/ prepended behind the operator's back (that used to happen
+    # unconditionally for a bare filename; it still does for a bare filename,
+    # but only when that's genuinely the default, not when --out was typed).
+    # Only an OMITTED --out gets a default, and the default depends on mode:
+    # a full-script run defaults to {project}/source_audio/narration.mp3 (the
+    # existing bare-filename shorthand); a --preview run with no --out
+    # defaults into the channel's own preview directory, so the natural way
+    # to run a preview lands somewhere evaluation is actually allowed.
+    if args.out is not None:
+        output_filename = args.out
+        out_path = Path(output_filename)
+        if out_path.is_absolute() or not args.project:
+            intended = out_path
+        else:
+            intended = Path(__file__).parent / args.project / "source_audio" / output_filename
+    elif args.preview:
+        rate_tag = f"_rate{int(args.speaking_rate * 100)}" if args.speaking_rate is not None else ""
+        output_filename = f"preview_{voice[:20].replace('/', '_')}{rate_tag}.mp3"
+        intended = channel.voice_preview_dir / output_filename
     else:
-        intended = Path(__file__).parent / args.project / "source_audio" / output_filename
+        output_filename = "narration.mp3"
+        if args.project:
+            intended = Path(__file__).parent / args.project / "source_audio" / output_filename
+        else:
+            intended = Path(output_filename)
 
     # ── Voice gate ──────────────────────────────────────────────────────────
     # Runs before the directory is created, before any credential is read,
@@ -1098,21 +1155,28 @@ async def main():
     # voice_previews/ is still evaluation; a --preview run targeting the
     # project's source_audio/ is still production and is held to the approved
     # profile exactly like a full run.
-    project_root = (Path(__file__).parent / args.project) if args.project else None
     try:
-        channel = channel_context.channel_for_voice(project_dir=project_root,
-                                                     requested=args.channel)
         mode, output_path_p = channel_context.classify_voice_output(
             channel, intended, project_dir=project_root)
     except channel_context.VoiceNotApproved as e:
         print(f"\n{e}", file=sys.stderr)
         print("\nNothing was synthesised.", file=sys.stderr)
         sys.exit(1)
-    except channel_context.ChannelError as e:
-        print(f"\ncannot determine the channel governing this narration: {e}",
-              file=sys.stderr)
-        sys.exit(1)
     output_path = str(output_path_p)
+
+    # A truncated preview must never become canonical narration — refuse
+    # before anything else happens, regardless of how --out got there.
+    if mode == "production" and args.preview:
+        print(f"\n✗ --preview cannot target a production destination "
+              f"({output_path}) — a one-sentence clip must never become "
+              f"canonical narration. Preview into {channel.voice_preview_dir} "
+              f"instead. Nothing was synthesised.", file=sys.stderr)
+        sys.exit(1)
+
+    # Model/locale/style/stability/similarity/language: only the active
+    # provider's fields are meaningful, but every name the dispatch below
+    # reads must exist regardless of which provider that is.
+    model = locale = style_prompt = stability = similarity = language = None
 
     if mode == "production":
         # Every generation-affecting value comes from the approved profile.
@@ -1122,21 +1186,43 @@ async def main():
         # one, regardless of what --out happens to point at.
         effective = _resolve_production_voice(args, channel)
         cli_provider = effective["provider"]
-        # Only the active provider's fields are meaningful, but every name the
-        # dispatch below reads must exist regardless of which provider that
-        # is — an edge profile leaves args_speaking_rate/args_speed unset by
-        # the branches above otherwise, which is exactly how this broke.
         args_edge_rate = args_edge_pitch = None
         args_speaking_rate = args_speed = None
         if cli_provider == "edge":
             voice, args_edge_rate, args_edge_pitch = (
                 effective["voice"], effective["rate"], effective["pitch"])
-        elif cli_provider in ("gemini", "gemini_cloudtts"):
+        elif cli_provider == "gemini":
             voice, args_speaking_rate = effective["voice"], effective["speaking_rate"]
-        else:  # elevenlabs, grok
+            model = effective["model"]
+        elif cli_provider == "gemini_cloudtts":
+            voice, args_speaking_rate = effective["voice"], effective["speaking_rate"]
+            model, locale, style_prompt = (
+                effective["model"], effective["locale"], effective["style"])
+        elif cli_provider == "elevenlabs":
             voice, args_speed = effective["voice_id"], effective["speed"]
+            model, stability, similarity = (
+                effective["model"], effective["stability"], effective["similarity_boost"])
+        else:  # grok
+            voice, args_speed = effective["voice_id"], effective["speed"]
+            language = effective["language"]
         args_edge_rate = args_edge_rate if args_edge_rate is not None else "+0%"
         args_edge_pitch = args_edge_pitch if args_edge_pitch is not None else "+0Hz"
+
+        # Production is held to two more invariants, checked before anything
+        # is built or written: normalization is never optional, and the tool
+        # that performs it must actually be present.
+        if args.no_normalize:
+            print(f"\n✗ production narration is always normalized to "
+                  f"{PRODUCTION_TARGET_LUFS} LUFS — --no-normalize only "
+                  f"applies to evaluation writes. Nothing was synthesised.",
+                  file=sys.stderr)
+            sys.exit(1)
+        import shutil as _shutil
+        if _shutil.which("ffmpeg") is None:
+            print(f"\n✗ ffmpeg not found on PATH — production narration "
+                  f"requires loudness normalization and cannot proceed "
+                  f"without it. Nothing was synthesised.", file=sys.stderr)
+            sys.exit(1)
     else:
         args_edge_rate = args.edge_rate if args.edge_rate is not None else "+0%"
         args_edge_pitch = args.edge_pitch if args.edge_pitch is not None else "+0Hz"
@@ -1167,22 +1253,52 @@ async def main():
     text = apply_pronunciation(text)
 
     chunk_boundaries: list[float] = []
+    actual_provider = cli_provider
     if cli_provider == "gemini_cloudtts":
-        chunk_boundaries = cloudtts_generate(text, voice, output_path, speaking_rate=rate)
+        chunk_boundaries, actual_provider = cloudtts_generate(
+            text, voice, output_path,
+            model=model if model is not None else DEFAULT_MODEL_CLOUDTTS,
+            locale=locale if locale is not None else DEFAULT_LOCALE_CLOUDTTS,
+            style_prompt=style_prompt if style_prompt is not None else DEFAULT_STYLE_CLOUDTTS,
+            speaking_rate=rate, strict=(mode == "production"))
     elif cli_provider == "gemini":
-        gemini_generate(text, voice, output_path, speaking_rate=rate)
+        gemini_generate(text, voice, output_path,
+                        model=model if model is not None else DEFAULT_MODEL_GEMINI,
+                        speaking_rate=rate)
     elif cli_provider == "elevenlabs":
-        chunk_boundaries = elevenlabs_generate(text, voice, output_path, speed=speed)
+        chunk_boundaries = elevenlabs_generate(
+            text, voice, output_path,
+            model=model if model is not None else DEFAULT_MODEL_EL,
+            stability=stability if stability is not None else DEFAULT_STABILITY,
+            similarity=similarity if similarity is not None else DEFAULT_SIMILARITY,
+            speed=speed)
     elif cli_provider == "grok":
-        chunk_boundaries = grok_generate(text, voice, output_path, speed=speed)
+        chunk_boundaries = grok_generate(
+            text, voice, output_path,
+            language=language if language is not None else DEFAULT_LANGUAGE_GROK,
+            speed=speed)
     else:
         await edge_generate(text, voice, output_path, rate=args_edge_rate, pitch=args_edge_pitch)
 
-    # Normalize loudness — skipped for --preview (short A/B test clips; loudnorm's
-    # measurement pass is unreliable on very short audio, same reason chunk/scene
-    # clips aren't normalized independently — see TARGET_LUFS comment above).
+    # Normalize loudness. Production is never optional here — the two inputs
+    # that used to be able to skip it (--preview and --no-normalize) are both
+    # refused outright for a production destination above, before synthesis
+    # even started; a production write that somehow still fails to normalize
+    # (ffmpeg present at the preflight check but failing here) is fatal, not a
+    # warning, and does not get a sidecar written over unnormalized audio.
+    # Evaluation keeps today's soft behavior — skipped for --preview (short
+    # A/B test clips; loudnorm's measurement pass is unreliable on very short
+    # audio) and skippable via --no-normalize.
     loudness = None
-    if not args.preview and not args.no_normalize:
+    if mode == "production":
+        loudness = normalize_loudness(output_path, target_lufs=PRODUCTION_TARGET_LUFS)
+        if loudness is None:
+            print(f"\n✗ loudness normalization failed — production narration "
+                  f"must be normalized to {PRODUCTION_TARGET_LUFS} LUFS; "
+                  f"refusing to write a production sidecar over unnormalized "
+                  f"audio.", file=sys.stderr)
+            sys.exit(1)
+    elif not args.preview and not args.no_normalize:
         loudness = normalize_loudness(output_path)
 
     # Write a voice-config sidecar alongside the audio — otherwise there's no
@@ -1204,13 +1320,21 @@ async def main():
             "voice_profile_sha256": channel.voice_profile_sha256,
             "effective_profile": approved_profile,
             "audio_sha256": audio_sha256,
+            "normalization": {
+                "policy": "always",
+                "target_lufs": PRODUCTION_TARGET_LUFS,
+                "measured": loudness,
+            },
             "generated_at": datetime.now().isoformat(timespec="seconds"),
         }
         channel_context._write_atomic_text(
             Path(f"{output_path}.voice.json"),
             json.dumps(sidecar, indent=2, ensure_ascii=False))
     else:
-        _write_voice_sidecar(output_path, cli_provider, voice, rate,
+        # actual_provider may differ from the requested cli_provider — the
+        # gemini_cloudtts→gemini evaluation fallback is exactly that case —
+        # so the sidecar records what actually ran, not what was requested.
+        _write_voice_sidecar(output_path, actual_provider, voice, rate,
                              chunk_boundaries_sec=chunk_boundaries, loudness=loudness,
                              speed=speed)
 

@@ -592,14 +592,37 @@ def main():
 
     audio_dir = f"{args.project}/audio"
     source_audio_dir = f"{args.project}/source_audio"
-    os.makedirs(audio_dir, exist_ok=True)
-    os.makedirs(source_audio_dir, exist_ok=True)
 
-    audio_path = f"{source_audio_dir}/{args.audio}"
-    if not os.path.exists(audio_path):
-        print(f"\n✗ Audio file not found: {audio_path}")
+    # ── --audio containment ─────────────────────────────────────────────────
+    # Checked before any directory is created, before the file (or a sidecar
+    # next to it) is ever opened, and before transcription. A prior version
+    # built audio_path by bare string concatenation with no containment check
+    # at all — `--audio ../escaped.mp3` reached WhisperX transcription with a
+    # valid sidecar sitting outside source_audio/, confirmed by a reviewer
+    # against the real stub sentinel. Same shape as the equivalent check in
+    # generation_gate.narration_binding_problems(): reject absolute/`..`
+    # before joining, resolve fully (follows symlinks), then check containment
+    # against the exact root — just run one stage earlier, so the refusal
+    # costs nothing rather than a full GPU pass.
+    raw_audio = Path(args.audio)
+    if raw_audio.is_absolute() or ".." in raw_audio.parts:
+        print(f"\n✗ --audio {args.audio!r} is absolute or traverses upward — "
+              f"refusing to resolve it at all")
+        return 2
+    audio_root = Path(source_audio_dir).resolve()
+    resolved_audio = (Path(source_audio_dir) / raw_audio).resolve()
+    if not resolved_audio.is_relative_to(audio_root):
+        print(f"\n✗ --audio {args.audio!r} resolves to {resolved_audio}, "
+              f"outside {audio_root} — refusing")
+        return 2
+    if not resolved_audio.is_file():
+        print(f"\n✗ Audio file not found: {resolved_audio}")
         print(f"  Place '{args.audio}' inside the '{source_audio_dir}/' folder and try again.")
         return 2
+    audio_path = str(resolved_audio)
+
+    os.makedirs(audio_dir, exist_ok=True)
+    os.makedirs(source_audio_dir, exist_ok=True)
 
     # ── Narration binding verification ──────────────────────────────────────
     # Required only when a real channel was actually assigned above — not
@@ -689,8 +712,13 @@ def main():
               f"voice profile")
         voice_key = "voice" if "voice" in effective else "voice_id"
         verified_voice = effective.get(voice_key, args.voice)
+        # Derived from the already-validated, fully-resolved path, not the
+        # raw --audio string — the manifest must record what was actually
+        # verified, never an untrusted CLI argument.
+        narration_audio_rel = Path(audio_path).resolve().relative_to(
+            Path(args.project).resolve()).as_posix()
         verified_narration_fields = {
-            "narration_audio_file": f"source_audio/{args.audio}",
+            "narration_audio_file": narration_audio_rel,
             "narration_voice_profile_sha256": recorded_hash,
             "narration_audio_sha256": recorded_audio_sha,
             "narration_effective_profile": effective,

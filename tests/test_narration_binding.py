@@ -26,6 +26,7 @@ required just to get the process running, not only to prove a sentinel.
 """
 
 import asyncio
+import contextlib
 import hashlib
 import json
 import os
@@ -245,16 +246,40 @@ async def _fake_edge_generate(text, voice, output_path, rate=None, pitch=None):
     Path(output_path).write_bytes(b"ID3fake mp3 bytes for a test\n")
 
 
-def _run_main(argv):
-    with mock.patch.object(sys, "argv", ["generate_source_audio.py", *argv]), \
-            mock.patch.object(gsa, "edge_generate", _fake_edge_generate), \
-            mock.patch.object(gsa, "normalize_loudness", lambda *a, **k: None), \
-            mock.patch.object(gsa, "get_duration", lambda *a, **k: 1.23):
+def _default_normalize(*a, **k):
+    """A production write now REQUIRES normalize_loudness() to succeed (return
+    non-None) or main() exits fatally without writing a sidecar — so the
+    default test double must simulate success, not the old None-means-skipped
+    behavior. Tests exercising the failure/invariant paths pass their own
+    normalize_fn/which_fn to _run_main_ex instead of using this default."""
+    return {"input_i": -20.0, "output_i": gsa.PRODUCTION_TARGET_LUFS,
+            "normalization_type": "linear"}
+
+
+def _run_main_ex(argv, *, patches=(), normalize_fn=None, which_fn=None, edge_fn=None):
+    """Like _run_main, but lets a caller inject extra mock.patch context
+    managers (to capture a provider's low-level _*_call args, or force a
+    gcloud-token/ffmpeg-availability scenario) without re-implementing the
+    base patch set every time."""
+    base = [
+        mock.patch.object(sys, "argv", ["generate_source_audio.py", *argv]),
+        mock.patch.object(gsa, "edge_generate", edge_fn or _fake_edge_generate),
+        mock.patch.object(gsa, "normalize_loudness", normalize_fn or _default_normalize),
+        mock.patch.object(gsa, "get_duration", lambda *a, **k: 1.23),
+        mock.patch("shutil.which", which_fn or (lambda name: "/usr/bin/ffmpeg")),
+    ]
+    with contextlib.ExitStack() as stack:
+        for p in (*base, *patches):
+            stack.enter_context(p)
         try:
             asyncio.run(gsa.main())
             return 0
         except SystemExit as e:
             return e.code or 0
+
+
+def _run_main(argv):
+    return _run_main_ex(argv)
 
 
 def s2_production_uses_approved_profile():
@@ -654,6 +679,372 @@ def s10_split_channel_assignment_regression():
     check("transcription never reached", not sentinel.exists())
 
 
+# ── 6. --preview / --out resolution ─────────────────────────────────────────
+
+def s11_preview_out_handling():
+    # (a) pending voice + preview, no --out -> the channel's own preview dir
+    root = temp_root()
+    make_pack(root / "channels", "beacon", voice_approved=False)
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+    with World(root):
+        code = _run_main_ex(["--project", str(proj), "--script", str(script),
+                             "--preview", "1", "--provider", "edge",
+                             "--voice", "CandidateA"])
+    check("pending voice + preview with no --out succeeds", code == 0, f"exit={code}")
+    expected = root / "voice_previews" / "preview_CandidateA.mp3"
+    check("default preview destination is the channel's preview dir", expected.is_file())
+
+    # (b) pending voice + an explicit --out into the preview dir still reaches
+    # mocked synthesis (proves the destination is actually usable, not just
+    # theoretically classified as evaluation).
+    out_path = root / "voice_previews" / "explicit_candidate.mp3"
+    with World(root):
+        code = _run_main_ex(["--project", str(proj), "--script", str(script),
+                             "--preview", "1", "--out", str(out_path),
+                             "--provider", "edge", "--voice", "CandidateB"])
+    check("explicit preview-root --out reaches mocked synthesis", code == 0, f"exit={code}")
+    check("explicit --out is honored exactly, not rewritten", out_path.is_file())
+
+    # (c) --preview targeting a production destination is refused outright —
+    # even with an APPROVED profile and no conflicting override — because a
+    # truncated clip must never become canonical narration.
+    root2 = temp_root()
+    make_pack(root2 / "channels", "beacon")  # approved
+    proj2 = make_project(root2, "ep_x", channel_id="beacon")
+    script2 = proj2 / "script_demo.txt"
+    prod_out = proj2 / "source_audio" / "narration.mp3"
+    with World(root2):
+        code = _run_main_ex(["--project", str(proj2), "--script", str(script2),
+                             "--preview", "1", "--out", str(prod_out)])
+    check("--preview to a production destination is refused", code != 0, f"exit={code}")
+    check("nothing was written", not prod_out.exists())
+
+    # (d) a full run (no --preview) with no --out keeps the existing
+    # narration.mp3 shorthand — no regression to the default full-run path.
+    root3 = temp_root()
+    make_pack(root3 / "channels", "beacon")
+    proj3 = make_project(root3, "ep_x", channel_id="beacon")
+    script3 = proj3 / "script_demo.txt"
+    with World(root3):
+        code = _run_main_ex(["--project", str(proj3), "--script", str(script3)])
+    check("full run with no --out still defaults to narration.mp3", code == 0, f"exit={code}")
+    check("default full-run output landed at source_audio/narration.mp3",
+          (proj3 / "source_audio" / "narration.mp3").is_file())
+
+
+# ── 7. production dispatch forwards the ENTIRE approved profile ────────────
+
+def s12_production_forwards_full_gemini_profile():
+    root = temp_root()
+    profile = {"provider": "gemini",
+              "settings": {"voice": "TestGeminiVoice", "model": "test-gemini-model-x",
+                          "speaking_rate": 0.77},
+              "approved_by": "test", "approved_at": "2026-01-01T00:00:00+00:00"}
+    make_pack(root / "channels", "beacon", profile=profile)
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+
+    call = mock.Mock(return_value=(b"raw-audio-bytes", "audio/mpeg"))
+    with mock.patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
+        with World(root):
+            code = _run_main_ex(
+                ["--project", str(proj), "--script", str(script), "--out", "narration.mp3"],
+                patches=[mock.patch.object(gsa, "_gemini_call", call)])
+    check("production gemini run succeeds", code == 0, f"exit={code}")
+    check("_gemini_call was invoked", call.called)
+    args, kwargs = call.call_args.args, call.call_args.kwargs
+    check("gemini voice forwarded", args[1] == "TestGeminiVoice", args)
+    check("gemini model forwarded", args[3] == "test-gemini-model-x", args)
+    check("gemini speaking_rate forwarded", kwargs.get("speaking_rate") == 0.77, kwargs)
+
+
+def s13_production_forwards_full_cloudtts_profile():
+    root = temp_root()
+    profile = {"provider": "gemini_cloudtts",
+              "settings": {"voice": "TestCloudVoice", "model": "test-cloud-model-x",
+                          "speaking_rate": 0.66, "locale": "xx-XX",
+                          "style": "a distinctive style prompt"},
+              "approved_by": "test", "approved_at": "2026-01-01T00:00:00+00:00"}
+    make_pack(root / "channels", "beacon", profile=profile)
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+
+    call = mock.Mock(return_value=b"raw-mp3-bytes")
+    token_fn = mock.Mock(return_value=("faketoken", "fakeproject"))
+    with World(root):
+        code = _run_main_ex(
+            ["--project", str(proj), "--script", str(script), "--out", "narration.mp3"],
+            patches=[mock.patch.object(gsa, "_cloudtts_call", call),
+                    mock.patch.object(gsa, "_get_gcloud_access_token", token_fn)])
+    check("production cloudtts run succeeds", code == 0, f"exit={code}")
+    check("_cloudtts_call was invoked", call.called)
+    args = call.call_args.args
+    check("cloudtts voice forwarded", args[1] == "TestCloudVoice", args)
+    check("cloudtts locale forwarded", args[2] == "xx-XX", args)
+    check("cloudtts model forwarded", args[3] == "test-cloud-model-x", args)
+    check("cloudtts style forwarded", args[4] == "a distinctive style prompt", args)
+    check("cloudtts speaking_rate forwarded", args[7] == 0.66, args)
+
+
+def s14_production_forwards_full_elevenlabs_profile():
+    root = temp_root()
+    profile = {"provider": "elevenlabs",
+              "settings": {"voice_id": "TestElevenVoiceId", "model": "test-eleven-model-x",
+                          "stability": 0.11, "similarity_boost": 0.22, "speed": 1.11},
+              "approved_by": "test", "approved_at": "2026-01-01T00:00:00+00:00"}
+    make_pack(root / "channels", "beacon", profile=profile)
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+
+    call = mock.Mock(return_value=b"raw-mp3-bytes")
+    with mock.patch.dict(os.environ, {"ELEVENLABS_API_KEY": "test-key"}):
+        with World(root):
+            code = _run_main_ex(
+                ["--project", str(proj), "--script", str(script), "--out", "narration.mp3"],
+                patches=[mock.patch.object(gsa, "_elevenlabs_call", call)])
+    check("production elevenlabs run succeeds", code == 0, f"exit={code}")
+    check("_elevenlabs_call was invoked", call.called)
+    args = call.call_args.args
+    check("elevenlabs voice_id forwarded", args[1] == "TestElevenVoiceId", args)
+    check("elevenlabs model forwarded", args[3] == "test-eleven-model-x", args)
+    check("elevenlabs stability forwarded", args[4] == 0.11, args)
+    check("elevenlabs similarity_boost forwarded", args[5] == 0.22, args)
+    check("elevenlabs speed forwarded", args[6] == 1.11, args)
+
+
+def s15_production_forwards_full_grok_profile():
+    root = temp_root()
+    profile = {"provider": "grok",
+              "settings": {"voice_id": "TestGrokVoiceId", "language": "xx", "speed": 0.99},
+              "approved_by": "test", "approved_at": "2026-01-01T00:00:00+00:00"}
+    make_pack(root / "channels", "beacon", profile=profile)
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+
+    call = mock.Mock(return_value=b"raw-mp3-bytes")
+    with mock.patch.dict(os.environ, {"XAI_API_KEY": "test-key"}):
+        with World(root):
+            code = _run_main_ex(
+                ["--project", str(proj), "--script", str(script), "--out", "narration.mp3"],
+                patches=[mock.patch.object(gsa, "_grok_call", call)])
+    check("production grok run succeeds", code == 0, f"exit={code}")
+    check("_grok_call was invoked", call.called)
+    args = call.call_args.args
+    check("grok voice_id forwarded", args[1] == "TestGrokVoiceId", args)
+    check("grok language forwarded", args[3] == "xx", args)
+    check("grok speed forwarded", args[4] == 0.99, args)
+
+
+# ── 8. no silent gemini_cloudtts -> gemini fallback in production ──────────
+
+def s16_cloudtts_strict_refuses_without_fallback():
+    root = temp_root()
+    profile = {"provider": "gemini_cloudtts",
+              "settings": {"voice": "V", "model": "M", "speaking_rate": 0.8,
+                          "locale": "en-IN", "style": ""},
+              "approved_by": "test", "approved_at": "2026-01-01T00:00:00+00:00"}
+    make_pack(root / "channels", "beacon", profile=profile)
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+
+    gemini_fallback = mock.Mock()
+    token_fn = mock.Mock(return_value=(None, None))
+    with World(root):
+        code = _run_main_ex(
+            ["--project", str(proj), "--script", str(script), "--out", "narration.mp3"],
+            patches=[mock.patch.object(gsa, "_get_gcloud_access_token", token_fn),
+                    mock.patch.object(gsa, "gemini_generate", gemini_fallback)])
+    check("production cloudtts with no gcloud token refuses", code != 0, f"exit={code}")
+    check("gemini fallback was never invoked", not gemini_fallback.called)
+    check("nothing was written",
+          not (proj / "source_audio" / "narration.mp3").exists())
+
+
+def s17_cloudtts_evaluation_fallback_records_actual_provider():
+    root = temp_root()
+    make_pack(root / "channels", "beacon", voice_approved=False)
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+    out_path = root / "voice_previews" / "candidate_cloudtts.mp3"
+
+    token_fn = mock.Mock(return_value=(None, None))
+    gemini_call = mock.Mock(return_value=(b"raw-audio-bytes", "audio/mpeg"))
+    with mock.patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
+        with World(root):
+            code = _run_main_ex(
+                ["--project", str(proj), "--script", str(script), "--out", str(out_path),
+                 "--provider", "gemini_cloudtts", "--voice", "SomeVoice"],
+                patches=[mock.patch.object(gsa, "_get_gcloud_access_token", token_fn),
+                        mock.patch.object(gsa, "_gemini_call", gemini_call)])
+    check("evaluation cloudtts-with-fallback succeeds", code == 0, f"exit={code}")
+    sidecar = json.loads(Path(f"{out_path}.voice.json").read_text(encoding="utf-8"))
+    check("evaluation sidecar records the provider that ACTUALLY ran (gemini)",
+          sidecar.get("provider") == "gemini", sidecar)
+
+
+# ── 9. production normalization is a real invariant, not a flag ────────────
+
+def s18_production_no_normalize_refused():
+    root = temp_root()
+    make_pack(root / "channels", "beacon")
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+    called = {"n": 0}
+
+    async def _tracking_edge(*a, **k):
+        called["n"] += 1
+        return await _fake_edge_generate(*a, **k)
+
+    with World(root):
+        code = _run_main_ex(
+            ["--project", str(proj), "--script", str(script), "--out", "narration.mp3",
+             "--no-normalize"],
+            edge_fn=_tracking_edge)
+    check("production --no-normalize is refused before synthesis", code != 0, f"exit={code}")
+    check("nothing was synthesised", called["n"] == 0)
+    check("no audio file was written",
+          not (proj / "source_audio" / "narration.mp3").exists())
+
+
+def s19_production_missing_ffmpeg_refused():
+    root = temp_root()
+    make_pack(root / "channels", "beacon")
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+    called = {"n": 0}
+
+    async def _tracking_edge(*a, **k):
+        called["n"] += 1
+        return await _fake_edge_generate(*a, **k)
+
+    with World(root):
+        code = _run_main_ex(
+            ["--project", str(proj), "--script", str(script), "--out", "narration.mp3"],
+            which_fn=lambda name: None, edge_fn=_tracking_edge)
+    check("missing ffmpeg is refused before synthesis", code != 0, f"exit={code}")
+    check("nothing was synthesised", called["n"] == 0)
+
+
+def s20_production_normalizes_at_exact_target_and_records_it():
+    root = temp_root()
+    make_pack(root / "channels", "beacon")
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+
+    seen = {}
+    def _spy_normalize(path, target_lufs=None):
+        seen["target_lufs"] = target_lufs
+        return {"input_i": -20.0, "output_i": target_lufs, "normalization_type": "linear"}
+
+    with World(root):
+        code = _run_main_ex(
+            ["--project", str(proj), "--script", str(script), "--out", "narration.mp3"],
+            normalize_fn=_spy_normalize)
+    check("production run succeeds", code == 0, f"exit={code}")
+    check("normalize_loudness was called with exactly the production target",
+          seen.get("target_lufs") == gsa.PRODUCTION_TARGET_LUFS, seen)
+    sidecar = json.loads(
+        (proj / "source_audio" / "narration.mp3.voice.json").read_text(encoding="utf-8"))
+    check("sidecar records the normalization policy and target",
+          sidecar.get("normalization", {}).get("target_lufs") == gsa.PRODUCTION_TARGET_LUFS,
+          sidecar)
+    check("sidecar records the measured result",
+          sidecar.get("normalization", {}).get("measured", {}).get("output_i")
+          == gsa.PRODUCTION_TARGET_LUFS, sidecar)
+
+
+def s21_production_normalization_failure_no_sidecar():
+    root = temp_root()
+    make_pack(root / "channels", "beacon")
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+    with World(root):
+        code = _run_main_ex(
+            ["--project", str(proj), "--script", str(script), "--out", "narration.mp3"],
+            normalize_fn=lambda *a, **k: None)
+    check("normalization failure exits nonzero", code != 0, f"exit={code}")
+    check("no production sidecar was written",
+          not (proj / "source_audio" / "narration.mp3.voice.json").exists())
+
+
+# ── 10. split-stage --audio containment ─────────────────────────────────────
+
+def s22_split_audio_traversal_refused():
+    root = temp_root()
+    proj = root / "escape_proj"
+    proj.mkdir()
+    (proj / "source_audio").mkdir()
+    outside_dir = root / "outside"
+    outside_dir.mkdir()
+    escaped_audio = outside_dir / "escaped.mp3"
+    escaped_audio.write_bytes(b"escaped audio bytes\n")
+    # A VALID approved sidecar sitting outside source_audio/ — this test is
+    # about containment of --audio itself, not sidecar verification.
+    Path(f"{escaped_audio}.voice.json").write_text(json.dumps({
+        "schema_version": 1, "channel_id": "beacon",
+        "voice_profile_sha256": cc.canonical_sha256(APPROVED_PROFILE),
+        "effective_profile": APPROVED_PROFILE,
+        "audio_sha256": sha(escaped_audio),
+        "generated_at": "2026-01-01T00:00:00+00:00"}, indent=2), encoding="utf-8")
+    (proj / "manifest.json").write_text(json.dumps({
+        "episode": "escape_proj", "identity_state": "ok", "identity_reasons": [],
+        "channel_id": "beacon", "channel_dna_version": 1, "scenes": []},
+        indent=2), encoding="utf-8")
+
+    sentinel = root / "s_escape.txt"
+    cmd = [sys.executable, str(ROOT / "auto_split_scenes_v1_stage3_export.py"),
+          "--project", str(proj), "--audio", "../outside/escaped.mp3",
+          "--allow-missing-script"]
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", env=_split_env(sentinel), cwd=str(root))
+    check("--audio traversal is refused", r.returncode != 0, r.stdout[-300:])
+    check("transcription was never reached", not sentinel.exists())
+    check("no audio/ directory was created", not (proj / "audio").exists())
+    check("no word-timestamp output was created",
+          not any((proj / "source_audio").glob("*_words.json")))
+    check("manifest was not overwritten with scene data",
+          json.loads((proj / "manifest.json").read_text(encoding="utf-8")).get("scenes") == [])
+
+
+def s23_split_audio_symlink_escape_refused():
+    root = temp_root()
+    proj = root / "symlink_proj"
+    proj.mkdir()
+    audio_dir = proj / "source_audio"
+    audio_dir.mkdir()
+    outside_dir = root / "outside2"
+    outside_dir.mkdir()
+    real_target = outside_dir / "real.mp3"
+    real_target.write_bytes(b"real bytes outside the project\n")
+    link_path = audio_dir / "linked.mp3"
+    try:
+        os.symlink(real_target, link_path)
+    except (OSError, NotImplementedError):
+        print("  SKIP  symlink escape (no symlink privilege on this platform)")
+        return
+
+    Path(f"{link_path}.voice.json").write_text(json.dumps({
+        "schema_version": 1, "channel_id": "beacon",
+        "voice_profile_sha256": cc.canonical_sha256(APPROVED_PROFILE),
+        "effective_profile": APPROVED_PROFILE,
+        "audio_sha256": sha(real_target),
+        "generated_at": "2026-01-01T00:00:00+00:00"}, indent=2), encoding="utf-8")
+    (proj / "manifest.json").write_text(json.dumps({
+        "episode": "symlink_proj", "identity_state": "ok", "identity_reasons": [],
+        "channel_id": "beacon", "channel_dna_version": 1, "scenes": []},
+        indent=2), encoding="utf-8")
+
+    sentinel = root / "s_symlink.txt"
+    cmd = [sys.executable, str(ROOT / "auto_split_scenes_v1_stage3_export.py"),
+          "--project", str(proj), "--audio", "linked.mp3",
+          "--allow-missing-script"]
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", env=_split_env(sentinel), cwd=str(root))
+    check("a symlink escaping source_audio/ is refused", r.returncode != 0, r.stdout[-300:])
+    check("transcription was never reached (symlink case)", not sentinel.exists())
+
+
 # ── run ──────────────────────────────────────────────────────────────────────
 
 def main() -> int:
@@ -678,6 +1069,32 @@ def main() -> int:
             s9_split_requires_and_verifies_sidecar)
         run("10. split-stage channel-assignment refusal exits nonzero",
             s10_split_channel_assignment_regression)
+        run("11. --preview / --out resolution",
+            s11_preview_out_handling)
+        run("12. production forwards the full gemini profile",
+            s12_production_forwards_full_gemini_profile)
+        run("13. production forwards the full gemini_cloudtts profile",
+            s13_production_forwards_full_cloudtts_profile)
+        run("14. production forwards the full elevenlabs profile",
+            s14_production_forwards_full_elevenlabs_profile)
+        run("15. production forwards the full grok profile",
+            s15_production_forwards_full_grok_profile)
+        run("16. production cloudtts refuses rather than falling back silently",
+            s16_cloudtts_strict_refuses_without_fallback)
+        run("17. evaluation cloudtts fallback records the provider that actually ran",
+            s17_cloudtts_evaluation_fallback_records_actual_provider)
+        run("18. production --no-normalize is refused",
+            s18_production_no_normalize_refused)
+        run("19. production refuses when ffmpeg is missing",
+            s19_production_missing_ffmpeg_refused)
+        run("20. production normalizes at the exact target and records it",
+            s20_production_normalizes_at_exact_target_and_records_it)
+        run("21. normalization failure leaves no production sidecar",
+            s21_production_normalization_failure_no_sidecar)
+        run("22. split-stage --audio traversal is refused",
+            s22_split_audio_traversal_refused)
+        run("23. split-stage --audio symlink escape is refused",
+            s23_split_audio_symlink_escape_refused)
     finally:
         for td in _temps:
             import shutil
