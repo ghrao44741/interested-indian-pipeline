@@ -127,9 +127,11 @@
     "approved_profile": null,
     "working_default": {
       "provider": "edge",
-      "voice": "en-IN-PrabhatNeural",
-      "rate": "+12%",
-      "pitch": "+15Hz",
+      "settings": {
+        "voice": "en-IN-PrabhatNeural",
+        "rate": "+12%",
+        "pitch": "+15Hz"
+      },
       "approved": false,
       "_note": "Used for the first pilot render, with two confirmed defects recorded in legacy_config.edge_note. Evaluation only — not an approved profile, and refused for any output outside preview_dir."
     },

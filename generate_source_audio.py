@@ -963,14 +963,113 @@ def _resolve_production_voice(args, channel) -> dict:
     return {"provider": provider, **settings}
 
 
+def _resolve_evaluation_voice(args, channel) -> dict:
+    """Build the effective TTS config for an EVALUATION write from the
+    Channel Pack's own `voice.working_default` — never from this module's
+    DEFAULT_* constants, which describe Interested Indian's generated legacy
+    adapter specifically and would silently misconfigure any other channel's
+    evaluation runs (the Task 2B backlog gap this closes).
+
+    Starts from the complete working_default profile, refusing outright if
+    the channel has none recorded — there is nowhere else this may safely
+    come from; substituting `approved_profile` would blur the same
+    evaluation/production line the destination classifier exists to draw.
+    Any CLI flag the operator explicitly passed (the same fields production's
+    conflict table knows about: voice/speaking-rate/speed/edge-rate/
+    edge-pitch) REPLACES the corresponding field here — unlike production,
+    evaluation is exactly the place experimentation is meant to be allowed.
+    The one thing refused outright is an explicit --provider that disagrees
+    with the working default's provider: the pack declares only one complete
+    evaluation profile, and assembling a different provider's settings would
+    mean quietly borrowing from a legacy default, which this exists to stop.
+    """
+    working = channel.config["voice"].get("working_default")
+    if not working:
+        print(f"\n✗ {channel.channel_id} has no evaluation working_default "
+              f"recorded — there is nothing to synthesise from. Record one "
+              f"in the channel pack first. Nothing was synthesised.",
+              file=sys.stderr)
+        sys.exit(1)
+    working = channel_context._thaw(working)
+    provider = working["provider"]
+    settings = dict(working["settings"])
+
+    if args.provider is not None and args.provider != provider:
+        print(f"\n✗ --provider={args.provider!r} conflicts with "
+              f"{channel.channel_id}'s working_default provider {provider!r} "
+              f"— the channel pack declares only one complete evaluation "
+              f"profile, so a different provider's settings can't be "
+              f"assembled without falling back to a legacy default. Preview "
+              f"with the working default's own provider, or record a "
+              f"different one in the channel pack. Nothing was synthesised.",
+              file=sys.stderr)
+        sys.exit(1)
+
+    for _flag, arg_attr, settings_key in _PRODUCTION_CHECKS_BY_PROVIDER.get(provider, ()):
+        cli_value = getattr(args, arg_attr)
+        if cli_value is not None:
+            settings[settings_key] = cli_value
+
+    return {"provider": provider, **settings}
+
+
+def _unpack_effective_profile(effective: dict) -> dict:
+    """Given a complete {"provider": ..., **settings} profile — production's
+    or evaluation's, they share the exact same shape — return every
+    dispatch-relevant field by name, with whichever ones that provider
+    doesn't have left None. One place to know which settings key means what
+    per provider, shared by both resolvers so they can't drift apart.
+    """
+    provider = effective["provider"]
+    voice = model = locale = style_prompt = stability = similarity = language = None
+    edge_rate = edge_pitch = speaking_rate = speed = None
+    if provider == "edge":
+        voice, edge_rate, edge_pitch = (
+            effective["voice"], effective["rate"], effective["pitch"])
+    elif provider == "gemini":
+        voice, speaking_rate, model = (
+            effective["voice"], effective["speaking_rate"], effective["model"])
+    elif provider == "gemini_cloudtts":
+        voice, speaking_rate = effective["voice"], effective["speaking_rate"]
+        model, locale, style_prompt = (
+            effective["model"], effective["locale"], effective["style"])
+    elif provider == "elevenlabs":
+        voice, speed = effective["voice_id"], effective["speed"]
+        model, stability, similarity = (
+            effective["model"], effective["stability"], effective["similarity_boost"])
+    else:  # grok
+        voice, speed = effective["voice_id"], effective["speed"]
+        language = effective["language"]
+    edge_rate = edge_rate if edge_rate is not None else "+0%"
+    edge_pitch = edge_pitch if edge_pitch is not None else "+0Hz"
+    return dict(provider=provider, voice=voice, model=model, locale=locale,
+               style_prompt=style_prompt, stability=stability, similarity=similarity,
+               language=language, edge_rate=edge_rate, edge_pitch=edge_pitch,
+               speaking_rate=speaking_rate, speed=speed)
+
+
 def _write_voice_sidecar(output_path: str, provider: str, voice: str, speaking_rate,
                           chunk_boundaries_sec: list[float] | None = None,
                           loudness: dict | None = None,
-                          speed: float | None = None) -> None:
-    """Record which voice config produced this audio file, alongside it as
-    {output_path}.voice.json. Without this, there's no way to later answer
-    "what voice made this file" other than re-listening — the exact gap that
-    let common/cta/cta.mp3 go stale (wrong voice) unnoticed for a while.
+                          speed: float | None = None, *,
+                          channel_id: str | None = None,
+                          requested_provider: str | None = None,
+                          effective_settings: dict | None = None) -> None:
+    """Record which voice config produced this EVALUATION audio file,
+    alongside it as {output_path}.voice.json. Without this, there's no way to
+    later answer "what voice made this file" other than re-listening — the
+    exact gap that let common/cta/cta.mp3 go stale (wrong voice) unnoticed
+    for a while.
+
+    channel_id/effective_settings make this sidecar channel-truthful: when a
+    working_default resolved the call, effective_settings is the COMPLETE
+    settings dict that actually reached the provider — never re-derived from
+    a module DEFAULT_* constant, which would describe Interested Indian's
+    legacy adapter regardless of which channel actually ran. requested_provider
+    is recorded only when it differs from provider — i.e. only when an
+    internal fallback fired (gemini_cloudtts -> gemini with no gcloud token),
+    so the sidecar names both what was asked for and what actually happened,
+    rather than letting the fallback silently pass as the requested provider.
 
     chunk_boundaries_sec lets review_narration_audio.py jump straight to a known
     chunk-concatenation seam instead of guessing where it is. loudness records
@@ -984,6 +1083,40 @@ def _write_voice_sidecar(output_path: str, provider: str, voice: str, speaking_r
         "loudness": loudness,
         "generated_at": datetime.now().isoformat(timespec="seconds"),
     }
+    if channel_id is not None:
+        sidecar["channel_id"] = channel_id
+    if requested_provider is not None and requested_provider != provider:
+        sidecar["requested_provider"] = requested_provider
+
+    if effective_settings is not None:
+        sidecar["effective_settings"] = effective_settings
+        # Back-compat convenience fields some readers key off of directly —
+        # derived from what ACTUALLY ran (effective_settings), never from a
+        # module DEFAULT_* constant, which would silently describe Interested
+        # Indian's legacy adapter regardless of which channel actually ran.
+        if provider == "gemini_cloudtts":
+            sidecar["model"]  = effective_settings.get("model")
+            sidecar["locale"] = effective_settings.get("locale")
+            sidecar["style"]  = effective_settings.get("style")
+        elif provider == "gemini":
+            sidecar["model"] = effective_settings.get("model")
+        elif provider == "elevenlabs":
+            sidecar["model"] = effective_settings.get("model")
+            sidecar["speed"] = effective_settings.get("speed", speed)
+        elif provider == "grok":
+            sidecar["language"] = effective_settings.get("language")
+            sidecar["speed"] = effective_settings.get("speed", speed)
+        try:
+            Path(f"{output_path}.voice.json").write_text(
+                json.dumps(sidecar, indent=2), encoding="utf-8"
+            )
+        except OSError as e:
+            print(f"  ⚠ Could not write voice-config sidecar: {e}")
+        return
+
+    # No resolved channel profile was available for this write — kept only
+    # for callers outside main()'s channel-resolved path, if any ever exist;
+    # every current call site always has one.
     if provider == "gemini_cloudtts":
         sidecar["model"]  = DEFAULT_MODEL_CLOUDTTS
         sidecar["locale"] = DEFAULT_LOCALE_CLOUDTTS
@@ -1089,10 +1222,13 @@ async def main():
         print(f"❌ Script file is empty: {script_path}")
         sys.exit(1)
 
-    # Free-form resolution — the default for evaluation, and for the preview
-    # filename below regardless of how this run eventually classifies. A
-    # production write below replaces every one of these with the approved
-    # profile's own values; nothing production-facing reads past this point.
+    # Cosmetic only, from here to the default preview filename below: NEITHER
+    # a production nor an evaluation write actually synthesises with these
+    # values — both are resolved from the Channel Pack (approved_profile /
+    # working_default respectively) further down, which overwrites
+    # cli_provider/voice with the channel's own values before anything is
+    # built or written. This block exists only so an unwritten preview's
+    # default output filename has something to name itself after.
     cli_provider = args.provider or DEFAULT_PROVIDER
     if cli_provider in ("gemini", "gemini_cloudtts"):
         voice = args.voice or DEFAULT_VOICE_GEMINI
@@ -1191,6 +1327,11 @@ async def main():
     # provider's fields are meaningful, but every name the dispatch below
     # reads must exist regardless of which provider that is.
     model = locale = style_prompt = stability = similarity = language = None
+    # Populated only in evaluation mode — the complete settings actually
+    # resolved for this call, recorded truthfully in the sidecar rather than
+    # re-derived from a module DEFAULT_* constant.
+    evaluation_settings = None
+    requested_provider = None
 
     if mode == "production":
         # Every generation-affecting value comes from the approved profile.
@@ -1199,28 +1340,15 @@ async def main():
         # the place to experiment with a different provider or voice, not this
         # one, regardless of what --out happens to point at.
         effective = _resolve_production_voice(args, channel)
-        cli_provider = effective["provider"]
-        args_edge_rate = args_edge_pitch = None
-        args_speaking_rate = args_speed = None
-        if cli_provider == "edge":
-            voice, args_edge_rate, args_edge_pitch = (
-                effective["voice"], effective["rate"], effective["pitch"])
-        elif cli_provider == "gemini":
-            voice, args_speaking_rate = effective["voice"], effective["speaking_rate"]
-            model = effective["model"]
-        elif cli_provider == "gemini_cloudtts":
-            voice, args_speaking_rate = effective["voice"], effective["speaking_rate"]
-            model, locale, style_prompt = (
-                effective["model"], effective["locale"], effective["style"])
-        elif cli_provider == "elevenlabs":
-            voice, args_speed = effective["voice_id"], effective["speed"]
-            model, stability, similarity = (
-                effective["model"], effective["stability"], effective["similarity_boost"])
-        else:  # grok
-            voice, args_speed = effective["voice_id"], effective["speed"]
-            language = effective["language"]
-        args_edge_rate = args_edge_rate if args_edge_rate is not None else "+0%"
-        args_edge_pitch = args_edge_pitch if args_edge_pitch is not None else "+0Hz"
+        unpacked = _unpack_effective_profile(effective)
+        cli_provider = unpacked["provider"]
+        voice = unpacked["voice"]
+        model, locale, style_prompt = (
+            unpacked["model"], unpacked["locale"], unpacked["style_prompt"])
+        stability, similarity, language = (
+            unpacked["stability"], unpacked["similarity"], unpacked["language"])
+        args_edge_rate, args_edge_pitch = unpacked["edge_rate"], unpacked["edge_pitch"]
+        args_speaking_rate, args_speed = unpacked["speaking_rate"], unpacked["speed"]
 
         # Production is held to two more invariants, checked before anything
         # is built or written: normalization is never optional, and the tool
@@ -1238,10 +1366,22 @@ async def main():
                   f"without it. Nothing was synthesised.", file=sys.stderr)
             sys.exit(1)
     else:
-        args_edge_rate = args.edge_rate if args.edge_rate is not None else "+0%"
-        args_edge_pitch = args.edge_pitch if args.edge_pitch is not None else "+0Hz"
-        args_speaking_rate = args.speaking_rate
-        args_speed = args.speed
+        # Resolved from the Channel Pack's own working_default — never from
+        # this module's DEFAULT_* constants, which describe Interested
+        # Indian's generated legacy adapter specifically. Refuses before
+        # mkdir/credentials/clients if there is no working_default, or if an
+        # explicit --provider conflicts with it.
+        effective = _resolve_evaluation_voice(args, channel)
+        unpacked = _unpack_effective_profile(effective)
+        cli_provider = requested_provider = unpacked["provider"]
+        voice = unpacked["voice"]
+        model, locale, style_prompt = (
+            unpacked["model"], unpacked["locale"], unpacked["style_prompt"])
+        stability, similarity, language = (
+            unpacked["stability"], unpacked["similarity"], unpacked["language"])
+        args_edge_rate, args_edge_pitch = unpacked["edge_rate"], unpacked["edge_pitch"]
+        args_speaking_rate, args_speed = unpacked["speaking_rate"], unpacked["speed"]
+        evaluation_settings = {k: v for k, v in effective.items() if k != "provider"}
 
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -1346,11 +1486,22 @@ async def main():
             json.dumps(sidecar, indent=2, ensure_ascii=False))
     else:
         # actual_provider may differ from the requested cli_provider — the
-        # gemini_cloudtts→gemini evaluation fallback is exactly that case —
-        # so the sidecar records what actually ran, not what was requested.
+        # gemini_cloudtts→gemini evaluation fallback is exactly that case. A
+        # cloudtts model/locale/style cannot carry over to a plain gemini
+        # call (a different API entirely, with its own model namespace), so
+        # when the fallback fired, the settings recorded are gemini's OWN
+        # defaults — what actually reached the provider — never the
+        # requested Cloud TTS profile.
+        if actual_provider != cli_provider:
+            settings_used = {"voice": voice, "model": DEFAULT_MODEL_GEMINI,
+                             "speaking_rate": rate}
+        else:
+            settings_used = evaluation_settings
         _write_voice_sidecar(output_path, actual_provider, voice, rate,
                              chunk_boundaries_sec=chunk_boundaries, loudness=loudness,
-                             speed=speed)
+                             speed=speed, channel_id=channel.channel_id,
+                             requested_provider=requested_provider,
+                             effective_settings=settings_used)
 
     duration = get_duration(output_path)
     if duration:

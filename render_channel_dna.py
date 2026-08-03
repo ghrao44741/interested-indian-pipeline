@@ -119,7 +119,8 @@ def render_dna(doc: dict) -> str:
         L += ["- **approved profile**: none on file"]
         wd = v.get("working_default")
         if wd:
-            L += [f"- **working default (unapproved)**: {wd['provider']} / {wd['voice']}"]
+            L += [f"- **working default (unapproved)**: {wd['provider']} / "
+                  f"{_profile_voice_label(wd)}"]
     pd = v.get("preview_dir")
     if pd:
         L += [f"- while pending, synthesis may only write into "

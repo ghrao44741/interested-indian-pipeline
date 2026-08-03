@@ -102,11 +102,28 @@ PROMPTS_ONE_PHOTO = (
 )
 
 
+DEFAULT_PENDING_WORKING_DEFAULT = {
+    "provider": "edge",
+    "settings": {"voice": "x", "rate": "+0%", "pitch": "+0Hz"},
+    "approved": False,
+}
+
+
 def make_pack(channels_dir: Path, channel_id: str, *, voice_approved: bool = True,
-             profile: dict = APPROVED_PROFILE) -> Path:
-    """Host disabled — this suite is about narration, not character/pose fixtures."""
+             profile: dict = APPROVED_PROFILE, working_default=None) -> Path:
+    """Host disabled — this suite is about narration, not character/pose fixtures.
+
+    working_default omitted (None, the sentinel — not "explicitly null") keeps
+    the old defaults: None when voice_approved, DEFAULT_PENDING_WORKING_DEFAULT
+    when pending. Pass working_default=... explicitly to test evaluation
+    dispatch against a specific, deliberately-non-default profile — that stays
+    independent of voice_approved, since a channel can have both an approved
+    profile and a working default at once.
+    """
     d = channels_dir / channel_id
     d.mkdir(parents=True, exist_ok=True)
+    if working_default is None:
+        working_default = None if voice_approved else DEFAULT_PENDING_WORKING_DEFAULT
     doc = {
         "schema_version": 1,
         "channel_id": channel_id,
@@ -122,16 +139,11 @@ def make_pack(channels_dir: Path, channel_id: str, *, voice_approved: bool = Tru
         "visual_style": {"palette": {"ink": "#101010"}, "pad_color": "#101010",
                          "rules": ["Flat."], "ken_burns_zoom": 1.05},
         "host": {"enabled": False},
-        "voice": ({"selection_status": "approved", "approved_profile": profile,
-                   "working_default": None,
-                   "preview_dir": {"path": "voice_previews",
-                                   "path_kind": "legacy_pipeline_root"}}
-                  if voice_approved else
-                  {"selection_status": "pending", "approved_profile": None,
-                   "working_default": {"provider": "edge", "voice": "x",
-                                       "approved": False},
-                   "preview_dir": {"path": "voice_previews",
-                                   "path_kind": "legacy_pipeline_root"}}),
+        "voice": {"selection_status": "approved" if voice_approved else "pending",
+                  "approved_profile": profile if voice_approved else None,
+                  "working_default": working_default,
+                  "preview_dir": {"path": "voice_previews",
+                                  "path_kind": "legacy_pipeline_root"}},
         "routing": {"policy_version": 1},
         "renderers": {"capabilities": {"PHOTO": "pexels"}},
         "evidence": {"require_provenance_for": ["PHOTO"]},
@@ -344,9 +356,17 @@ def s4_boundary_preview_flag_does_not_grant_production_leniency():
 
 def s5_boundary_full_run_to_preview_dir_is_evaluation():
     """Boundary 2: a full script run (no --preview) targeting voice_previews/
-    remains evaluation, and any provider/voice combination is allowed."""
+    remains evaluation. Task 2B-A change: evaluation is now resolved from the
+    channel's own working_default rather than being fully free-form — the
+    PROVIDER must match the working_default's provider, but a --voice
+    override for that same provider is still allowed (evaluation is exactly
+    where experimentation is meant to be allowed)."""
     root = temp_root()
-    make_pack(root / "channels", "beacon")
+    make_pack(root / "channels", "beacon",
+             working_default={"provider": "edge",
+                              "settings": {"voice": "en-IN-PrabhatNeural",
+                                          "rate": "+12%", "pitch": "+15Hz"},
+                              "approved": False})
     proj = make_project(root, "ep_x", channel_id="beacon")
     script = proj / "script_demo.txt"
     out_path = root / "voice_previews" / "candidate_x.mp3"
@@ -355,12 +375,13 @@ def s5_boundary_full_run_to_preview_dir_is_evaluation():
         code = _run_main(["--project", str(proj), "--script", str(script),
                           "--out", str(out_path), "--voice", "AnyVoiceAtAll",
                           "--provider", "edge"])
-    check("a full run targeting voice_previews/ succeeds despite an "
-         "arbitrary voice", code == 0, f"exit={code}")
+    check("a full run targeting voice_previews/ succeeds with a voice "
+         "override on the working_default's own provider",
+         code == 0, f"exit={code}")
     check("evaluation output landed in voice_previews/", out_path.is_file())
     sidecar = json.loads(Path(f"{out_path}.voice.json").read_text(encoding="utf-8"))
-    check("evaluation sidecar is the old free-form shape, not channel-bound",
-          "channel_id" not in sidecar and sidecar.get("voice") == "AnyVoiceAtAll")
+    check("evaluation sidecar is now channel-bound (Task 2B-A)",
+          sidecar.get("channel_id") == "beacon" and sidecar.get("voice") == "AnyVoiceAtAll")
 
 
 # ── 3. manifest channel outranks --channel ──────────────────────────────────
@@ -513,8 +534,7 @@ def _install_real_channel(channel_id: str, *, voice_approved: bool = True,
                                    "path_kind": "legacy_pipeline_root"}}
                   if voice_approved else
                   {"selection_status": "pending", "approved_profile": None,
-                   "working_default": {"provider": "edge", "voice": "x",
-                                       "approved": False},
+                   "working_default": DEFAULT_PENDING_WORKING_DEFAULT,
                    "preview_dir": {"path": "voice_previews",
                                    "path_kind": "legacy_pipeline_root"}}),
         "routing": {"policy_version": 1},
@@ -863,7 +883,12 @@ def s16_cloudtts_strict_refuses_without_fallback():
 
 def s17_cloudtts_evaluation_fallback_records_actual_provider():
     root = temp_root()
-    make_pack(root / "channels", "beacon", voice_approved=False)
+    wd = {"provider": "gemini_cloudtts",
+         "settings": {"voice": "SomeVoice", "model": "requested-cloud-model",
+                     "speaking_rate": 0.8, "locale": "en-IN",
+                     "style": "requested cloud style"},
+         "approved": False}
+    make_pack(root / "channels", "beacon", voice_approved=False, working_default=wd)
     proj = make_project(root, "ep_x", channel_id="beacon")
     script = proj / "script_demo.txt"
     out_path = root / "voice_previews" / "candidate_cloudtts.mp3"
@@ -873,14 +898,23 @@ def s17_cloudtts_evaluation_fallback_records_actual_provider():
     with mock.patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
         with World(root):
             code = _run_main_ex(
-                ["--project", str(proj), "--script", str(script), "--out", str(out_path),
-                 "--provider", "gemini_cloudtts", "--voice", "SomeVoice"],
+                ["--project", str(proj), "--script", str(script), "--out", str(out_path)],
                 patches=[mock.patch.object(gsa, "_get_gcloud_access_token", token_fn),
                         mock.patch.object(gsa, "_gemini_call", gemini_call)])
     check("evaluation cloudtts-with-fallback succeeds", code == 0, f"exit={code}")
     sidecar = json.loads(Path(f"{out_path}.voice.json").read_text(encoding="utf-8"))
     check("evaluation sidecar records the provider that ACTUALLY ran (gemini)",
           sidecar.get("provider") == "gemini", sidecar)
+    check("evaluation sidecar names the requested provider separately",
+          sidecar.get("requested_provider") == "gemini_cloudtts", sidecar)
+    check("evaluation sidecar's model is gemini's own, NOT the requested cloud model",
+          sidecar.get("model") == gsa.DEFAULT_MODEL_GEMINI
+          and sidecar.get("model") != "requested-cloud-model", sidecar)
+    check("evaluation sidecar's effective_settings describe gemini's actual call",
+          sidecar.get("effective_settings", {}).get("model") == gsa.DEFAULT_MODEL_GEMINI,
+          sidecar)
+    check("evaluation sidecar still names the channel", sidecar.get("channel_id") == "beacon",
+          sidecar)
 
 
 # ── 9. production normalization is a real invariant, not a flag ────────────
@@ -1033,6 +1067,308 @@ def s24_preview_relative_out_resolves_from_pipeline_root_not_project():
           not (proj / "source_audio").exists())
 
 
+# ── 11. Task 2B-A: evaluation resolved from the Channel Pack's own ─────────
+# ── working_default, never from this module's legacy DEFAULT_* constants ───
+
+def s25_evaluation_uses_second_channel_own_edge_profile():
+    """A second, unrelated Channel Pack with an Edge working_default
+    deliberately different from every module DEFAULT_* constant (and from
+    Interested Indian's own legacy_config) must dispatch with ITS values —
+    proving evaluation is no longer silently borrowing Interested Indian's
+    generated legacy adapter."""
+    root = temp_root()
+    wd = {"provider": "edge",
+         "settings": {"voice": "en-IN-TestSecondChannelVoice",
+                     "rate": "+31%", "pitch": "+9Hz"},
+         "approved": False}
+    make_pack(root / "channels", "beacon", voice_approved=False, working_default=wd)
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+    out_path = root / "voice_previews" / "candidate_edge.mp3"
+
+    captured = {}
+
+    async def _capturing_edge(text, voice, output_path, rate=None, pitch=None):
+        captured["voice"], captured["rate"], captured["pitch"] = voice, rate, pitch
+        Path(output_path).write_bytes(b"ID3fake mp3 bytes for a test\n")
+
+    with World(root):
+        code = _run_main_ex(["--project", str(proj), "--script", str(script),
+                             "--out", str(out_path)], edge_fn=_capturing_edge)
+    check("evaluation with no override succeeds", code == 0, f"exit={code}")
+    check("edge voice is the channel's OWN working_default, not the module default",
+          captured.get("voice") == "en-IN-TestSecondChannelVoice"
+          and captured.get("voice") != gsa.DEFAULT_VOICE_EDGE, captured)
+    check("edge rate matches the channel's own working_default",
+          captured.get("rate") == "+31%", captured)
+    check("edge pitch matches the channel's own working_default",
+          captured.get("pitch") == "+9Hz", captured)
+    sidecar = json.loads(Path(f"{out_path}.voice.json").read_text(encoding="utf-8"))
+    check("sidecar names the channel", sidecar.get("channel_id") == "beacon", sidecar)
+    check("sidecar's effective_settings match the working_default exactly",
+          sidecar.get("effective_settings") == wd["settings"], sidecar)
+
+
+def s26_evaluation_working_default_gemini():
+    root = temp_root()
+    wd = {"provider": "gemini",
+         "settings": {"voice": "WdGeminiVoice", "model": "wd-gemini-model",
+                     "speaking_rate": 0.61},
+         "approved": False}
+    make_pack(root / "channels", "beacon", voice_approved=False, working_default=wd)
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+    out_path = root / "voice_previews" / "candidate_gemini.mp3"
+
+    call = mock.Mock(return_value=(b"raw-audio-bytes", "audio/mpeg"))
+    with mock.patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
+        with World(root):
+            code = _run_main_ex(
+                ["--project", str(proj), "--script", str(script), "--out", str(out_path)],
+                patches=[mock.patch.object(gsa, "_gemini_call", call)])
+    check("evaluation gemini working-default run succeeds", code == 0, f"exit={code}")
+    args, kwargs = call.call_args.args, call.call_args.kwargs
+    check("gemini voice matches working_default", args[1] == "WdGeminiVoice", args)
+    check("gemini model matches working_default", args[3] == "wd-gemini-model", args)
+    check("gemini speaking_rate matches working_default",
+          kwargs.get("speaking_rate") == 0.61, kwargs)
+    sidecar = json.loads(Path(f"{out_path}.voice.json").read_text(encoding="utf-8"))
+    check("sidecar names the channel", sidecar.get("channel_id") == "beacon", sidecar)
+    check("sidecar's effective_settings match the working_default exactly",
+          sidecar.get("effective_settings") == wd["settings"], sidecar)
+
+
+def s27_evaluation_working_default_cloudtts():
+    root = temp_root()
+    wd = {"provider": "gemini_cloudtts",
+         "settings": {"voice": "WdCloudVoice", "model": "wd-cloud-model",
+                     "speaking_rate": 0.52, "locale": "yy-YY",
+                     "style": "a working-default style prompt"},
+         "approved": False}
+    make_pack(root / "channels", "beacon", voice_approved=False, working_default=wd)
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+    out_path = root / "voice_previews" / "candidate_cloud.mp3"
+
+    call = mock.Mock(return_value=b"raw-mp3-bytes")
+    token_fn = mock.Mock(return_value=("faketoken", "fakeproject"))
+    with World(root):
+        code = _run_main_ex(
+            ["--project", str(proj), "--script", str(script), "--out", str(out_path)],
+            patches=[mock.patch.object(gsa, "_cloudtts_call", call),
+                    mock.patch.object(gsa, "_get_gcloud_access_token", token_fn)])
+    check("evaluation cloudtts working-default run succeeds", code == 0, f"exit={code}")
+    args = call.call_args.args
+    check("cloudtts voice matches working_default", args[1] == "WdCloudVoice", args)
+    check("cloudtts locale matches working_default", args[2] == "yy-YY", args)
+    check("cloudtts model matches working_default", args[3] == "wd-cloud-model", args)
+    check("cloudtts style matches working_default",
+          args[4] == "a working-default style prompt", args)
+    check("cloudtts speaking_rate matches working_default", args[7] == 0.52, args)
+    sidecar = json.loads(Path(f"{out_path}.voice.json").read_text(encoding="utf-8"))
+    check("sidecar's effective_settings match the working_default exactly",
+          sidecar.get("effective_settings") == wd["settings"], sidecar)
+
+
+def s28_evaluation_working_default_elevenlabs():
+    root = temp_root()
+    wd = {"provider": "elevenlabs",
+         "settings": {"voice_id": "WdElevenVoiceId", "model": "wd-eleven-model",
+                     "stability": 0.13, "similarity_boost": 0.27, "speed": 1.05},
+         "approved": False}
+    make_pack(root / "channels", "beacon", voice_approved=False, working_default=wd)
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+    out_path = root / "voice_previews" / "candidate_eleven.mp3"
+
+    call = mock.Mock(return_value=b"raw-mp3-bytes")
+    with mock.patch.dict(os.environ, {"ELEVENLABS_API_KEY": "test-key"}):
+        with World(root):
+            code = _run_main_ex(
+                ["--project", str(proj), "--script", str(script), "--out", str(out_path)],
+                patches=[mock.patch.object(gsa, "_elevenlabs_call", call)])
+    check("evaluation elevenlabs working-default run succeeds", code == 0, f"exit={code}")
+    args = call.call_args.args
+    check("elevenlabs voice_id matches working_default", args[1] == "WdElevenVoiceId", args)
+    check("elevenlabs model matches working_default", args[3] == "wd-eleven-model", args)
+    check("elevenlabs stability matches working_default", args[4] == 0.13, args)
+    check("elevenlabs similarity_boost matches working_default", args[5] == 0.27, args)
+    check("elevenlabs speed matches working_default", args[6] == 1.05, args)
+    sidecar = json.loads(Path(f"{out_path}.voice.json").read_text(encoding="utf-8"))
+    check("sidecar's effective_settings match the working_default exactly",
+          sidecar.get("effective_settings") == wd["settings"], sidecar)
+
+
+def s29_evaluation_working_default_grok():
+    root = temp_root()
+    wd = {"provider": "grok",
+         "settings": {"voice_id": "WdGrokVoiceId", "language": "zz", "speed": 0.77},
+         "approved": False}
+    make_pack(root / "channels", "beacon", voice_approved=False, working_default=wd)
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+    out_path = root / "voice_previews" / "candidate_grok.mp3"
+
+    call = mock.Mock(return_value=b"raw-mp3-bytes")
+    with mock.patch.dict(os.environ, {"XAI_API_KEY": "test-key"}):
+        with World(root):
+            code = _run_main_ex(
+                ["--project", str(proj), "--script", str(script), "--out", str(out_path)],
+                patches=[mock.patch.object(gsa, "_grok_call", call)])
+    check("evaluation grok working-default run succeeds", code == 0, f"exit={code}")
+    args = call.call_args.args
+    check("grok voice_id matches working_default", args[1] == "WdGrokVoiceId", args)
+    check("grok language matches working_default", args[3] == "zz", args)
+    check("grok speed matches working_default", args[4] == 0.77, args)
+    sidecar = json.loads(Path(f"{out_path}.voice.json").read_text(encoding="utf-8"))
+    check("sidecar's effective_settings match the working_default exactly",
+          sidecar.get("effective_settings") == wd["settings"], sidecar)
+
+
+def s30_evaluation_cli_override_changes_dispatch_and_sidecar():
+    root = temp_root()
+    wd = {"provider": "edge",
+         "settings": {"voice": "WdEdgeVoice", "rate": "+10%", "pitch": "+5Hz"},
+         "approved": False}
+    make_pack(root / "channels", "beacon", voice_approved=False, working_default=wd)
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+    out_path = root / "voice_previews" / "candidate_override.mp3"
+
+    captured = {}
+
+    async def _capturing_edge(text, voice, output_path, rate=None, pitch=None):
+        captured["voice"], captured["rate"], captured["pitch"] = voice, rate, pitch
+        Path(output_path).write_bytes(b"ID3fake mp3 bytes for a test\n")
+
+    with World(root):
+        code = _run_main_ex(["--project", str(proj), "--script", str(script),
+                             "--out", str(out_path), "--voice", "OverrideVoice"],
+                            edge_fn=_capturing_edge)
+    check("evaluation with a CLI voice override succeeds", code == 0, f"exit={code}")
+    check("dispatch used the OVERRIDE voice, not the working_default's",
+          captured.get("voice") == "OverrideVoice", captured)
+    check("dispatch kept the working_default's rate/pitch (not overridden)",
+          captured.get("rate") == "+10%" and captured.get("pitch") == "+5Hz", captured)
+    sidecar = json.loads(Path(f"{out_path}.voice.json").read_text(encoding="utf-8"))
+    check("sidecar truthfully records the override voice",
+          sidecar.get("voice") == "OverrideVoice", sidecar)
+    check("sidecar's effective_settings truthfully record the override",
+          sidecar.get("effective_settings", {}).get("voice") == "OverrideVoice", sidecar)
+
+
+def s31_evaluation_mismatched_provider_refused():
+    root = temp_root()
+    wd = {"provider": "edge",
+         "settings": {"voice": "WdEdgeVoice", "rate": "+0%", "pitch": "+0Hz"},
+         "approved": False}
+    make_pack(root / "channels", "beacon", voice_approved=False, working_default=wd)
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+    out_path = root / "voice_previews" / "candidate_mismatch.mp3"
+
+    called = {"n": 0}
+
+    async def _tracking_edge(*a, **k):
+        called["n"] += 1
+        return await _fake_edge_generate(*a, **k)
+
+    with World(root):
+        code = _run_main_ex(["--project", str(proj), "--script", str(script),
+                             "--out", str(out_path), "--provider", "grok"],
+                            edge_fn=_tracking_edge)
+    check("a mismatched explicit --provider is refused", code != 0, f"exit={code}")
+    check("nothing was synthesised", called["n"] == 0)
+    check("no output directory was created", not (root / "voice_previews").exists())
+
+
+def s32_evaluation_null_working_default_refused():
+    root = temp_root()
+    make_pack(root / "channels", "beacon", voice_approved=True, working_default=None)
+    proj = make_project(root, "ep_x", channel_id="beacon")
+    script = proj / "script_demo.txt"
+    out_path = root / "voice_previews" / "candidate_null.mp3"
+
+    called = {"n": 0}
+
+    async def _tracking_edge(*a, **k):
+        called["n"] += 1
+        return await _fake_edge_generate(*a, **k)
+
+    with World(root):
+        code = _run_main_ex(["--project", str(proj), "--script", str(script),
+                             "--out", str(out_path)], edge_fn=_tracking_edge)
+    check("a null working_default is refused", code != 0, f"exit={code}")
+    check("nothing was synthesised", called["n"] == 0)
+    check("no preview directory was created", not (root / "voice_previews").exists())
+
+
+def s33_schema_rejects_malformed_working_default():
+    base_doc = {
+        "schema_version": 1, "channel_id": "malformed", "channel_dna_version": 1,
+        "brand": {"name": "m", "promise": "p", "language": "English"},
+        "audience": {"primary": "t", "secondary": "t"},
+        "editorial": {"tone": ["dry"], "principles": ["Say true things."]},
+        "narrative": {"structure": [{"step": 1, "beat": "Open."}],
+                     "portfolio_planning_guidance": {
+                         "note": "n", "shares": [{"share_pct": 100, "label": "x"}]}},
+        "visual_style": {"palette": {"ink": "#101010"}, "pad_color": "#101010",
+                         "rules": ["Flat."], "ken_burns_zoom": 1.05},
+        "host": {"enabled": False},
+        "voice": {"selection_status": "pending", "approved_profile": None,
+                  "working_default": None,
+                  "preview_dir": {"path": "voice_previews",
+                                  "path_kind": "legacy_pipeline_root"}},
+        "routing": {"policy_version": 1},
+        "renderers": {"capabilities": {"PHOTO": "pexels"}},
+        "evidence": {"require_provenance_for": ["PHOTO"]},
+        "safety": {"rules": ["x"]},
+        "economics": {"currency": "USD", "image_pricing": {}},
+    }
+
+    def with_working_default(wd):
+        doc = json.loads(json.dumps(base_doc))
+        doc["voice"]["working_default"] = wd
+        return doc
+
+    # Incomplete: edge provider missing "pitch"
+    incomplete = with_working_default(
+        {"provider": "edge", "settings": {"voice": "v", "rate": "+0%"}, "approved": False})
+    try:
+        cc.validate_document(incomplete, source="t")
+        check("an incomplete working_default is refused", False, "it validated")
+    except cc.ChannelError:
+        check("an incomplete working_default is refused", True)
+
+    # Cross-provider: edge settings smuggling in an elevenlabs-only field
+    cross = with_working_default(
+        {"provider": "edge",
+         "settings": {"voice": "v", "rate": "+0%", "pitch": "+0Hz", "stability": 0.5},
+         "approved": False})
+    try:
+        cc.validate_document(cross, source="t")
+        check("a cross-provider working_default is refused", False, "it validated")
+    except cc.ChannelError:
+        check("a cross-provider working_default is refused", True)
+
+    # approved:true is refused regardless of an otherwise-valid shape
+    approved_true = with_working_default(
+        {"provider": "edge", "settings": {"voice": "v", "rate": "+0%", "pitch": "+0Hz"},
+         "approved": True})
+    try:
+        cc.validate_document(approved_true, source="t")
+        check("a working_default marked approved:true is refused", False, "it validated")
+    except cc.ChannelError:
+        check("a working_default marked approved:true is refused", True)
+
+    # A genuinely complete, correct working_default validates cleanly.
+    good = with_working_default(
+        {"provider": "edge", "settings": {"voice": "v", "rate": "+0%", "pitch": "+0Hz"},
+         "approved": False})
+    cc.validate_document(good, source="t")
+    check("a genuinely complete working_default validates", True)
+
+
 def s23_split_audio_symlink_escape_refused():
     root = temp_root()
     proj = root / "symlink_proj"
@@ -1123,6 +1459,24 @@ def main() -> int:
             s23_split_audio_symlink_escape_refused)
         run("24. relative preview --out resolves from the pipeline root",
             s24_preview_relative_out_resolves_from_pipeline_root_not_project)
+        run("25. evaluation uses a second channel's own edge working_default",
+            s25_evaluation_uses_second_channel_own_edge_profile)
+        run("26. evaluation working_default dispatch: gemini",
+            s26_evaluation_working_default_gemini)
+        run("27. evaluation working_default dispatch: gemini_cloudtts",
+            s27_evaluation_working_default_cloudtts)
+        run("28. evaluation working_default dispatch: elevenlabs",
+            s28_evaluation_working_default_elevenlabs)
+        run("29. evaluation working_default dispatch: grok",
+            s29_evaluation_working_default_grok)
+        run("30. an evaluation CLI override changes dispatch and the sidecar truthfully",
+            s30_evaluation_cli_override_changes_dispatch_and_sidecar)
+        run("31. a mismatched explicit --provider is refused before dispatch",
+            s31_evaluation_mismatched_provider_refused)
+        run("32. a null working_default is refused before dispatch",
+            s32_evaluation_null_working_default_refused)
+        run("33. the schema rejects malformed working_default shapes",
+            s33_schema_rejects_malformed_working_default)
     finally:
         for td in _temps:
             import shutil

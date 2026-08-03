@@ -188,7 +188,9 @@ def make_pack(channels_dir: Path, channel_id: str, *, host: bool = True,
                                    "path_kind": "legacy_pipeline_root"}}
                   if voice_approved else
                   {"selection_status": "pending", "approved_profile": None,
-                   "working_default": {"provider": "edge", "voice": "v",
+                   "working_default": {"provider": "edge",
+                                       "settings": {"voice": "v", "rate": "+0%",
+                                                    "pitch": "+0Hz"},
                                        "approved": False},
                    "preview_dir": {"path": "voice_previews",
                                    "path_kind": "legacy_pipeline_root"}}),

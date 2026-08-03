@@ -312,23 +312,108 @@
           ]
         },
         "working_default": {
+          "description": "Either null (no evaluation default committed yet) or a COMPLETE evaluation profile — provider-discriminated exactly like approved_profile, using the identical per-provider settings shape, so evaluation dispatch never has to borrow a missing field from the legacy adapter or anywhere else. additionalProperties:false on each settings shape means a working default can neither omit a required field nor smuggle in one from another provider.",
           "oneOf": [
             { "type": "null" },
             {
               "type": "object",
               "additionalProperties": false,
-              "required": ["provider", "voice", "approved"],
+              "required": ["provider", "settings", "approved"],
               "properties": {
-                "provider": { "type": "string" },
-                "voice": { "type": "string" },
-                "rate": { "type": "string" },
-                "pitch": { "type": "string" },
+                "provider": { "enum": ["edge", "gemini", "gemini_cloudtts", "elevenlabs", "grok"] },
+                "settings": { "type": "object" },
                 "approved": {
                   "const": false,
                   "description": "A working default is by definition not approved. If it were, it would belong in approved_profile."
                 },
                 "_note": { "type": "string" }
-              }
+              },
+              "allOf": [
+                {
+                  "if": { "properties": { "provider": { "const": "edge" } } },
+                  "then": {
+                    "properties": {
+                      "settings": {
+                        "type": "object", "additionalProperties": false,
+                        "required": ["voice", "rate", "pitch"],
+                        "properties": {
+                          "voice": { "type": "string" },
+                          "rate": { "type": "string" },
+                          "pitch": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": { "properties": { "provider": { "const": "gemini" } } },
+                  "then": {
+                    "properties": {
+                      "settings": {
+                        "type": "object", "additionalProperties": false,
+                        "required": ["voice", "model", "speaking_rate"],
+                        "properties": {
+                          "voice": { "type": "string" },
+                          "model": { "type": "string" },
+                          "speaking_rate": { "type": "number" }
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": { "properties": { "provider": { "const": "gemini_cloudtts" } } },
+                  "then": {
+                    "properties": {
+                      "settings": {
+                        "type": "object", "additionalProperties": false,
+                        "required": ["voice", "model", "speaking_rate", "locale", "style"],
+                        "properties": {
+                          "voice": { "type": "string" },
+                          "model": { "type": "string" },
+                          "speaking_rate": { "type": "number" },
+                          "locale": { "type": "string" },
+                          "style": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": { "properties": { "provider": { "const": "elevenlabs" } } },
+                  "then": {
+                    "properties": {
+                      "settings": {
+                        "type": "object", "additionalProperties": false,
+                        "required": ["voice_id", "model", "stability", "similarity_boost", "speed"],
+                        "properties": {
+                          "voice_id": { "type": "string" },
+                          "model": { "type": "string" },
+                          "stability": { "type": "number" },
+                          "similarity_boost": { "type": "number" },
+                          "speed": { "type": "number" }
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": { "properties": { "provider": { "const": "grok" } } },
+                  "then": {
+                    "properties": {
+                      "settings": {
+                        "type": "object", "additionalProperties": false,
+                        "required": ["voice_id", "language", "speed"],
+                        "properties": {
+                          "voice_id": { "type": "string" },
+                          "language": { "type": "string" },
+                          "speed": { "type": "number" }
+                        }
+                      }
+                    }
+                  }
+                }
+              ]
             }
           ]
         },
