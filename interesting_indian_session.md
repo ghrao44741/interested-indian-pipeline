@@ -1894,3 +1894,149 @@ Eleven suites, run twice, identical, all green: the ten Task 1/2A suites
    every PHOTO and DOCUMENT.
 4. **Semantic visual dry-run** → Checkpoint 3 approval → only then paid pilot
    generation.
+
+---
+
+## Session — 2026-08-02/03: three independent-review rounds on the narration path, then Task 2B-A
+
+Four more reviewed commits after `bdbed8a`, each starting from a fresh
+external review pass rather than a rubber stamp — every round found at least
+one real gap outside the fixtures the previous round's own tests supplied.
+
+### `e8744f7` — three defects found in `7194355`
+
+1. **`--preview` silently discarded an explicit `--out`.** `--out` defaulted
+   to the literal string `"narration.mp3"`, so "was it explicitly passed"
+   was undetectable; the preview branch unconditionally overwrote it with a
+   generated `preview_<voice>.mp3` name. Fixed by defaulting `--out` to
+   `None` and honoring an explicit value exactly, preview or not — plus
+   refusing `--preview` outright when the resolved destination is
+   production (a one-sentence clip must never become canonical narration,
+   which also closes the normalization-skip gap below).
+2. **Production dispatch forwarded only a subset of the approved profile.**
+   `voice`/`speaking_rate`/`speed` reached the provider call; `model`,
+   `locale`, `style`, `stability`, `similarity_boost`, `language` silently
+   fell back to module `DEFAULT_*` constants. Worse: an approved
+   `gemini_cloudtts` profile could synthesize through plain `gemini` instead
+   whenever gcloud auth was unavailable, while the sidecar still claimed
+   Cloud TTS ran. Fixed by forwarding every field from the resolved profile,
+   and adding `strict=` to `cloudtts_generate()` — production now refuses
+   outright rather than falling back; evaluation keeps the fallback but the
+   sidecar records the provider that actually ran.
+3. **The split stage had no `--audio` containment at all.** `audio_path =
+   f"{source_audio_dir}/{args.audio}"` was bare string concatenation;
+   `--audio ../escaped.mp3` reached WhisperX transcription (confirmed
+   against the real stub sentinel) before the existing manifest-level
+   containment check in `generation_gate.narration_binding_problems()` ever
+   got a chance to run. Fixed with the identical reject-then-resolve-then-
+   `is_relative_to()` shape, one stage earlier, before any directory is
+   created or file touched.
+
+Also made production normalization a fixed invariant: `PRODUCTION_TARGET_LUFS
+= -14.0`, an `ffmpeg` preflight check, `--no-normalize` refused for
+production, and a failed normalization pass blocks the sidecar write
+entirely rather than writing one over unnormalized audio.
+
+### `5fdc828` — one more preview/`--out` gap, found in review of `e8744f7`
+
+A *relative* `--out` during `--preview` was still being rewritten into
+`{project}/source_audio/voice_previews/candidate.mp3` — the production
+bare-filename shorthand was applying to an explicit preview destination,
+contradicting "honored exactly." Fixed by introducing `SCRIPT_DIR` (a
+mockable module constant replacing the inline `Path(__file__).parent`) and
+resolving a relative preview `--out` from the pipeline root, never from the
+project.
+
+`ea8bb23` recorded (without implementing) a Task 2B backlog item spotted in
+the same review: evaluation runs with an omitted provider/voice still used
+this module's legacy `DEFAULT_*` constants — Interested Indian's own
+generated legacy adapter — rather than the loaded Channel Pack's own
+`voice.working_default`, which would silently misconfigure a second channel.
+
+### `ffc15b4` — Task 2B-A: evaluation defaults move into the Channel Pack
+
+The backlog item above, explicitly authorized as a narrowly-scoped slice of
+Task 2B (evaluation defaults only — semantic routing stays unauthorized).
+
+- `voice.working_default` becomes provider-discriminated in the schema,
+  identical per-provider `settings` shape to `approved_profile`
+  (`additionalProperties: false` per provider, so an incomplete or
+  cross-provider default fails validation). Migrated the real
+  `channels/interested_indian/channel.json` and regenerated
+  `CHANNEL_DNA.md`/`channel_config.json`/`brand.json` through
+  `render_channel_dna.py` only.
+- New `_resolve_evaluation_voice()`: starts from `working_default`, refuses
+  before any credential/client/`mkdir` if it's `null` or if an explicit
+  `--provider` conflicts with it, and layers CLI overrides on top per field
+  — unlike production, which refuses any conflicting override outright,
+  evaluation is exactly where experimentation is meant to be allowed. A
+  shared `_unpack_effective_profile()` keeps production's and evaluation's
+  per-provider field extraction (voice vs voice_id, which fields each
+  provider even has) from drifting apart.
+- Evaluation sidecars now record `channel_id` and the complete
+  `effective_settings` actually used; when the `gemini_cloudtts → gemini`
+  fallback fires, the sidecar names both the requested and actual provider
+  and records gemini's own settings — never the requested Cloud TTS
+  model/locale/style.
+
+`1b08a26` marked the backlog item (`TASKS.md` #18) complete in the same
+style as the surrounding list.
+
+### `e1a38da` — one more portability gap, found in review of `ffc15b4`
+
+Dispatch now correctly used the resolved channel's `working_default`, but an
+**omitted** `--preview --out` still built its default filename from
+`DEFAULT_VOICE_EDGE` (`"en-US-GuyNeural"`) — reproduced directly: dispatch
+voice `SecondChannelVoice`, filename `preview_en-US-GuyNeural.mp3`.
+Misleading on its own, and a real collision risk if two channels ever shared
+a preview root.
+
+Fixed by moving the `_resolve_evaluation_voice()` call to before the default
+filename is built specifically for that one case (an omitted `--out` during
+`--preview`, whose destination is always the channel's own preview
+directory, so it was always evaluation regardless of when the profile got
+resolved) — cached so the later, generic mode-branch resolution reuses it
+rather than resolving twice. Also updated `--provider`/`--voice` CLI help
+text that still named `channel_config.json` as the evaluation source.
+
+### State
+
+Eleven suites, run twice after each of the four commits above, sixteen runs
+total, all identical, all green. Gate matrix unchanged in kind throughout:
+
+- **pilot_neet_scandal** — `BLOCKED (2)` at both identity and generation,
+  `SCENE-066` still named independently of its stale plan. Not touched.
+- **test_2min** — identity `ready`; generation `BLOCKED (4)`: pending voice
+  profile, missing narration binding, a stale visual-plan channel-pack hash
+  (pre-existing — the plan was made against an earlier pack revision; not
+  something these commits caused or need to fix), and no Checkpoint 3
+  approval.
+
+Voice `selection_status` is still `"pending"` for `interested_indian` —
+`working_default` now has the right *shape* (and now actually governs
+evaluation dispatch), but the actual voice decision from the thirteen
+`voice_previews/` candidates is still outstanding.
+
+Two unrelated, intentional user changes (`character.zip` and
+`character (2).zip` deleted from the repo, apparently superseded by the
+untracked `character.7z`) sat in the working tree through all four commits
+and were never staged or touched by any of them.
+
+### Pending — next session, in order
+
+1. **Voice decision — still the blocker**, unchanged from last time. Once
+   chosen, record it as `voice.approved_profile` (now schema-identical to
+   `working_default`'s shape).
+2. **Re-narrate** through the production path → verified sidecar →
+   **re-split** → clears `SCENE-066` if the re-narration also fixes the
+   underlying alignment gap.
+3. **Task 2B, remaining scope (unauthorized)** — semantic routing
+   (`visual_routes.json`, MAP/CHART/TIMELINE/DOCUMENT/PHOTO/REENACTMENT/
+   ILLUSTRATION with `host_present`/`host_mode` independent of
+   `visual_type`), stripping hardcoded mascot/channel prose out of
+   `generate_image_prompts.py`/`generate_images_flux.py`/`review_images.py`
+   in favour of the Channel Pack, deterministic DOCUMENT/TIMELINE renderers,
+   provenance for every PHOTO and DOCUMENT. Evaluation-defaults migration
+   (2B-A) is now done; this is everything else.
+4. **Semantic visual dry-run** → Checkpoint 3 approval → only then paid
+   pilot generation.
