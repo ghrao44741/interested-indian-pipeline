@@ -44,6 +44,7 @@ if "anthropic" not in sys.modules:
 
 import approve_checkpoint as ac          # noqa: E402
 import channel_context as cc             # noqa: E402
+import channel_fixture                  # noqa: E402
 import composite_character               # noqa: E402
 import generation_gate as gate           # noqa: E402
 import plan_visuals                      # noqa: E402
@@ -55,6 +56,16 @@ import source_ids                        # noqa: E402
 
 FIXTURE_PACK = ROOT / "tests" / "fixtures" / "channels" / "test_channel"
 REAL_CHANNEL = "interested_indian"
+
+# Shared with make_pack()'s "voice_approved" branch below, so a project built
+# by _ready_project() can carry a narration binding that genuinely matches the
+# pack it was planned against.
+FIXTURE_APPROVED_PROFILE = {
+    "provider": "edge",
+    "settings": {"voice": "v", "rate": "+0%", "pitch": "+0Hz"},
+    "approved_by": "test",
+    "approved_at": "2026-01-01T00:00:00+00:00",
+}
 
 failures = []
 _temps = []
@@ -171,15 +182,16 @@ def make_pack(channels_dir: Path, channel_id: str, *, host: bool = True,
                                       "soft_ceiling_pct": 35, "max_consecutive": 2}
                                      if host else {})},
         "voice": ({"selection_status": "approved",
-                   "approved_profile": {"provider": "mock", "voice": "v",
-                                        "approved_by": "test",
-                                        "approved_at": "2026-01-01T00:00:00+00:00"},
-                   "working_default": None, "preview_dir": "voice_previews"}
+                   "approved_profile": FIXTURE_APPROVED_PROFILE,
+                   "working_default": None,
+                   "preview_dir": {"path": "voice_previews",
+                                   "path_kind": "legacy_pipeline_root"}}
                   if voice_approved else
                   {"selection_status": "pending", "approved_profile": None,
-                   "working_default": {"provider": "mock", "voice": "v",
+                   "working_default": {"provider": "edge", "voice": "v",
                                        "approved": False},
-                   "preview_dir": "voice_previews"}),
+                   "preview_dir": {"path": "voice_previews",
+                                   "path_kind": "legacy_pipeline_root"}}),
         "routing": {"policy_version": 1},
         "renderers": {"capabilities": capabilities
                       or {"PHOTO": "pexels", "HOST_COMPOSITE": "approved_pose_compositor"}},
@@ -632,6 +644,14 @@ def _ready_project(voice_approved=True, channel="beacon"):
     make_pack(root / "channels", channel, voice_approved=voice_approved)
     spec = root / "channels" / channel / "character" / "character_spec.json"
     proj = make_project(root, "ep_x", channel_id=channel)
+    if voice_approved:
+        # A narration binding that genuinely matches FIXTURE_APPROVED_PROFILE,
+        # so "everything is fine, approval holds" tests are exercising a real
+        # narration_binding_problems() pass, not one exempted from the check.
+        m = json.loads((proj / "manifest.json").read_text(encoding="utf-8"))
+        m.update(channel_fixture.write_narration_fixture(
+            proj, effective_profile=FIXTURE_APPROVED_PROFILE))
+        (proj / "manifest.json").write_text(json.dumps(m, indent=2), encoding="utf-8")
     return root, proj, spec
 
 
@@ -780,26 +800,32 @@ def s_voice_output_allowlist():
         preview = c.voice_preview_dir
         preview.mkdir(parents=True, exist_ok=True)
 
-        def refused(label, target):
+        def refused(label, target, project_dir=None):
             try:
-                cc.require_voice_output_allowed(c, target)
+                cc.classify_voice_output(c, target, project_dir=project_dir)
                 check(label, False, f"allowed {target}")
             except cc.VoiceNotApproved:
                 check(label, True)
 
-        refused("project narration is refused", proj / "source_audio" / "narration.mp3")
-        refused("an arbitrary external path is refused", root / "elsewhere" / "n.mp3")
+        refused("project narration is refused while pending",
+                proj / "source_audio" / "narration.mp3", project_dir=proj)
+        refused("an arbitrary external path is refused",
+                root / "elsewhere" / "n.mp3", project_dir=proj)
         refused("a path outside the tree entirely is refused",
-                Path(tempfile.gettempdir()) / "escape.mp3")
+                Path(tempfile.gettempdir()) / "escape.mp3", project_dir=proj)
         refused("upward traversal out of the preview dir is refused",
-                preview / ".." / "source_audio" / "n.mp3")
+                preview / ".." / "source_audio" / "n.mp3", project_dir=proj)
         refused("traversal that lands back in a project is refused",
-                preview / ".." / "ep_x" / "source_audio" / "n.mp3")
+                preview / ".." / "ep_x" / "source_audio" / "n.mp3", project_dir=proj)
+        refused("no destination at all (no project) still refuses non-preview paths",
+                root / "elsewhere" / "n.mp3", project_dir=None)
 
-        ok = cc.require_voice_output_allowed(c, preview / "cand_a.mp3")
-        check("a preview-directory target is allowed", ok.name == "cand_a.mp3")
-        ok = cc.require_voice_output_allowed(c, preview / "sub" / "cand_b.mp3")
-        check("a nested preview target is allowed", ok.name == "cand_b.mp3")
+        mode, ok = cc.classify_voice_output(c, preview / "cand_a.mp3")
+        check("a preview-directory target is evaluation",
+              mode == "evaluation" and ok.name == "cand_a.mp3")
+        mode, ok = cc.classify_voice_output(c, preview / "sub" / "cand_b.mp3")
+        check("a nested preview target is evaluation",
+              mode == "evaluation" and ok.name == "cand_b.mp3")
 
         link = root / "sneaky"
         try:
@@ -809,15 +835,33 @@ def s_voice_output_allowlist():
         else:
             (proj / "source_audio").mkdir(parents=True, exist_ok=True)
             refused("a symlinked directory escaping the preview dir is refused",
-                    link / "narration.mp3")
+                    link / "narration.mp3", project_dir=proj)
 
     root2, proj2, _ = _ready_project(voice_approved=True)
     with World(root2):
         c2 = cc.load_channel("beacon")
-        out = cc.require_voice_output_allowed(
-            c2, proj2 / "source_audio" / "narration.mp3")
-        check("an approved voice may write project narration",
-              out.name == "narration.mp3")
+        mode, out = cc.classify_voice_output(
+            c2, proj2 / "source_audio" / "narration.mp3", project_dir=proj2)
+        check("an approved voice may write project narration as production",
+              mode == "production" and out.name == "narration.mp3")
+
+        # Boundary 1: --preview (a truncated run) targeting project audio with
+        # an approved voice is STILL production — destination decides, not the
+        # flag. (The CLI-level conflict refusal itself is exercised against
+        # generate_source_audio.py in tests/test_narration_binding.py; this
+        # confirms the primitive classifies the destination correctly.)
+        mode, out = cc.classify_voice_output(
+            c2, proj2 / "source_audio" / "preview_x.mp3", project_dir=proj2)
+        check("--preview targeting project audio still classifies as production",
+              mode == "production")
+
+        # Boundary 2: a full run (no truncation implied at this layer — this
+        # primitive has no notion of --preview at all) targeting the preview
+        # root remains evaluation even though the voice is approved.
+        mode, out = cc.classify_voice_output(
+            c2, c2.voice_preview_dir / "full_script_probe.mp3", project_dir=proj2)
+        check("a run targeting voice_previews/ remains evaluation even when approved",
+              mode == "evaluation")
 
 
 # ── 12-15. the real repository is unchanged ──────────────────────────────────

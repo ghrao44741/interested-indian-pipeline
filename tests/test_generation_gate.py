@@ -149,7 +149,7 @@ def build_fixture() -> tuple[Path, Path]:
         })
     manifest = channel_fixture.stamp(
         {"episode": "demo", "identity_state": "ok", "identity_reasons": [],
-         "scenes": scenes})
+         "scenes": scenes}, project_dir=proj)
     channel_fixture.install(td)
     (proj / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 

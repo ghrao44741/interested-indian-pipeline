@@ -70,7 +70,13 @@ APPROVAL_REQUIRED_FIELDS = ("schema_version", "project", "plan_id",
 # reference resolving into any of these must never reach a render: raw holds
 # pre-alpha generator output, pose_candidates holds unreviewed replacements,
 # archive holds superseded identities (the v1 child face lives there).
-NON_RENDERABLE_DIRS = ("pose_candidates", "pose_sources", "archive", "raw", "pending")
+# Re-exported from channel_context, which is the lower-level module and is the
+# one place this list is actually defined now — a master path and a preview
+# directory both need the same "underneath an approved subtree is not enough"
+# check, so it lives where both channel_context._resolve_asset() and this
+# module's _check_masters() can share it without one importing the other's
+# private state.
+NON_RENDERABLE_DIRS = channel_context.NON_RENDERABLE_DIRS
 
 
 # ── the registry of paid entry points ────────────────────────────────────────
@@ -317,6 +323,102 @@ def _check_channel(rep: GateReport, project_dir: Path):
     return ctx
 
 
+def narration_binding_problems(project_dir: Path, manifest: dict, context) -> list[str]:
+    """Human-readable problems with this episode's recorded narration binding.
+
+    Pure and side-effect-free so both `require_generation_ready()` and
+    the approval writer (`approve_checkpoint.py`) can call the exact same check —
+    approval must not be grantable over unverifiable audio only to fail later,
+    at dispatch, with the check having lived in one place but not the other.
+
+    Verifies, in order: the four narration fields are present (their absence
+    means this manifest predates binding enforcement — treated as
+    unverifiable, not silently passed); `narration_audio_file` is a safe,
+    project-relative path actually inside `source_audio/`; the on-disk file at
+    that path still hashes to `narration_audio_sha256`; and — the missing link
+    a hash-only check would otherwise leave open — that the recorded hash
+    genuinely describes the recorded settings and that both still match the
+    channel's current approval:
+
+        canonical_sha256(narration_effective_profile)
+            == narration_voice_profile_sha256 == context.voice_profile_sha256
+
+    and `narration_effective_profile` equals the channel's current
+    `approved_profile` dict exactly, not merely its hash. Without this, a
+    sidecar or manifest could name the current approved hash correctly while
+    `narration_effective_profile` had been edited to describe a different
+    voice — the hash would look right only because nothing ever recomputes it
+    from the dict it is supposed to describe.
+    """
+    if context is None:
+        return []          # _check_channel already reports the missing channel
+
+    problems: list[str] = []
+    required = ("narration_audio_file", "narration_voice_profile_sha256",
+               "narration_audio_sha256", "narration_effective_profile")
+    missing = [f for f in required if not manifest.get(f)]
+    if missing:
+        return [f"no verified narration binding recorded ({', '.join(missing)} "
+                f"missing) — this manifest predates binding enforcement or was "
+                f"never split with a verified sidecar; re-split with a channel-"
+                f"bound production narration file"]
+
+    raw = manifest["narration_audio_file"]
+    p = Path(raw)
+    if p.is_absolute() or ".." in p.parts:
+        problems.append(f"narration_audio_file {raw!r} is absolute or traverses "
+                        f"upward — refusing to resolve it at all")
+    else:
+        audio_root = (project_dir / "source_audio").resolve()
+        resolved = (project_dir / p).resolve()
+        if not resolved.is_relative_to(audio_root):
+            problems.append(f"narration_audio_file {raw!r} resolves to {resolved}, "
+                            f"outside this project's source_audio/ ({audio_root})")
+        elif not resolved.exists():
+            problems.append(f"recorded narration audio file is missing: {resolved}")
+        else:
+            found = _sha(resolved)
+            if found != manifest["narration_audio_sha256"]:
+                problems.append(
+                    f"narration audio has changed since it was split — recorded "
+                    f"{manifest['narration_audio_sha256'][:12]}…, found "
+                    f"{found[:12]}… — someone replaced the file after the fact")
+
+    recorded_hash = manifest["narration_voice_profile_sha256"]
+    if recorded_hash != context.voice_profile_sha256:
+        problems.append(
+            f"this episode was narrated against voice profile "
+            f"{str(recorded_hash)[:12]}…, the channel's approved profile is now "
+            f"{str(context.voice_profile_sha256)[:12]}… — re-narrate and re-split")
+
+    effective = manifest["narration_effective_profile"]
+    self_hash = channel_context.canonical_sha256(effective)
+    if self_hash != recorded_hash:
+        problems.append(
+            f"narration_effective_profile does not hash to its own recorded "
+            f"narration_voice_profile_sha256 — the settings and the hash "
+            f"claiming to describe them disagree "
+            f"(hash of settings: {self_hash[:12]}…, recorded: "
+            f"{str(recorded_hash)[:12]}…)")
+    current_profile = channel_context._thaw(
+        context.config.get("voice", {}).get("approved_profile") or {})
+    if effective != current_profile:
+        problems.append(
+            "narration_effective_profile no longer matches the channel's current "
+            "approved_profile exactly, even though a hash looked current — "
+            "re-narrate and re-split against the current approval")
+
+    return problems
+
+
+def _check_narration_binding(rep: GateReport, project_dir: Path, manifest: dict,
+                             context) -> None:
+    if context is None or manifest is None:
+        return
+    problems = narration_binding_problems(project_dir, manifest, context)
+    rep.add("narration binding is verified", not problems, "; ".join(problems))
+
+
 def _check_voice_approved(rep: GateReport, context) -> None:
     """A recorded voice decision, not merely a configured one.
 
@@ -335,13 +437,58 @@ def _check_voice_approved(rep: GateReport, context) -> None:
             f"re-narrate and re-plan")
 
 
+def _character_root(context=None) -> Path:
+    """This channel's own approved character directory.
+
+    Narrower than _asset_base(context): for a legacy-kind channel, that
+    resolves to the pipeline root itself, which every episode folder and every
+    other channel pack also sits beneath. A master path escaping the actual
+    character directory but still nominally "under the pipeline root" must not
+    pass just because the hash also happens to match.
+    """
+    return SPEC_PATH.parent if context is None else Path(context.character_spec_path).parent
+
+
+def _resolve_active_asset(raw, *, context, label: str) -> tuple[Path | None, str]:
+    """Validate and resolve a path stored in character_spec.json.
+
+    Used for both `masters.*.path` and the top-level `references.*` pointers —
+    both are runtime-resolved (unlike `masters.*.references_used`, which is
+    provenance/history and deliberately exempt, since it legitimately points
+    into archive/). Returns (resolved_path, "") or (None, problem_description).
+    """
+    if not isinstance(raw, str) or not raw:
+        return None, f"{label}: no path recorded"
+    p = Path(raw)
+    if p.is_absolute() or ".." in p.parts:
+        return None, f"{label}: path {raw!r} is absolute or traverses upward"
+    forbidden = [part for part in p.parts if part in NON_RENDERABLE_DIRS]
+    if forbidden:
+        return None, (f"{label}: path {raw!r} passes through {forbidden} — not "
+                      f"approved output, even underneath an otherwise-approved dir")
+    resolved = (_asset_base(context) / p).resolve()
+    root = _character_root(context).resolve()
+    if not resolved.is_relative_to(root):
+        return None, (f"{label}: path {raw!r} resolves to {resolved}, which is "
+                      f"outside this channel's own character directory ({root}) — "
+                      f"being underneath the pipeline root is not sufficient")
+    return resolved, ""
+
+
 def _check_masters(rep: GateReport, context=None) -> None:
-    """Masters exist and still hash to what was approved.
+    """Masters exist, still hash to what was approved, and are actually
+    reachable only from this channel's own approved character directory.
 
     A drifted master silently changes the character in every asset generated
     afterwards, and nothing downstream would notice — the files would all look
-    like valid output.
+    like valid output. An uncontained master path is the same failure with an
+    attacker or corruption controlling both the path and the recorded hash.
+
+    A channel with no host has no character package to check at all — nothing
+    to skip past, nothing to report.
     """
+    if context is not None and not context.host_enabled:
+        return
     spec_path = _spec_path(context)
     if not rep.add("character spec present", spec_path.exists(), str(spec_path)):
         return
@@ -356,21 +503,56 @@ def _check_masters(rep: GateReport, context=None) -> None:
     if not rep.add("masters recorded with provenance", bool(masters),
                    "spec has no masters block"):
         return
+
+    resolved_masters: dict[str, Path] = {}
     for key, m in masters.items():
-        path = _asset_base(context) / m["path"]
-        if not rep.add(f"master {key} present", path.exists(), str(path)):
+        resolved, problem = _resolve_active_asset(m.get("path"), context=context,
+                                                   label=f"master {key}")
+        if not rep.add(f"master {key} path is contained", resolved is not None, problem):
+            continue
+        resolved_masters[key] = resolved
+        if not rep.add(f"master {key} present", resolved.exists(), str(resolved)):
             continue
         expected = m.get("sha256")
         if not expected:
             rep.add(f"master {key} has an approved hash", False,
                     "no sha256 recorded — provenance cannot be verified")
             continue
-        found = _sha(path)
+        found = _sha(resolved)
         rep.add(f"master {key} matches approved hash", found == expected,
                 f"expected {expected[:12]}…, found {found[:12]}…")
 
+    # character_spec.json carries a second, independent pointer to the same
+    # assets at the top level (references.body_master / references.face_master).
+    # generate_poses.py and friends read THAT key; this gate reads masters.*.
+    # Nothing previously required them to agree — recreating exactly the
+    # two-sources-of-truth problem this task exists to close.
+    refs = spec.get("references", {})
+    for key in ("body_master", "face_master"):
+        if key not in masters:
+            continue
+        ref_resolved, problem = _resolve_active_asset(refs.get(key), context=context,
+                                                       label=f"reference {key}")
+        if not rep.add(f"reference {key} path is contained", ref_resolved is not None,
+                       problem):
+            continue
+        master_resolved = resolved_masters.get(key)
+        agrees = master_resolved is not None and ref_resolved == master_resolved
+        if not rep.add(f"reference {key} agrees with the approved master", agrees,
+                       f"references.{key} resolves to {ref_resolved}, "
+                       f"masters.{key}.path resolves to {master_resolved}"):
+            continue
+        expected = masters[key].get("sha256")
+        if ref_resolved.exists() and expected:
+            found = _sha(ref_resolved)
+            rep.add(f"reference {key} hash matches the approved master",
+                    found == expected,
+                    f"expected {expected[:12]}…, found {found[:12]}…")
+
 
 def _check_pose_registry(rep: GateReport, context=None) -> None:
+    if context is not None and not context.host_enabled:
+        return          # no host, no pose registry to audit
     try:
         audit = pose_registry.audit(context=context)
     except Exception as e:                                  # unreadable spec, etc.
@@ -821,6 +1003,7 @@ def require_generation_ready(project,
         manifest = _check_manifest_identity(rep, project_dir, operation)
         _check_sidecar_currency(rep, project_dir)
         _check_voice_approved(rep, ctx)
+        _check_narration_binding(rep, project_dir, manifest, ctx)
         _check_route_failures(rep, project_dir)
         _check_visual_plan(rep, project_dir, manifest, ctx)
         _check_approval(rep, project_dir, manifest, ctx)

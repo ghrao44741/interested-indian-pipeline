@@ -12,6 +12,7 @@ make these suites quietly depend on channel behaviour that
 tests/test_channel_context.py is the right place to check.
 """
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -20,6 +21,15 @@ import render_channel_dna as rd
 
 CHANNEL_ID = "fixture_channel"
 DNA_VERSION = 1
+
+# A real provider name — schema now discriminates approved_profile.settings by
+# provider, so "mock" no longer validates. Every field "edge" requires.
+APPROVED_PROFILE = {
+    "provider": "edge",
+    "settings": {"voice": "fixture-voice", "rate": "+0%", "pitch": "+0Hz"},
+    "approved_by": "fixture suite",
+    "approved_at": "2026-01-01T00:00:00+00:00",
+}
 
 
 def pack_document(channel_id: str = CHANNEL_ID) -> dict:
@@ -42,10 +52,10 @@ def pack_document(channel_id: str = CHANNEL_ID) -> dict:
         "character": {"spec_path": "character/character_spec.json",
                       "path_kind": "legacy_pipeline_root"},
         "voice": {"selection_status": "approved",
-                  "approved_profile": {"provider": "mock", "voice": "fixture",
-                                       "approved_by": "fixture suite",
-                                       "approved_at": "2026-01-01T00:00:00+00:00"},
-                  "working_default": None, "preview_dir": "voice_previews"},
+                  "approved_profile": APPROVED_PROFILE,
+                  "working_default": None,
+                  "preview_dir": {"path": "voice_previews",
+                                  "path_kind": "legacy_pipeline_root"}},
         "routing": {"policy_version": 1},
         "renderers": {"capabilities": {"PHOTO": "pexels",
                                        "HOST_COMPOSITE": "approved_pose_compositor"}},
@@ -66,7 +76,45 @@ def install(root: Path, channel_id: str = CHANNEL_ID) -> str:
     return channel_id
 
 
-def stamp(manifest: dict, channel_id: str = CHANNEL_ID) -> dict:
+def stamp(manifest: dict, channel_id: str = CHANNEL_ID, *,
+         project_dir: Path | None = None) -> dict:
+    """Add channel assignment, and — when project_dir is given — a verified
+    narration binding consistent with APPROVED_PROFILE.
+
+    Most suites in this repo predate narration-binding enforcement and don't
+    care about it; they get channel_id/channel_dna_version only. A suite that
+    needs require_generation_ready() to come back fully clean (an approved
+    dispatch, a successful "everything is fine" path) passes project_dir so a
+    real, correctly-hashed fixture audio file and matching manifest fields
+    exist for that check to pass honestly, rather than being exempted from it.
+    """
     manifest["channel_id"] = channel_id
     manifest["channel_dna_version"] = DNA_VERSION
+    if project_dir is not None:
+        manifest.update(write_narration_fixture(project_dir))
     return manifest
+
+
+def write_narration_fixture(project_dir: Path, *,
+                            effective_profile: dict = APPROVED_PROFILE) -> dict:
+    """Write a fake narration file and return the manifest fields describing it.
+
+    The three numbers this produces are internally consistent by construction
+    — audio_sha256 is the real hash of the file just written, and
+    voice_profile_sha256 is the real hash of effective_profile — which is
+    exactly the property narration_binding_problems() checks for. A test that
+    wants to exercise the "hash is right but the profile doesn't match"
+    failure mode should call this once for a legitimate baseline and then edit
+    the returned dict's effective_profile afterward, rather than trying to
+    hand-construct an inconsistent one from scratch.
+    """
+    audio_dir = Path(project_dir) / "source_audio"
+    audio_dir.mkdir(parents=True, exist_ok=True)
+    audio_path = audio_dir / "narration.mp3"
+    audio_path.write_bytes(b"fixture narration audio, not a real MP3\n")
+    return {
+        "narration_audio_file": "source_audio/narration.mp3",
+        "narration_voice_profile_sha256": cc.canonical_sha256(effective_profile),
+        "narration_audio_sha256": hashlib.sha256(audio_path.read_bytes()).hexdigest(),
+        "narration_effective_profile": effective_profile,
+    }

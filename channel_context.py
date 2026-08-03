@@ -62,7 +62,21 @@ CHANNEL_ID_RE = re.compile(r"^[a-z][a-z0-9_]{2,63}$")
 # episode project, archive/, pose_candidates/ and pose_sources/, so "is it under
 # the pipeline root" would admit all of them. Only what is named here is
 # reachable, and only until Task 2B moves the assets into their pack.
+#
+# Two separate allowlists, not one shared list: a preview directory must never
+# be able to resolve into the character tree (or vice versa) just because both
+# happen to be declared with path_kind "legacy_pipeline_root".
 LEGACY_ASSET_ROOTS = ("character",)
+LEGACY_PREVIEW_ROOTS = ("voice_previews",)
+
+# Directories whose contents are, by definition, not approved output — even
+# though they sit inside an otherwise-approved subtree. "Underneath character/"
+# is not enough: character/archive/, character/pose_candidates/ and
+# character/pose_sources/ are all beneath character/ and would pass a plain
+# containment check. Shared with generation_gate (re-exported there) and with
+# pose_registry's own NON_RENDERABLE_DIRS-equivalent reasoning, so a forbidden
+# subdirectory is rejected the same way everywhere it is checked.
+NON_RENDERABLE_DIRS = ("pose_candidates", "pose_sources", "archive", "raw", "pending")
 
 
 class ChannelError(RuntimeError):
@@ -204,12 +218,24 @@ def pack_dir(channel_id: str) -> Path:
 
 
 def _resolve_asset(context_pack_dir: Path, declared: str, path_kind: str,
-                   *, label: str, channel_id: str) -> Path:
+                   *, label: str, channel_id: str,
+                   legacy_roots: tuple[str, ...] = LEGACY_ASSET_ROOTS,
+                   must_exist: bool = True) -> Path:
     """Resolve a declared asset path, or refuse.
 
     Rejects absolute and upward-traversing declarations before resolution, then
     resolves fully — so a symlink cannot smuggle a target past the check — and
     requires the result to sit inside the one root this path_kind permits.
+
+    `legacy_roots` lets a caller pick which allowlist applies to
+    "legacy_pipeline_root": the character tree and the preview directory are
+    different subtrees, and neither may resolve into the other.
+
+    `must_exist` defaults True (an asset like the character spec must already
+    be there). A preview directory may legitimately not exist yet — nothing has
+    been synthesised — so its caller passes `must_exist=False`; every other
+    check here (traversal, forbidden components, containment, symlink
+    resolution) still applies regardless.
     """
     if not isinstance(declared, str) or not declared:
         raise ChannelError(f"{channel_id}: {label} path must be a non-empty string")
@@ -217,12 +243,18 @@ def _resolve_asset(context_pack_dir: Path, declared: str, path_kind: str,
     if p.is_absolute() or ".." in p.parts:
         raise ChannelError(
             f"{channel_id}: {label} path {declared!r} is absolute or traverses upward")
+    forbidden = [part for part in p.parts if part in NON_RENDERABLE_DIRS]
+    if forbidden:
+        raise ChannelError(
+            f"{channel_id}: {label} path {declared!r} passes through {forbidden} — "
+            f"not approved output, even though it sits under an otherwise-approved "
+            f"directory")
 
     if path_kind == "pack_relative":
         roots = [context_pack_dir.resolve()]
         base = context_pack_dir
     elif path_kind == "legacy_pipeline_root":
-        roots = [(PIPELINE_DIR / r).resolve() for r in LEGACY_ASSET_ROOTS]
+        roots = [(PIPELINE_DIR / r).resolve() for r in legacy_roots]
         base = PIPELINE_DIR
     else:
         raise ChannelError(f"{channel_id}: unknown path_kind {path_kind!r}")
@@ -235,7 +267,7 @@ def _resolve_asset(context_pack_dir: Path, declared: str, path_kind: str,
             f"which is outside the only location {path_kind!r} permits ({allowed}). "
             f"Being underneath the pipeline root is not sufficient — every other "
             f"channel pack and every episode folder is underneath it too.")
-    if not resolved.exists():
+    if must_exist and not resolved.exists():
         raise ChannelError(f"{channel_id}: {label} not found at {resolved}")
     return resolved
 
@@ -333,7 +365,17 @@ def load_channel(channel_id: str, *, check_drift: bool = True) -> ChannelContext
     # would hand a pending selection a hash that every later check reads as an
     # approved one.
     voice_sha = canonical_sha256(profile) if (status == "approved" and profile) else None
-    preview_dir = (PIPELINE_DIR / voice.get("preview_dir", "voice_previews")).resolve()
+
+    # The evaluation destination gets the exact same treatment as the character
+    # spec — containment, traversal and forbidden-component checks — because a
+    # bare string here previously resolved wherever it pointed, including
+    # outside the pipeline root entirely, with nothing to catch it.
+    pd = voice["preview_dir"]
+    preview_dir = _resolve_asset(d, pd["path"], pd["path_kind"],
+                                 label="voice preview directory",
+                                 channel_id=channel_id,
+                                 legacy_roots=LEGACY_PREVIEW_ROOTS,
+                                 must_exist=False)
 
     legacy = bool(doc.get("legacy_adapter", False))
     if legacy:
@@ -533,16 +575,26 @@ def channel_for_voice(project_dir=None, requested: str | None = None) -> Channel
     """Find the pack governing a synthesis run.
 
     Narration genuinely runs before the manifest exists, so unlike every other
-    runtime path this one cannot always read the channel off the episode. It
-    tries the manifest, then an explicit id, then the sole installed pack — and
-    refuses when more than one exists rather than picking.
+    runtime path this one cannot always read the channel off the episode. But
+    when a manifest already assigns a channel, that assignment wins outright —
+    an explicit --channel may confirm it (matching id) but never override it.
+    A reproduced bug: a project whose manifest said 'alpha' resolved narration
+    under 'beta' because `requested` was checked first. --channel is only
+    actually used to choose a channel when the project has none yet (or when
+    there is no project at all — pre-split evaluation).
     """
-    if requested:
-        return load_channel(requested)
     if project_dir is not None:
         cid, _ = read_manifest_channel(project_dir)
         if cid:
-            return load_channel_for_project(project_dir)
+            ctx = load_channel_for_project(project_dir)
+            if requested and requested != ctx.channel_id:
+                raise ChannelError(
+                    f"{Path(project_dir).name}'s manifest already assigns channel "
+                    f"{ctx.channel_id!r}; --channel {requested!r} conflicts with it "
+                    f"and is refused")
+            return ctx
+    if requested:
+        return load_channel(requested)
     known = list_channels()
     if len(known) == 1:
         return load_channel(known[0])
@@ -551,38 +603,64 @@ def channel_for_voice(project_dir=None, requested: str | None = None) -> Channel
         f"Pass --channel explicitly.")
 
 
-def require_voice_output_allowed(context: ChannelContext, out_path) -> Path:
-    """Refuse synthesis whose output would land anywhere it should not.
-
-    An allowlist, not a blocklist. Blocking only the project's audio folder still
-    lets `--out ../elsewhere/narration.mp3` produce a usable file from an
-    unapproved voice, which someone then copies into place by hand. So while
-    selection is pending the resolved output must sit inside the pack's preview
-    directory and nowhere else.
-
-    Call this before reading credentials, building a client, making a request,
-    creating a directory or writing a byte.
-    """
+def _canonical_output_path(out_path) -> Path:
     resolved = Path(out_path).expanduser()
     if not resolved.is_absolute():
         resolved = (Path.cwd() / resolved)
     # Resolve the parent: the output file itself does not exist yet, but a
     # symlinked directory in its path would otherwise carry the write outside.
-    resolved = (resolved.parent.resolve() / resolved.name)
+    return resolved.parent.resolve() / resolved.name
 
-    if context.voice_approved:
-        return resolved
 
-    root = context.voice_preview_dir
-    if not resolved.is_relative_to(root):
-        raise VoiceNotApproved(
-            f"{context.channel_id} has no approved voice profile "
-            f"(selection_status={context.voice_selection_status!r}), so synthesis may "
-            f"only write inside {root}.\n"
-            f"  refused: {resolved}\n"
-            f"Evaluate candidates there, then record the choice as "
-            f"voice.approved_profile in {context.pack_dir / PACK_NAME} and re-render.")
-    return resolved
+def classify_voice_output(context: ChannelContext, out_path,
+                          project_dir=None) -> tuple[str, Path]:
+    """Classify a synthesis destination as "evaluation" or "production", or refuse.
+
+    Destination decides, not `--preview` — `--preview` only truncates the
+    input text; it says nothing about where the result is going; and it must
+    never confer evaluation privileges. A full-script run that happens to
+    target `voice_previews/` is still evaluation; a `--preview` run targeting
+    a project's `source_audio/` is still production and must be held to the
+    approved profile like any other production write.
+
+        under the channel's approved preview root  -> "evaluation" — anything goes
+        under the assigned project's source_audio/  -> "production" — requires
+                                                        an approved profile
+        anywhere else                                -> refused outright
+
+    This is also where "while pending, only evaluation is a valid destination"
+    is enforced — previously that was true only because production output
+    happened to always land outside the preview root; now it is checked
+    directly, and unconditionally (an approved voice does not exempt a
+    destination that is neither of the two recognised roots — the earlier
+    version returned any path unconditionally once approved, which is its own
+    latent hole).
+
+    Call this before reading credentials, building a client, making a request,
+    creating a directory or writing a byte.
+    """
+    resolved = _canonical_output_path(out_path)
+
+    if resolved.is_relative_to(context.voice_preview_dir):
+        return "evaluation", resolved
+
+    if project_dir is not None:
+        prod_root = (Path(project_dir) / "source_audio").resolve()
+        if resolved.is_relative_to(prod_root):
+            if not context.voice_approved:
+                raise VoiceNotApproved(
+                    f"{context.channel_id} has no approved voice profile "
+                    f"(selection_status={context.voice_selection_status!r}); while "
+                    f"pending, only {context.voice_preview_dir} is a valid "
+                    f"destination.\n  refused: {resolved}")
+            return "production", resolved
+
+    raise VoiceNotApproved(
+        f"output must resolve inside either {context.voice_preview_dir} "
+        f"(evaluation) or the assigned project's source_audio/ (production).\n"
+        f"  refused: {resolved}")
+
+
 
 
 # ── CLI ──────────────────────────────────────────────────────────────────────

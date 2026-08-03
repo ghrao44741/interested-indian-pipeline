@@ -154,7 +154,8 @@ def build_fixture(prompts: str = PROMPTS_OK) -> tuple[Path, Path]:
     (proj / "manifest.json").write_text(
         json.dumps(channel_fixture.stamp(
             {"episode": "demo", "identity_state": "ok",
-             "identity_reasons": [], "scenes": scenes}), indent=2), encoding="utf-8")
+             "identity_reasons": [], "scenes": scenes}, project_dir=proj),
+            indent=2), encoding="utf-8")
     channel_fixture.install(td)
     (proj / route_images.PROMPTS_FILE).write_text(prompts, encoding="utf-8")
     return td, proj

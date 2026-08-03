@@ -174,6 +174,18 @@ def write_approval(project, approver: str, confirmation: str) -> Path:
             f"{context.pack_dir / channel_context.PACK_NAME}, re-render, re-narrate, "
             f"then re-plan.")
 
+    # A human should not be able to grant Checkpoint 3 over audio nobody can
+    # verify and have that only surface later, at dispatch. Same shared
+    # validator the generation gate uses — one place decides what "verified
+    # narration" means, not two that could quietly drift apart.
+    early_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    narration_problems = gg.narration_binding_problems(project_dir, early_manifest,
+                                                       context)
+    if narration_problems:
+        raise ApprovalRefused(
+            "the narration binding is not verified:\n"
+            + "\n".join(f"  - {p}" for p in narration_problems))
+
     plan_id = plan.get("plan_id")
     if not plan_id:
         raise ApprovalRefused("the plan has no plan_id — re-run plan_visuals.py")

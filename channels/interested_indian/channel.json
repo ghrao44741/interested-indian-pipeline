@@ -137,7 +137,10 @@
       "Natural international English.",
       "Correct pronunciation of Indian names and terms."
     ],
-    "preview_dir": "voice_previews",
+    "preview_dir": {
+      "path": "voice_previews",
+      "path_kind": "legacy_pipeline_root"
+    },
     "legacy_config": {
       "provider": "edge",
       "gemini_voice": "Iapetus",

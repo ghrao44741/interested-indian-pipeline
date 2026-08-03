@@ -58,10 +58,12 @@ USAGE:
 """
 
 import argparse
+import hashlib
 import json
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 # Stdlib-only module — safe to import under the WhisperX venv, which has none of
@@ -597,7 +599,102 @@ def main():
     if not os.path.exists(audio_path):
         print(f"\n✗ Audio file not found: {audio_path}")
         print(f"  Place '{args.audio}' inside the '{source_audio_dir}/' folder and try again.")
-        return
+        return 2
+
+    # ── Narration binding verification ──────────────────────────────────────
+    # Required only when a real channel was actually assigned above — not
+    # merely because channel_context happens to be importable. A sibling
+    # checkout could have the module on its path with no channels/ directory
+    # at all, in which case channel_id is None and none of this applies; that
+    # is the genuinely-unchanged legacy case.
+    #
+    # Runs before transcribe_with_timestamps — the expensive GPU pass — so a
+    # refusal costs seconds, not minutes.
+    verified_voice = args.voice
+    verified_narration_fields = {}
+    if channel_id:
+        sidecar_path = Path(f"{audio_path}.voice.json")
+        if not sidecar_path.is_file():
+            print(f"\n✗ no verified narration sidecar at {sidecar_path}")
+            print(f"  This channel requires narration produced through "
+                  f"generate_source_audio.py's production path, which writes one. "
+                  f"Re-narrate rather than supplying audio directly.")
+            return 2
+        try:
+            sidecar = json.loads(sidecar_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            print(f"\n✗ {sidecar_path} is not valid JSON: {e}")
+            return 2
+
+        problems = []
+        if sidecar.get("schema_version") != 1:
+            problems.append(f"unsupported sidecar schema_version "
+                            f"{sidecar.get('schema_version')!r}")
+        if sidecar.get("channel_id") != channel_id:
+            problems.append(f"sidecar names channel {sidecar.get('channel_id')!r}, "
+                            f"this episode is assigned to {channel_id!r}")
+
+        ctx_for_check = None
+        try:
+            ctx_for_check = channel_context.load_channel(channel_id)
+        except channel_context.ChannelError as e:
+            problems.append(str(e))
+
+        recorded_hash = sidecar.get("voice_profile_sha256")
+        effective = sidecar.get("effective_profile")
+        if ctx_for_check is not None:
+            # A profile re-approved between narration and split must be caught
+            # here, not only later at the generation gate.
+            if recorded_hash != ctx_for_check.voice_profile_sha256:
+                problems.append(
+                    f"sidecar's voice_profile_sha256 no longer matches {channel_id}'s "
+                    f"current approved profile — the profile changed since this "
+                    f"narration was produced; re-narrate")
+            # The missing link a hash-only check would leave open: the hash
+            # must actually describe the settings it claims to, and both must
+            # still match what the channel currently approves — not merely
+            # agree with each other while describing something else entirely.
+            self_hash = (channel_context.canonical_sha256(effective)
+                        if effective is not None else None)
+            if self_hash != recorded_hash:
+                problems.append(
+                    "sidecar's effective_profile does not hash to its own recorded "
+                    "voice_profile_sha256 — the settings and the hash claiming to "
+                    "describe them disagree")
+            current_profile = channel_context._thaw(
+                (ctx_for_check.config.get("voice", {}) or {}).get("approved_profile") or {})
+            if effective != current_profile:
+                problems.append(
+                    "sidecar's effective_profile no longer matches the channel's "
+                    "current approved_profile exactly")
+
+        recorded_audio_sha = sidecar.get("audio_sha256")
+        if not recorded_audio_sha:
+            problems.append("sidecar has no audio_sha256 recorded")
+        else:
+            found_audio_sha = hashlib.sha256(Path(audio_path).read_bytes()).hexdigest()
+            if found_audio_sha != recorded_audio_sha:
+                problems.append(
+                    f"the audio file no longer matches the sidecar's recorded hash — "
+                    f"someone replaced it after narration (recorded "
+                    f"{recorded_audio_sha[:12]}…, found {found_audio_sha[:12]}…)")
+
+        if problems:
+            print(f"\n✗ narration sidecar verification failed for {sidecar_path}:")
+            for p in problems:
+                print(f"  - {p}")
+            return 2
+
+        print(f"  ✓ narration sidecar verified against {channel_id}'s approved "
+              f"voice profile")
+        voice_key = "voice" if "voice" in effective else "voice_id"
+        verified_voice = effective.get(voice_key, args.voice)
+        verified_narration_fields = {
+            "narration_audio_file": f"source_audio/{args.audio}",
+            "narration_voice_profile_sha256": recorded_hash,
+            "narration_audio_sha256": recorded_audio_sha,
+            "narration_effective_profile": effective,
+        }
 
     # Step 1: Transcribe with word timestamps
     whisper_result = transcribe_with_timestamps(audio_path, model_size=args.model, device=args.device,
@@ -777,13 +874,18 @@ def main():
         "channel_id": channel_id,
         "channel_dna_version": channel_dna_version,
         "title": args.title,
-        "voice": args.voice,
+        # Keeps its existing compatibility meaning: a plain voice-name string.
+        # When a verified sidecar exists, this comes from IT rather than from
+        # the free-form --voice claim; it does not become an object — the full
+        # profile and its hashes live in the separate narration_* fields below.
+        "voice": verified_voice,
         "word_segments_file": words_filename,
         "total_duration": total_duration,
         # Downstream gate: routing and paid generation must refuse a blocked
         # manifest rather than generate against uncertain identity.
         "identity_state": identity,
         "identity_reasons": identity_reasons,
+        **verified_narration_fields,
         "scenes": manifest_scenes
     }
 
@@ -867,4 +969,4 @@ def main():
         print(f"  4. Run stitch_video.py")
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

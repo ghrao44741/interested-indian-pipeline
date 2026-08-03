@@ -52,15 +52,15 @@
   "voice": {
     "selection_status": "approved",
     "approved_profile": {
-      "provider": "mock_tts",
-      "voice": "fixture_narrator",
+      "provider": "edge",
+      "settings": { "voice": "fixture_narrator", "rate": "+0%", "pitch": "+0Hz" },
       "approved_by": "fixture",
       "approved_at": "2026-01-01T00:00:00+00:00",
-      "_note": "A fixture profile. No real synthesis backend is named."
+      "_note": "A fixture profile. No real synthesis backend is used."
     },
     "working_default": null,
     "requirements": ["Neutral delivery."],
-    "preview_dir": "voice_previews"
+    "preview_dir": { "path": "voice_previews", "path_kind": "legacy_pipeline_root" }
   },
   "routing": {
     "policy_version": 1,

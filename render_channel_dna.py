@@ -36,6 +36,32 @@ ADAPTER_WARNING = ("GENERATED FILE — DO NOT EDIT. Change the channel pack and 
 
 # ── the human-readable brief ─────────────────────────────────────────────────
 
+# Which settings key names the voice, per provider — edge/gemini/gemini_cloudtts
+# call it "voice"; elevenlabs/grok call it "voice_id". One place to know that,
+# rather than every reader guessing.
+VOICE_KEY_BY_PROVIDER = {
+    "edge": "voice", "gemini": "voice", "gemini_cloudtts": "voice",
+    "elevenlabs": "voice_id", "grok": "voice_id",
+}
+
+# Every generation-affecting settings key an approved profile carries, by
+# provider — the schema's own required-settings list, kept here once so the
+# adapter override (render_adapters) and any future reader agree with the
+# schema rather than re-deriving it.
+SETTINGS_KEYS_BY_PROVIDER = {
+    "edge": ("voice", "rate", "pitch"),
+    "gemini": ("voice", "model", "speaking_rate"),
+    "gemini_cloudtts": ("voice", "model", "speaking_rate", "locale", "style"),
+    "elevenlabs": ("voice_id", "model", "stability", "similarity_boost", "speed"),
+    "grok": ("voice_id", "language", "speed"),
+}
+
+
+def _profile_voice_label(profile: dict) -> str:
+    key = VOICE_KEY_BY_PROVIDER.get(profile["provider"], "voice")
+    return profile["settings"].get(key, "?")
+
+
 def render_dna(doc: dict) -> str:
     b, ed, na = doc["brand"], doc["editorial"], doc["narrative"]
     L = [f"# {b['name']} — Channel DNA", "",
@@ -87,15 +113,17 @@ def render_dna(doc: dict) -> str:
     L += ["## Voice", "", f"- **selection**: `{v['selection_status']}`"]
     prof = v.get("approved_profile")
     if prof:
-        L += [f"- **approved**: {prof['provider']} / {prof['voice']} — "
+        L += [f"- **approved**: {prof['provider']} / {_profile_voice_label(prof)} — "
               f"{prof['approved_by']}, {prof['approved_at']}"]
     else:
         L += ["- **approved profile**: none on file"]
         wd = v.get("working_default")
         if wd:
             L += [f"- **working default (unapproved)**: {wd['provider']} / {wd['voice']}"]
+    pd = v.get("preview_dir")
+    if pd:
         L += [f"- while pending, synthesis may only write into "
-              f"`{v.get('preview_dir', 'voice_previews')}/`"]
+              f"`{pd['path']}/` ({pd['path_kind']})"]
     for r in v.get("requirements", []):
         L.append(f"- {r}")
     L += [""]
@@ -146,6 +174,52 @@ def _provenance(doc: dict) -> dict:
     }
 
 
+# Maps a provider's `settings` key to the legacy channel_config.json key it
+# overrides. Only the keys THAT provider's approved profile actually carries
+# are written — so approving a grok profile does not touch gemini_voice, etc.
+_LEGACY_KEY_MAP = {
+    "edge":     {"voice": "edge_voice", "rate": "edge_rate", "pitch": "edge_pitch"},
+    "gemini":   {"voice": "gemini_voice", "model": "gemini_model",
+                "speaking_rate": "gemini_speaking_rate"},
+    "gemini_cloudtts": {"voice": "gemini_voice", "model": "gemini_cloudtts_model",
+                       "speaking_rate": "gemini_speaking_rate",
+                       "locale": "gemini_cloudtts_locale",
+                       "style": "gemini_cloudtts_style"},
+    "elevenlabs": {"voice_id": "elevenlabs_default", "model": "model",
+                  "stability": "stability", "similarity_boost": "similarity_boost",
+                  "speed": "speed"},
+    "grok": {"voice_id": "grok_voice_id", "language": "grok_language",
+            "speed": "grok_speed"},
+}
+
+
+def _legacy_voice_block(voice: dict) -> dict:
+    """The generated channel_config.json's `voice` block.
+
+    While pending, this is just the frozen `legacy_config` snapshot — labelled
+    as such, not claimed to be authoritative. Once approved, it must reflect
+    THAT decision: every field the provider's synthesis call needs comes from
+    `approved_profile.settings`, overwriting whatever `legacy_config` happened
+    to say. Leaving `legacy_config` untouched here after approval is exactly
+    the staleness this fix exists to close — a re-approved profile with a
+    different provider or voice would otherwise leave the generated file
+    silently describing the pre-approval state forever.
+    """
+    block = dict(cc._thaw(voice.get("legacy_config", {})))
+    profile = voice.get("approved_profile")
+    if voice["selection_status"] == "approved" and profile:
+        provider = profile["provider"]
+        block["provider"] = provider
+        key_map = _LEGACY_KEY_MAP.get(provider, {})
+        for settings_key, legacy_key in key_map.items():
+            if settings_key in profile["settings"]:
+                block[legacy_key] = profile["settings"][settings_key]
+        block["_profile_source"] = "approved_profile"
+    else:
+        block["_profile_source"] = "working_default (unapproved)"
+    return block
+
+
 def render_adapters(doc: dict) -> dict[str, str]:
     """The root-level files still read directly by un-migrated modules.
 
@@ -160,7 +234,7 @@ def render_adapters(doc: dict) -> dict[str, str]:
 
     vs = doc["visual_style"]
     config = dict(_provenance(doc))
-    config["voice"] = cc._thaw(doc["voice"].get("legacy_config", {}))
+    config["voice"] = _legacy_voice_block(doc["voice"])
     config["stitch"] = {"ken_burns_zoom": vs.get("ken_burns_zoom", 1.05)}
     config["image_pricing"] = cc._thaw(doc["economics"]["image_pricing"])
 

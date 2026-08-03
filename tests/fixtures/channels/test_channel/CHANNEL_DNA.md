@@ -45,7 +45,8 @@ Planning guidance across the slate, not a per-episode quota.
 ## Voice
 
 - **selection**: `approved`
-- **approved**: mock_tts / fixture_narrator — fixture, 2026-01-01T00:00:00+00:00
+- **approved**: edge / fixture_narrator — fixture, 2026-01-01T00:00:00+00:00
+- while pending, synthesis may only write into `voice_previews/` (legacy_pipeline_root)
 - Neutral delivery.
 
 ## Visual style

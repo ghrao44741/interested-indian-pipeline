@@ -49,6 +49,7 @@ USAGE — full generation:
 import argparse
 import asyncio
 import base64
+import hashlib
 import json
 import os
 import re
@@ -877,6 +878,64 @@ def normalize_loudness(audio_path: str, target_lufs: float = TARGET_LUFS) -> dic
     return actual
 
 
+# Which settings key holds "the voice" and which CLI flag/settings-key pairs
+# matter, per provider. Kept here (and in render_channel_dna.py, which needs
+# the same mapping for the generated adapter) rather than inferred, since
+# guessing wrong here is exactly the kind of silent mismatch this fix exists
+# to close.
+_PRODUCTION_CHECKS_BY_PROVIDER = {
+    "edge": (("--voice", "voice", "voice"), ("--edge-rate", "edge_rate", "rate"),
+            ("--edge-pitch", "edge_pitch", "pitch")),
+    "gemini": (("--voice", "voice", "voice"),
+              ("--speaking-rate", "speaking_rate", "speaking_rate")),
+    "gemini_cloudtts": (("--voice", "voice", "voice"),
+                       ("--speaking-rate", "speaking_rate", "speaking_rate")),
+    "elevenlabs": (("--voice", "voice", "voice_id"), ("--speed", "speed", "speed")),
+    "grok": (("--voice", "voice", "voice_id"), ("--speed", "speed", "speed")),
+}
+
+
+def _resolve_production_voice(args, channel) -> dict:
+    """Build the effective TTS config for a production (approved) write.
+
+    Every generation-affecting value comes from
+    `channel.config["voice"]["approved_profile"]` — nothing here falls back to
+    `legacy_config` or a DEFAULT_* constant, because "derive production config
+    from the approved profile" is meaningless if any field can still fall
+    through to something else. Any CLI flag the operator explicitly passed
+    (detectable because every one of these now defaults to None) that
+    disagrees with the approved profile is refused — before any credential is
+    read, any client built, or any request made. `--preview` is the place to
+    experiment with something else; this path is not.
+    """
+    profile = channel_context._thaw(channel.config["voice"]["approved_profile"])
+    provider = profile["provider"]
+    settings = profile["settings"]
+
+    conflicts = []
+    if args.provider is not None and args.provider != provider:
+        conflicts.append(f"--provider={args.provider!r} conflicts with the "
+                         f"approved profile's provider={provider!r}")
+    for flag, arg_attr, settings_key in _PRODUCTION_CHECKS_BY_PROVIDER.get(provider, ()):
+        cli_value = getattr(args, arg_attr)
+        if cli_value is not None and str(cli_value) != str(settings[settings_key]):
+            conflicts.append(f"{flag}={cli_value!r} conflicts with the approved "
+                             f"profile's {settings_key}={settings[settings_key]!r}")
+
+    if conflicts:
+        print(f"\nproduction narration must use the approved voice profile "
+              f"({provider}) exactly — {len(conflicts)} conflict(s):",
+              file=sys.stderr)
+        for c in conflicts:
+            print(f"  - {c}", file=sys.stderr)
+        print(f"\nUse --preview targeting {channel.voice_preview_dir} to experiment "
+              f"with a different provider or voice. Nothing was synthesised.",
+              file=sys.stderr)
+        sys.exit(1)
+
+    return {"provider": provider, **settings}
+
+
 def _write_voice_sidecar(output_path: str, provider: str, voice: str, speaking_rate,
                           chunk_boundaries_sec: list[float] | None = None,
                           loudness: dict | None = None,
@@ -926,11 +985,15 @@ async def main():
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--project",   help="Episode folder (e.g. ep01)")
     parser.add_argument("--script",    help="Path to narration .txt file")
-    parser.add_argument("--provider",  default=DEFAULT_PROVIDER,
+    parser.add_argument("--provider",  default=None,
                         choices=["gemini_cloudtts", "gemini", "elevenlabs", "grok", "edge"],
-                        help=f"TTS provider (default from channel_config: {DEFAULT_PROVIDER})")
+                        help=f"TTS provider (default from channel_config: {DEFAULT_PROVIDER}). "
+                             f"For a production write, must match the approved profile, "
+                             f"or be omitted.")
     parser.add_argument("--voice",     default=None,
-                        help="Voice ID (ElevenLabs) or voice name (Edge TTS). Defaults from channel_config.json.")
+                        help="Voice ID (ElevenLabs) or voice name (Edge TTS). Defaults from "
+                             "channel_config.json for evaluation; must match the approved "
+                             "profile, or be omitted, for a production write.")
     parser.add_argument("--out",       default="narration.mp3",
                         help="Output filename inside {project}/source_audio/")
     parser.add_argument("--preview",   type=int, metavar="N", default=None,
@@ -949,10 +1012,12 @@ async def main():
     parser.add_argument("--no-normalize", action="store_true",
                         help=f"Skip loudness normalization (default: normalize full-script "
                              f"generations to {TARGET_LUFS} LUFS via ffmpeg loudnorm)")
-    parser.add_argument("--edge-rate", default="+0%", metavar="RATE",
-                        help="Edge TTS speaking-rate offset, e.g. '+12%%' or '-10%%'. Edge-only.")
-    parser.add_argument("--edge-pitch", default="+0Hz", metavar="PITCH",
-                        help="Edge TTS pitch offset, e.g. '+15Hz' or '-5Hz'. Edge-only.")
+    parser.add_argument("--edge-rate", default=None, metavar="RATE",
+                        help="Edge TTS speaking-rate offset, e.g. '+12%%' or '-10%%'. Edge-only. "
+                             "Default '+0%%' for evaluation.")
+    parser.add_argument("--edge-pitch", default=None, metavar="PITCH",
+                        help="Edge TTS pitch offset, e.g. '+15Hz' or '-5Hz'. Edge-only. "
+                             "Default '+0Hz' for evaluation.")
     parser.add_argument("--channel", default=None,
                         help="Channel pack governing this narration. Needed only when "
                              "the episode has no manifest yet and more than one pack "
@@ -993,12 +1058,16 @@ async def main():
         print(f"❌ Script file is empty: {script_path}")
         sys.exit(1)
 
-    # Resolve voice
-    if args.provider in ("gemini", "gemini_cloudtts"):
+    # Free-form resolution — the default for evaluation, and for the preview
+    # filename below regardless of how this run eventually classifies. A
+    # production write below replaces every one of these with the approved
+    # profile's own values; nothing production-facing reads past this point.
+    cli_provider = args.provider or DEFAULT_PROVIDER
+    if cli_provider in ("gemini", "gemini_cloudtts"):
         voice = args.voice or DEFAULT_VOICE_GEMINI
-    elif args.provider == "elevenlabs":
+    elif cli_provider == "elevenlabs":
         voice = args.voice or DEFAULT_VOICE_EL
-    elif args.provider == "grok":
+    elif cli_provider == "grok":
         voice = args.voice or DEFAULT_VOICE_GROK
     else:
         voice = args.voice or DEFAULT_VOICE_EDGE
@@ -1023,16 +1092,18 @@ async def main():
     # Runs before the directory is created, before any credential is read,
     # before a client is built and before a single byte is synthesised.
     #
-    # An allowlist, not a blocklist. Refusing only the project's audio folder
-    # would still let `--out ../elsewhere/narration.mp3` produce a usable file
-    # from a voice nobody approved, which someone then copies into place by
-    # hand. So until the channel records an approved voice profile, synthesis
-    # may write into the pack's preview directory and nowhere else.
+    # Classified by DESTINATION, not by --preview — --preview only truncates
+    # the input text; it says nothing about where the result is going, and
+    # must never confer evaluation privileges. A full-script run targeting
+    # voice_previews/ is still evaluation; a --preview run targeting the
+    # project's source_audio/ is still production and is held to the approved
+    # profile exactly like a full run.
+    project_root = (Path(__file__).parent / args.project) if args.project else None
     try:
-        _channel = channel_context.channel_for_voice(
-            project_dir=(Path(__file__).parent / args.project) if args.project else None,
-            requested=args.channel)
-        output_path = str(channel_context.require_voice_output_allowed(_channel, intended))
+        channel = channel_context.channel_for_voice(project_dir=project_root,
+                                                     requested=args.channel)
+        mode, output_path_p = channel_context.classify_voice_output(
+            channel, intended, project_dir=project_root)
     except channel_context.VoiceNotApproved as e:
         print(f"\n{e}", file=sys.stderr)
         print("\nNothing was synthesised.", file=sys.stderr)
@@ -1041,21 +1112,52 @@ async def main():
         print(f"\ncannot determine the channel governing this narration: {e}",
               file=sys.stderr)
         sys.exit(1)
+    output_path = str(output_path_p)
+
+    if mode == "production":
+        # Every generation-affecting value comes from the approved profile.
+        # Any CLI flag the operator explicitly passed that disagrees is
+        # refused here, before anything is built or written — --preview is
+        # the place to experiment with a different provider or voice, not this
+        # one, regardless of what --out happens to point at.
+        effective = _resolve_production_voice(args, channel)
+        cli_provider = effective["provider"]
+        # Only the active provider's fields are meaningful, but every name the
+        # dispatch below reads must exist regardless of which provider that
+        # is — an edge profile leaves args_speaking_rate/args_speed unset by
+        # the branches above otherwise, which is exactly how this broke.
+        args_edge_rate = args_edge_pitch = None
+        args_speaking_rate = args_speed = None
+        if cli_provider == "edge":
+            voice, args_edge_rate, args_edge_pitch = (
+                effective["voice"], effective["rate"], effective["pitch"])
+        elif cli_provider in ("gemini", "gemini_cloudtts"):
+            voice, args_speaking_rate = effective["voice"], effective["speaking_rate"]
+        else:  # elevenlabs, grok
+            voice, args_speed = effective["voice_id"], effective["speed"]
+        args_edge_rate = args_edge_rate if args_edge_rate is not None else "+0%"
+        args_edge_pitch = args_edge_pitch if args_edge_pitch is not None else "+0Hz"
+    else:
+        args_edge_rate = args.edge_rate if args.edge_rate is not None else "+0%"
+        args_edge_pitch = args.edge_pitch if args.edge_pitch is not None else "+0Hz"
+        args_speaking_rate = args.speaking_rate
+        args_speed = args.speed
 
     Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
     word_count = len(text.split())
     char_count = len(text)
     print(f"Script  : {script_path.name} ({word_count} words, {char_count} chars)")
-    print(f"Provider: {args.provider}")
+    print(f"Mode    : {mode}")
+    print(f"Provider: {cli_provider}")
     print(f"Voice   : {voice}")
     print(f"Output  : {output_path}")
     print(f"{'─' * 55}")
 
-    rate = args.speaking_rate if args.speaking_rate is not None else DEFAULT_SPEAKING_RATE
-    if args.speed is not None:
-        speed = args.speed
-    elif args.provider == "grok":
+    rate = args_speaking_rate if args_speaking_rate is not None else DEFAULT_SPEAKING_RATE
+    if args_speed is not None:
+        speed = args_speed
+    elif cli_provider == "grok":
         speed = DEFAULT_SPEED_GROK
     else:
         speed = DEFAULT_SPEED_EL
@@ -1065,16 +1167,16 @@ async def main():
     text = apply_pronunciation(text)
 
     chunk_boundaries: list[float] = []
-    if args.provider == "gemini_cloudtts":
+    if cli_provider == "gemini_cloudtts":
         chunk_boundaries = cloudtts_generate(text, voice, output_path, speaking_rate=rate)
-    elif args.provider == "gemini":
+    elif cli_provider == "gemini":
         gemini_generate(text, voice, output_path, speaking_rate=rate)
-    elif args.provider == "elevenlabs":
+    elif cli_provider == "elevenlabs":
         chunk_boundaries = elevenlabs_generate(text, voice, output_path, speed=speed)
-    elif args.provider == "grok":
+    elif cli_provider == "grok":
         chunk_boundaries = grok_generate(text, voice, output_path, speed=speed)
     else:
-        await edge_generate(text, voice, output_path, rate=args.edge_rate, pitch=args.edge_pitch)
+        await edge_generate(text, voice, output_path, rate=args_edge_rate, pitch=args_edge_pitch)
 
     # Normalize loudness — skipped for --preview (short A/B test clips; loudnorm's
     # measurement pass is unreliable on very short audio, same reason chunk/scene
@@ -1086,8 +1188,31 @@ async def main():
     # Write a voice-config sidecar alongside the audio — otherwise there's no
     # way to later answer "what voice made this file" other than re-listening
     # (exactly the gap that let common/cta/cta.mp3 go stale unnoticed).
-    _write_voice_sidecar(output_path, args.provider, voice, rate,
-                          chunk_boundaries_sec=chunk_boundaries, loudness=loudness, speed=speed)
+    if mode == "production":
+        # channel_context is an unconditional import in this script — there is
+        # no "production write with no resolvable channel" case here to fall
+        # back from: classify_voice_output() already raised before this point
+        # if none existed. So production is always full-binding, and a failure
+        # to write it is fatal, not a warning — the whole reason it exists is
+        # to make a later swap or a re-approval detectable.
+        audio_sha256 = hashlib.sha256(Path(output_path).read_bytes()).hexdigest()
+        approved_profile = channel_context._thaw(
+            channel.config["voice"]["approved_profile"])
+        sidecar = {
+            "schema_version": 1,
+            "channel_id": channel.channel_id,
+            "voice_profile_sha256": channel.voice_profile_sha256,
+            "effective_profile": approved_profile,
+            "audio_sha256": audio_sha256,
+            "generated_at": datetime.now().isoformat(timespec="seconds"),
+        }
+        channel_context._write_atomic_text(
+            Path(f"{output_path}.voice.json"),
+            json.dumps(sidecar, indent=2, ensure_ascii=False))
+    else:
+        _write_voice_sidecar(output_path, cli_provider, voice, rate,
+                             chunk_boundaries_sec=chunk_boundaries, loudness=loudness,
+                             speed=speed)
 
     duration = get_duration(output_path)
     if duration:

@@ -69,7 +69,7 @@ Editorial planning guidance across the slate, not a mechanical per-episode quota
 - **selection**: `pending`
 - **approved profile**: none on file
 - **working default (unapproved)**: edge / en-IN-PrabhatNeural
-- while pending, synthesis may only write into `voice_previews/`
+- while pending, synthesis may only write into `voice_previews/` (legacy_pipeline_root)
 - Natural international English.
 - Correct pronunciation of Indian names and terms.
 
