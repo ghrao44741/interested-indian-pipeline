@@ -1,0 +1,561 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://the-interested-indian.local/schema/visual_routes.schema.json",
+  "title": "Canonical Visual Routes",
+  "description": "The single machine-readable source of truth for one episode's visual routing. additionalProperties is false everywhere on purpose: a misspelled key must be an error, not a silently ignored no-op. This artifact carries no independently mutable summary (mix, paid totals, needs-review counts) — those are always derived from routes at render time, never stored, so they cannot drift out of sync with the data they summarise.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "project_id",
+    "routes_id",
+    "generated_at",
+    "inputs",
+    "channel",
+    "renderer_registry_sha256",
+    "routes_content_sha256",
+    "routes"
+  ],
+  "properties": {
+    "schema_version": {
+      "enum": [1],
+      "description": "Refused by version, not by shape."
+    },
+    "project_id": { "type": "string", "minLength": 1 },
+    "routes_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Fresh nonce per build (uuid4 hex). Guards against a previously-revoked approval being treated as current merely because file content happened to match again."
+    },
+    "generated_at": { "type": "string", "minLength": 1 },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifest_sha256"],
+      "properties": {
+        "manifest_sha256": { "type": "string", "minLength": 1 }
+      }
+    },
+    "channel": { "$ref": "#/$defs/channelBinding" },
+    "renderer_registry_sha256": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Canonical hash over {renderer_id: {module, entry, cost_category, implemented, supports_reference_input}} for every renderer_id referenced by any route in this artifact (base or host). Detects a code-only change to renderers.py even when the Channel Pack hash never moves."
+    },
+    "routes_content_sha256": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Deterministic hash over meaningful route content only (channel binding, renderer registry projection, route order, and every executable/review field of every route) — excludes routes_id, generated_at, and this field itself. Lets a rebuild with identical routing be told apart from one that actually changed routing, separately from the exact file-byte hash approval binds to."
+    },
+    "routes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/route" }
+    }
+  },
+  "$defs": {
+    "visualType": {
+      "enum": ["MAP", "CHART", "TIMELINE", "DOCUMENT", "PHOTO", "ILLUSTRATION", "REENACTMENT"]
+    },
+    "channelBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel_id",
+        "channel_dna_version",
+        "channel_json_sha256",
+        "character_spec_sha256",
+        "voice_profile_sha256"
+      ],
+      "properties": {
+        "channel_id": { "type": "string", "minLength": 1 },
+        "channel_dna_version": { "type": "integer", "minimum": 1 },
+        "channel_json_sha256": { "type": "string", "minLength": 1 },
+        "character_spec_sha256": { "type": ["string", "null"] },
+        "voice_profile_sha256": { "type": ["string", "null"] }
+      },
+      "description": "Identical shape to channel_context.ChannelContext.plan_binding()."
+    },
+    "reviewReasonCode": {
+      "enum": [
+        "AMBIGUOUS_LEGACY_CARTOON",
+        "AMBIGUOUS_LEGACY_HOST",
+        "LEGACY_UNCLASSIFIED",
+        "INCOMPLETE_ROUTE_ARGS",
+        "LOW_CONFIDENCE",
+        "MANUAL_OVERRIDE",
+        "RENDERER_UNAVAILABLE",
+        "MANIFEST_IDENTITY_UNRESOLVED",
+        "OTHER"
+      ]
+    },
+    "reviewReason": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "detail"],
+      "properties": {
+        "code": { "$ref": "#/$defs/reviewReasonCode" },
+        "detail": { "type": "string", "minLength": 1 }
+      }
+    },
+    "manualOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason"],
+      "properties": {
+        "reason": { "type": "string", "minLength": 1 },
+        "by": { "type": "string" },
+        "at": { "type": "string" }
+      }
+    },
+    "hostPlacement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "position": { "type": "string", "minLength": 1 },
+        "framing": { "type": "string", "minLength": 1 }
+      }
+    },
+    "chartDataPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "value"],
+      "properties": {
+        "label": { "type": "string", "minLength": 1 },
+        "value": { "type": "number" }
+      }
+    },
+    "mapArgs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "regions": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "secondary_regions": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "callout": { "type": ["string", "null"] }
+      }
+    },
+    "chartArgs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "chart_type": { "enum": ["bar", "stat", "pie"] },
+        "data": { "type": "array", "items": { "$ref": "#/$defs/chartDataPoint" } },
+        "title": { "type": ["string", "null"] }
+      }
+    },
+    "timelineEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "order_or_date"],
+      "properties": {
+        "label": { "type": "string", "minLength": 1 },
+        "order_or_date": { "type": "string", "minLength": 1 }
+      }
+    },
+    "timelineArgs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "events": { "type": "array", "items": { "$ref": "#/$defs/timelineEvent" } },
+        "title": { "type": ["string", "null"] }
+      }
+    },
+    "documentField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "value"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "value": { "type": "string" }
+      }
+    },
+    "sourceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "citation"],
+      "properties": {
+        "label": { "type": "string", "minLength": 1 },
+        "citation": { "type": "string", "minLength": 1 }
+      }
+    },
+    "documentArgs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "doc_kind": { "enum": ["notification", "order", "letter", "form"] },
+        "fields": { "type": "array", "items": { "$ref": "#/$defs/documentField" } },
+        "source_refs": { "type": "array", "items": { "$ref": "#/$defs/sourceRef" } }
+      }
+    },
+    "photoConstraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "orientation": { "enum": ["landscape", "portrait", "square"] },
+        "min_width": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "photoArgs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "query": { "type": ["string", "null"] },
+        "constraints": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/photoConstraints" }] }
+      }
+    },
+    "illustrationArgs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "prompt": { "type": ["string", "null"] },
+        "style_tags": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "reenactmentArgs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "prompt": { "type": ["string", "null"] },
+        "reference_asset_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "routeArgs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["map", "chart", "timeline", "document", "photo", "illustration", "reenactment"],
+      "description": "Discriminated by the route's visual_type. Exactly the one sub-object matching visual_type may be non-null; every other key must be null. No shell-string args (MAP_ARGS/CHART_ARGS) survive here.",
+      "properties": {
+        "map": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/mapArgs" }] },
+        "chart": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/chartArgs" }] },
+        "timeline": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/timelineArgs" }] },
+        "document": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/documentArgs" }] },
+        "photo": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/photoArgs" }] },
+        "illustration": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/illustrationArgs" }] },
+        "reenactment": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/reenactmentArgs" }] }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "visual_asset_id", "source_ids", "shot_instance_id", "scene_id", "output_file",
+        "status", "review_reasons", "candidate_visual_types", "routing_confidence",
+        "manual_override", "visual_type", "route_args",
+        "narration", "prompt", "visual_cue", "overlay_text",
+        "renderer_id", "host_renderer_id", "cost_category", "paid",
+        "host_present", "host_method", "host_pose_id", "host_scene_bound",
+        "host_reference_asset_ids", "host_placement"
+      ],
+      "properties": {
+        "visual_asset_id": { "type": "string", "minLength": 1 },
+        "source_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "shot_instance_id": { "type": "string", "minLength": 1 },
+        "scene_id": { "type": "string", "minLength": 1, "description": "Display-order only." },
+        "output_file": { "type": "string", "minLength": 1 },
+
+        "status": { "enum": ["READY", "NEEDS_REVIEW"] },
+        "review_reasons": { "type": "array", "items": { "$ref": "#/$defs/reviewReason" } },
+        "candidate_visual_types": { "type": "array", "items": { "$ref": "#/$defs/visualType" } },
+        "routing_confidence": {
+          "oneOf": [{ "type": "null" }, { "type": "number", "minimum": 0, "maximum": 1 }],
+          "description": "null when genuinely unmeasured. Never a fabricated sentinel."
+        },
+        "manual_override": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/manualOverride" }]
+        },
+
+        "visual_type": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/visualType" }] },
+        "route_args": { "$ref": "#/$defs/routeArgs" },
+
+        "narration": { "type": "string" },
+        "prompt": { "type": ["string", "null"] },
+        "visual_cue": { "type": ["string", "null"] },
+        "overlay_text": { "type": ["string", "null"] },
+
+        "renderer_id": { "type": ["string", "null"] },
+        "host_renderer_id": { "type": ["string", "null"] },
+        "cost_category": {
+          "oneOf": [{ "type": "null" }, { "enum": ["free_local", "free_api", "paid_api", "derived"] }]
+        },
+        "paid": { "type": "boolean" },
+
+        "host_present": { "type": "boolean" },
+        "host_method": {
+          "oneOf": [{ "type": "null" }, { "enum": ["approved_pose_composite", "reference_anchored_generation"] }]
+        },
+        "host_pose_id": { "type": ["string", "null"] },
+        "host_scene_bound": { "type": ["boolean", "null"] },
+        "host_reference_asset_ids": {
+          "oneOf": [{ "type": "null" }, { "type": "array", "items": { "type": "string", "minLength": 1 } }]
+        },
+        "host_placement": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/hostPlacement" }] }
+      },
+      "allOf": [
+        {
+          "description": "host_present=false: every host-method/pose/reference field is null.",
+          "if": { "properties": { "host_present": { "const": false } } },
+          "then": {
+            "properties": {
+              "host_method": { "const": null },
+              "host_pose_id": { "const": null },
+              "host_scene_bound": { "const": null },
+              "host_reference_asset_ids": { "const": null }
+            }
+          }
+        },
+        {
+          "description": "READY + host_present=true: host_method must be explicitly present and non-null.",
+          "if": { "properties": { "host_present": { "const": true }, "status": { "const": "READY" } } },
+          "then": {
+            "required": ["host_method"],
+            "properties": {
+              "host_method": { "enum": ["approved_pose_composite", "reference_anchored_generation"] }
+            }
+          }
+        },
+        {
+          "description": "NEEDS_REVIEW + host_present=true may leave host_method null — a migrated legacy HOST route stays schema-valid without inventing a method.",
+          "if": { "properties": { "host_present": { "const": true }, "status": { "const": "NEEDS_REVIEW" } } },
+          "then": {
+            "properties": {
+              "host_method": { "oneOf": [{ "type": "null" }, { "enum": ["approved_pose_composite", "reference_anchored_generation"] }] }
+            }
+          }
+        },
+        {
+          "description": "approved_pose_composite: pose_id + scene_bound required; reference ids forbidden.",
+          "if": { "properties": { "host_method": { "const": "approved_pose_composite" } } },
+          "then": {
+            "required": ["host_pose_id", "host_scene_bound"],
+            "properties": {
+              "host_pose_id": { "type": "string", "minLength": 1 },
+              "host_scene_bound": { "type": "boolean" },
+              "host_reference_asset_ids": { "const": null }
+            }
+          }
+        },
+        {
+          "description": "reference_anchored_generation: non-empty reference ids required; pose-only fields forbidden.",
+          "if": { "properties": { "host_method": { "const": "reference_anchored_generation" } } },
+          "then": {
+            "required": ["host_reference_asset_ids"],
+            "properties": {
+              "host_reference_asset_ids": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+              "host_pose_id": { "const": null },
+              "host_scene_bound": { "const": null }
+            }
+          }
+        },
+        {
+          "description": "READY requires a non-null canonical visual_type.",
+          "if": { "properties": { "status": { "const": "READY" } } },
+          "then": {
+            "required": ["visual_type"],
+            "properties": { "visual_type": { "$ref": "#/$defs/visualType" } }
+          }
+        },
+        {
+          "description": "NEEDS_REVIEW always carries at least one structured reason.",
+          "if": { "properties": { "status": { "const": "NEEDS_REVIEW" } } },
+          "then": { "properties": { "review_reasons": { "minItems": 1 } } }
+        },
+        {
+          "description": "visual_type null: no route_args sub-object may be populated.",
+          "if": { "properties": { "visual_type": { "const": null } } },
+          "then": {
+            "properties": {
+              "route_args": {
+                "properties": {
+                  "map": { "const": null }, "chart": { "const": null }, "timeline": { "const": null },
+                  "document": { "const": null }, "photo": { "const": null },
+                  "illustration": { "const": null }, "reenactment": { "const": null }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "visual_type": { "const": "MAP" } } },
+          "then": {
+            "properties": {
+              "route_args": {
+                "properties": {
+                  "chart": { "const": null }, "timeline": { "const": null }, "document": { "const": null },
+                  "photo": { "const": null }, "illustration": { "const": null }, "reenactment": { "const": null }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "const": "READY" }, "visual_type": { "const": "MAP" } } },
+          "then": {
+            "properties": {
+              "route_args": {
+                "required": ["map"],
+                "properties": { "map": { "required": ["regions", "callout"], "properties": { "regions": { "minItems": 1 } } } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "visual_type": { "const": "CHART" } } },
+          "then": {
+            "properties": {
+              "route_args": {
+                "properties": {
+                  "map": { "const": null }, "timeline": { "const": null }, "document": { "const": null },
+                  "photo": { "const": null }, "illustration": { "const": null }, "reenactment": { "const": null }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "const": "READY" }, "visual_type": { "const": "CHART" } } },
+          "then": {
+            "properties": {
+              "route_args": {
+                "required": ["chart"],
+                "properties": { "chart": { "required": ["chart_type", "data"], "properties": { "data": { "minItems": 1 } } } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "visual_type": { "const": "TIMELINE" } } },
+          "then": {
+            "properties": {
+              "route_args": {
+                "properties": {
+                  "map": { "const": null }, "chart": { "const": null }, "document": { "const": null },
+                  "photo": { "const": null }, "illustration": { "const": null }, "reenactment": { "const": null }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "const": "READY" }, "visual_type": { "const": "TIMELINE" } } },
+          "then": {
+            "properties": {
+              "route_args": {
+                "required": ["timeline"],
+                "properties": { "timeline": { "required": ["events"], "properties": { "events": { "minItems": 1 } } } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "visual_type": { "const": "DOCUMENT" } } },
+          "then": {
+            "properties": {
+              "route_args": {
+                "properties": {
+                  "map": { "const": null }, "chart": { "const": null }, "timeline": { "const": null },
+                  "photo": { "const": null }, "illustration": { "const": null }, "reenactment": { "const": null }
+                }
+              }
+            }
+          }
+        },
+        {
+          "description": "READY DOCUMENT routes require at least one source reference — a document cannot be authorised to render without a stated ground truth.",
+          "if": { "properties": { "status": { "const": "READY" }, "visual_type": { "const": "DOCUMENT" } } },
+          "then": {
+            "properties": {
+              "route_args": {
+                "required": ["document"],
+                "properties": {
+                  "document": {
+                    "required": ["doc_kind", "fields", "source_refs"],
+                    "properties": { "source_refs": { "minItems": 1 }, "fields": { "minItems": 1 } }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "visual_type": { "const": "PHOTO" } } },
+          "then": {
+            "properties": {
+              "route_args": {
+                "properties": {
+                  "map": { "const": null }, "chart": { "const": null }, "timeline": { "const": null },
+                  "document": { "const": null }, "illustration": { "const": null }, "reenactment": { "const": null }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "const": "READY" }, "visual_type": { "const": "PHOTO" } } },
+          "then": {
+            "properties": {
+              "route_args": {
+                "required": ["photo"],
+                "properties": { "photo": { "required": ["query"], "properties": { "query": { "type": "string", "minLength": 1 } } } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "visual_type": { "const": "ILLUSTRATION" } } },
+          "then": {
+            "properties": {
+              "route_args": {
+                "properties": {
+                  "map": { "const": null }, "chart": { "const": null }, "timeline": { "const": null },
+                  "document": { "const": null }, "photo": { "const": null }, "reenactment": { "const": null }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "const": "READY" }, "visual_type": { "const": "ILLUSTRATION" } } },
+          "then": {
+            "properties": {
+              "route_args": {
+                "required": ["illustration"],
+                "properties": { "illustration": { "required": ["prompt"], "properties": { "prompt": { "type": "string", "minLength": 1 } } } }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "visual_type": { "const": "REENACTMENT" } } },
+          "then": {
+            "properties": {
+              "route_args": {
+                "properties": {
+                  "map": { "const": null }, "chart": { "const": null }, "timeline": { "const": null },
+                  "document": { "const": null }, "photo": { "const": null }, "illustration": { "const": null }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "status": { "const": "READY" }, "visual_type": { "const": "REENACTMENT" } } },
+          "then": {
+            "properties": {
+              "route_args": {
+                "required": ["reenactment"],
+                "properties": {
+                  "reenactment": {
+                    "required": ["prompt", "reference_asset_ids"],
+                    "properties": {
+                      "prompt": { "type": "string", "minLength": 1 },
+                      "reference_asset_ids": { "minItems": 1 }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
