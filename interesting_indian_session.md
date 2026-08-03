@@ -2040,3 +2040,154 @@ and were never staged or touched by any of them.
    (2B-A) is now done; this is everything else.
 4. **Semantic visual dry-run** → Checkpoint 3 approval → only then paid
    pilot generation.
+
+## Session — 2026-08-03: Task 2B-B1 — canonical `visual_routes.json` contract foundation
+
+Three planning revisions, each rejected with detailed corrections, before two
+implementation commits landed the bounded foundation slice. The goal: replace
+`image_prompts_one_line_per_prompt.md` as the executable routing source with
+a schema-validated `visual_routes.json`, eventually. This session only builds
+the contract — nothing in the live pipeline reads or writes it yet.
+
+### Planning: three rejections before authorization
+
+1. First draft (full architecture: schema + producer refactor + dispatcher
+   cutover in one Task 2B-B) was rejected — it changed
+   `generate_image_prompts.py` to stop producing the legacy markdown while
+   every downstream consumer (`pipeline_agents.py`, `plan_visuals.py`,
+   `generation_gate.py`, `route_images.py`, `generate_images_flux.py`,
+   `review_images.py`, `add_text_overlays.py`, `run_episode_needed_or_not.py`)
+   still expected it to exist — an unsafe mid-pipeline cutover disguised as
+   "foundation work."
+2. Second draft narrowed to schema + shared library + migration tool, still
+   partially conflated with semantic routing (a `SYSTEM_PROMPT` rewrite
+   teaching Claude to choose canonical types) — rejected again: choosing
+   `visual_type` from narration is itself semantic routing, out of scope for
+   B1 regardless of which file it lives in.
+3. Final revision: exactly four new files, synthetic fixtures only, no
+   producer/dispatcher/gate changes, corrected schema (CHART/TIMELINE kept as
+   separate shapes, `READY`/`NEEDS_REVIEW` status split, structured
+   `review_reasons`, no invented `confidence` sentinel). Authorized with
+   eleven mandatory amendments covering integrity-vs-executability, real
+   hash/binding enforcement, manifest coverage by persistent identity, output
+   path hardening, real character-registry vocabulary for host assets, and
+   renderer-registry drift detection.
+
+### `23d21ba` — first implementation
+
+`channels/schema/visual_routes.schema.json`, `visual_routes.py`,
+`migrate_routes_from_markdown.py`, `tests/test_visual_routes.py` — canonical
+schema (`MAP`/`CHART`/`TIMELINE`/`DOCUMENT`/`PHOTO`/`ILLUSTRATION`/
+`REENACTMENT`, no `CARTOON`/`HOST`), a pure `validate_contract()` validator,
+`routes_content_sha256`/`renderer_registry_sha256` hashing, an atomic
+JSON-then-adapter writer, and a migration tool that preserves legacy
+`CARTOON`/`HOST` ambiguity as `NEEDS_REVIEW` rather than guessing. Eleven
+suites plus the new one passed twice; gates unchanged. Rejected on review:
+conflated "schema-valid" with "safe to dispatch" (no distinction between
+artifact integrity and execution readiness), the pure validator's
+hash/binding checks weren't in its own main path, host/reference assets used
+an invented `{"state": "active", "channel_id": ...}` shape instead of the
+real pose-registry vocabulary, and a handful of narrower schema/migration
+gaps (CHART accepted a `timeline` chart_type; READY routes could carry a
+null renderer_id; migration didn't resolve real renderer bindings for
+unambiguous routes).
+
+### `9abf6a6` — corrective follow-up, same four files
+
+- **Integrity vs. executability, made explicit.** `validate_contract()`
+  proves an artifact is internally honest; it says nothing about whether
+  it's safe to dispatch. New `execution_blockers()`/`is_executable()`
+  answer that question — a `NEEDS_REVIEW` route can pass every hash/binding
+  check and still block dispatch by definition.
+- **Hash/binding checks moved into the main validator path.** A stale
+  `manifest_sha256`, a stale `routes_content_sha256`, and renderer-registry
+  drift (module/entry/cost/implemented/`supports_reference_input`) are now
+  caught directly inside `validate_contract()`, not only via the standalone
+  `check_renderer_registry_drift()` helper. `write_atomic()` now refuses to
+  write a document whose stored content hash has gone stale.
+- **Manifest coverage by persistent identity.** Matching moved from
+  `scene_id` (display metadata) to `visual_asset_id`; new
+  `check_manifest_coverage()` rejects empty routing documents against a
+  non-empty manifest, missing manifest shots, duplicate
+  `visual_asset_id`/`shot_instance_id`/`output_file`, and a manifest identity
+  appearing twice. A `NEEDS_REVIEW` route carrying a synthetic
+  `UNRESOLVED-*` id (because its own identity genuinely couldn't be
+  resolved) is deliberately exempted from the "extra route" check — only
+  `READY` routes are held to that standard, so migration can still surface
+  the ambiguity honestly instead of being blocked from writing at all.
+- **READY tightened.** Now requires non-empty `source_ids`, a non-null
+  `renderer_id`/`cost_category` matching a real Channel Pack capability and
+  an implemented registry entry, correct `paid` classification, and empty
+  `review_reasons`/`candidate_visual_types`.
+- **Real character-registry vocabulary for host assets.** Pose/reference
+  verification now mirrors `pose_registry.resolve()` exactly: `status`
+  (`approved`/`approved_scene_bound`), `path`, `sha256`, with genuine
+  containment/existence/live-hash checks against real files — a missing
+  file, missing hash evidence, and an actual hash mismatch are three
+  distinct, separately tested failures. "Cross-channel" collapses cleanly
+  to "not registered in this channel's own dict," matching how the real
+  system scopes pose ids (no invented `channel_id` field needed).
+  `reference_anchored_generation` is now restricted to `ILLUSTRATION`/
+  `REENACTMENT` renderers that declare `supports_reference_input`, forbids
+  `host_renderer_id` (the base renderer performs the anchored generation
+  directly), and is refused for every deterministic type including
+  `TIMELINE` (missed in the first pass).
+- **Migration resolves real renderer bindings.** An unambiguous `MAP`/
+  `CHART`/`PHOTO` route now gets `renderer_id`/`cost_category`/`paid` from
+  the governing Channel Pack, downgrading to `NEEDS_REVIEW` with
+  `RENDERER_UNAVAILABLE` when the pack has nothing implemented for that
+  type — never writes `READY` with a null renderer. The full built artifact
+  now runs through `validate_contract()` before a single byte is written.
+  Legacy input is rejected if external to the pipeline root, unmanifested,
+  or cross-channel, before any temp file or output is created.
+- **`resolve_output_target()`** (new): foundation-only path containment,
+  creates nothing, rejects absolute paths, traversal, both separator
+  styles, and symlink escapes. `output_file` in the schema now rejects
+  path separators and traversal at the pattern level too.
+- **Adapter hardened**: escapes pipe/newline content so narration can't
+  corrupt the routes table, and now exposes typed route_args,
+  renderer/cost, host method/assets, prompt, cue, overlay and review
+  reasons per route.
+
+### State
+
+Both commits verified against remote. `tests/test_visual_routes.py` passes
+twice, byte-identical, zero failures. All eleven existing suites pass twice
+after each commit; `test_channel_context` and `test_narration_binding` show
+only the same pre-existing tempdir-name/set-order nondeterminism as every
+prior round — never a real difference, exit code 0 both times regardless.
+Gate reports unchanged throughout, since nothing that feeds them was
+touched: **pilot_neet_scandal** identity `BLOCKED (2)`, generation
+`BLOCKED (9)`; **test_2min** identity `ready`, generation `BLOCKED (4)`.
+Nothing in the live pipeline reads or writes `visual_routes.json` yet — no
+producer, no dispatcher, no gate. The two intentional ZIP deletions
+(`character.zip`, `character (2).zip`) sat untouched through both commits.
+
+### Pending — next session, in order
+
+1. **Voice decision — still the blocker**, unchanged for several sessions
+   now. Once chosen, record it as `voice.approved_profile`.
+2. **Re-narrate** → verified sidecar → **re-split** → may clear `SCENE-066`.
+3. **Task 2B-B2 (unauthorized, separately reviewed)** — the executable
+   cutover: repoint `route_images.py`/`generate_images_flux.py`/
+   `review_images.py`/`pipeline_agents.py`/`generation_gate.py`/
+   `approve_checkpoint.py`/`add_text_overlays.py` at `visual_routes.json`;
+   retire `plan_visuals.py`'s `visual_plan.json`/`.md` path entirely; refuse
+   markdown-only input at `search_pexels.py`'s standalone mode and
+   `generate_images_aibmm.py`; update every message that currently tells a
+   human to re-run `plan_visuals.py`. A legacy project with no
+   `visual_routes.json` will gain a new "canonical routing artifact missing"
+   blocker once this lands — `pilot_neet_scandal`/`test_2min` are not
+   migrated in this task or the next, so expect their generation-blocked
+   counts to go up, not stay flat, once B2 actually cuts over.
+4. **Producer integration** — how `generate_image_prompts.py` comes to
+   populate `visual_routes.json` directly (still undecided: refactor in
+   place vs. delegate to a shared authoring module) — separately scoped from
+   B2, deliberately deferred again this round.
+5. **Semantic routing** — teaching the authoring step to *choose*
+   `visual_type`/`host_present`/`host_method`/`confidence` from narration
+   meaning, rather than carrying over today's Claude TYPE call structurally.
+6. **Deterministic DOCUMENT/TIMELINE renderers**, and the provenance-sidecar
+   writer (`generate_document.py`/`generate_timeline.py` don't exist yet;
+   `visual_routes.validate_provenance_sidecar()` only validates shape, no
+   writer exists until a dispatcher needs one).
