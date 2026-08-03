@@ -2299,3 +2299,87 @@ Same six items — voice decision, re-narrate/re-split, Task 2B-B2 (still
 unauthorized), producer integration, semantic routing, deterministic
 DOCUMENT/TIMELINE renderers + provenance-sidecar writer. Nothing in this
 follow-up round touched that list.
+
+## Session — 2026-08-03 (continued): Task 2B-B1 exception-safety micro-fix — HANDOFF
+
+`cb990d3` (the boundary micro-fix round above) was reviewed again and
+REJECTED with a 2-point list, narrower than every prior round. Fixed in one
+more follow-up commit, only three files this time (the schema needed no
+change) — `channels/schema/visual_routes.schema.json` untouched,
+`visual_routes.py`, `migrate_routes_from_markdown.py`,
+`tests/test_visual_routes.py` changed — `cb990d3` and its ancestors
+untouched, nothing amended/rebased/reverted/force-pushed.
+
+### What changed
+
+- **Canonical channel_id validation.** `migrate()`'s `_blank(v)` helper only
+  rejected `None` or a blank/whitespace-only string — a non-`str` value
+  (`123`, `True`) is neither, so it sailed through the cross-channel binding
+  check; a string like `" testchan "` or `"test/chan"` also passed since
+  `_blank()` never checked shape, only blankness. Replaced with
+  `_valid_channel_id(v)`: requires `str`, non-empty, unchanged by `.strip()`,
+  and a `fullmatch` against the existing `channel_context.CHANNEL_ID_RE`
+  (`^[a-z][a-z0-9_]{2,63}$`) — no new regex invented. Runs in the exact same
+  place as before, still ahead of `load_channel_for_project()`/
+  `parse_shots()`/any temp file or output creation.
+- **Exception-safe path resolution.** `_verify_asset_path_and_hash()`
+  promises "return blockers, never crash the caller" and already wrapped the
+  hash-read step in `try/except OSError`, but the two `Path.resolve()` calls
+  above it were unguarded. A symlink loop raises `RuntimeError`; a registered
+  path with an embedded NUL byte raises `ValueError` (confirmed directly in
+  the interpreter — `Path.resolve()` on `"poses/bad\x00asset.png"` raises
+  `ValueError: stat: embedded null character in path`, even though
+  constructing the `Path` object itself doesn't). Both are now caught
+  alongside `OSError` in one `try/except (OSError, RuntimeError, ValueError)`
+  wrapping resolution + containment + existence + is-file checks, returning
+  a blocker string instead of propagating.
+
+### State
+
+New commit `059cc41fde062cd5ffa619d429e8d544c492c38e` pushed and verified
+against remote (`git fetch` + `git rev-parse HEAD origin/main` both match).
+`tests/test_visual_routes.py`: 301 PASS / 0 FAIL, run twice, byte-identical.
+Two new tests added: `s6_refuses_malformed_channel_id` (loops
+`123, True, "", "   ", " testchan ", "test/chan", "../evil"` on both source
+and target, asserts `load_channel_for_project`/`parse_shots` never called via
+`mock.patch.object`, `MigrationError` raised, nothing written, plus a valid-id
+success case) and `s5_pose_and_reference_path_resolution_exceptions_are_caught`
+(symlink-loop + embedded-NUL regressions for both pose and reference, with
+`Path.read_bytes` replaced by an assertion-raising spy proving the asset is
+never read, checking `validate_contract`/`execution_blockers`/`is_executable`
+all three). Symlink-loop sub-cases print `SKIP` on this machine — this
+Windows account can't create symlinks without elevation, same limitation as
+the pre-existing `7c` test; the embedded-NUL sub-cases are not skipped and do
+exercise the new `ValueError` branch.
+
+All eleven other suites pass twice (all exit 0); nine are byte-identical
+between runs, `test_channel_context` and `test_narration_binding` show only
+the same pre-existing set-order/tempdir-name nondeterminism as every prior
+round. Clean-tree gate comparison (`git archive cb990d3` vs. `git archive
+HEAD` with the three changed files overlaid, both run from scratch
+checkouts) is byte-identical before/after: **pilot_neet_scandal** identity
+`BLOCKED (2)`, generation `BLOCKED (9)`; **test_2min** identity `ready`,
+generation `BLOCKED (4)` — same numbers as every prior round, still not the
+`BLOCKED (10)`/`BLOCKED (6)` the reviewer has stated as expected each time;
+flagged again rather than silently reconciled, since none of the three
+touched files are wired into anything the gate reads. `git diff --check`
+clean. No `visual_routes.json`/`.md` in any real project. No real
+provider/API/TTS/gcloud/WhisperX/GPU call anywhere. Both ZIP deletions
+(`character.zip`, `character (2).zip`) untouched and still not staged.
+
+### Handoff note
+
+This entry is written for a fresh session, not just continuity within this
+one — per-round context (base commit hash, the numbered review list,
+authorized files) is fully self-contained and recoverable from git history,
+so starting a new session at the next review round (rather than continuing
+to `/compact` this one indefinitely) is the plan going forward. Anything a
+future session needs to pick this exact round back up: commit
+`059cc41`, three files, awaiting review verdict.
+
+### Pending — unchanged from the section above
+
+Same six items — voice decision, re-narrate/re-split, Task 2B-B2 (still
+unauthorized), producer integration, semantic routing, deterministic
+DOCUMENT/TIMELINE renderers + provenance-sidecar writer. Nothing in this
+follow-up round touched that list.
