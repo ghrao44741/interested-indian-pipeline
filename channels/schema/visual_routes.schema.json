@@ -250,7 +250,12 @@
         "source_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } },
         "shot_instance_id": { "type": "string", "minLength": 1 },
         "scene_id": { "type": "string", "minLength": 1, "description": "Display-order only." },
-        "output_file": { "type": "string", "minLength": 1 },
+        "output_file": {
+          "type": "string", "minLength": 1,
+          "pattern": "^[^/\\\\:]+$",
+          "not": { "enum": [".", ".."] },
+          "description": "A contained relative filename only — never an absolute path, a traversal, or a path with separators. Real containment/symlink resolution happens in resolve_output_target(), not this pattern alone."
+        },
 
         "status": { "enum": ["READY", "NEEDS_REVIEW"] },
         "review_reasons": { "type": "array", "items": { "$ref": "#/$defs/reviewReason" } },
@@ -322,26 +327,42 @@
           }
         },
         {
-          "description": "approved_pose_composite: pose_id + scene_bound required; reference ids forbidden.",
+          "description": "approved_pose_composite: pose_id + scene_bound + a host_renderer_id required; reference ids forbidden.",
           "if": { "properties": { "host_method": { "const": "approved_pose_composite" } } },
           "then": {
-            "required": ["host_pose_id", "host_scene_bound"],
+            "required": ["host_pose_id", "host_scene_bound", "host_renderer_id"],
             "properties": {
               "host_pose_id": { "type": "string", "minLength": 1 },
               "host_scene_bound": { "type": "boolean" },
+              "host_renderer_id": { "type": "string", "minLength": 1 },
               "host_reference_asset_ids": { "const": null }
             }
           }
         },
         {
-          "description": "reference_anchored_generation: non-empty reference ids required; pose-only fields forbidden.",
+          "description": "reference_anchored_generation: non-empty reference ids required; pose-only fields and host_renderer_id forbidden — the base renderer performs the anchored generation, there is no separate compositing pass.",
           "if": { "properties": { "host_method": { "const": "reference_anchored_generation" } } },
           "then": {
             "required": ["host_reference_asset_ids"],
             "properties": {
               "host_reference_asset_ids": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
               "host_pose_id": { "const": null },
-              "host_scene_bound": { "const": null }
+              "host_scene_bound": { "const": null },
+              "host_renderer_id": { "const": null }
+            }
+          }
+        },
+        {
+          "description": "READY: no unresolved review reasons or candidates, non-empty source_ids, non-null renderer_id and cost_category. These are execution-readiness invariants, distinct from the schema-level NEEDS_REVIEW allowances above.",
+          "if": { "properties": { "status": { "const": "READY" } } },
+          "then": {
+            "required": ["source_ids", "renderer_id", "cost_category"],
+            "properties": {
+              "review_reasons": { "maxItems": 0 },
+              "candidate_visual_types": { "maxItems": 0 },
+              "source_ids": { "minItems": 1 },
+              "renderer_id": { "type": "string", "minLength": 1 },
+              "cost_category": { "enum": ["free_local", "free_api", "paid_api", "derived"] }
             }
           }
         },

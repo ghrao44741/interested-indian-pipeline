@@ -20,30 +20,42 @@ Three artifacts this module knows about, kept deliberately distinct:
     code-only change to renderers.py is detectable even when the governing
     Channel Pack's own hash never moves.
 
-Three hashes, kept separate on purpose (see routes_id / routes_content_sha256
-/ the exact file-byte hash a future approval step would bind to):
+Three hashes, kept separate on purpose:
 
   - `routes_id`              — a fresh nonce per build. Anti-resurrection,
     the same role `plan_id` already plays in generation_gate today.
   - `routes_content_sha256`  — deterministic hash over meaningful route
     content only (channel/manifest bindings, the renderer-registry
     projection, route order, and every route's executable/review fields).
-    Excludes only routes_id, generated_at, and itself.
+    Excludes only routes_id, generated_at, and itself. write_atomic()
+    refuses to write a document whose stored value has gone stale.
   - the exact SHA-256 of the file's bytes on disk — what a future approval
     step would bind to. Computed the same way generation_gate/
     approve_checkpoint already compute it elsewhere; this module does not
     duplicate that helper, callers hash the file themselves.
 
+**Integrity is not executability.** `validate_contract()` proves an artifact
+is internally honest — every hash current, every binding correct, every
+manifest identity accounted for exactly once, every READY route's renderer
+resolvable and registered. It says nothing about whether the artifact is
+*safe to dispatch* — an artifact can be perfectly integral and still contain
+NEEDS_REVIEW routes, which are execution blockers by definition. Use
+`execution_blockers()` / `is_executable()` for that question; never read
+"no integrity problems" as "safe to run."
+
     python visual_routes.py --validate <project>/visual_routes.json
 """
 
 import argparse
+import hashlib
 import json
 import sys
 import uuid
+from collections import Counter
 from datetime import datetime, timezone
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
+import channel_context
 from channel_context import canonical_sha256, _write_atomic_text
 
 PIPELINE_DIR = Path(__file__).parent
@@ -55,6 +67,10 @@ SCHEMA_VERSION = 1
 CANONICAL_VISUAL_TYPES = (
     "MAP", "CHART", "TIMELINE", "DOCUMENT", "PHOTO", "ILLUSTRATION", "REENACTMENT",
 )
+# Only these two types may ever carry a host through reference-anchored
+# generation. Deterministic renders (MAP/CHART/TIMELINE/DOCUMENT) and
+# provider-sourced PHOTO can never be substituted by it.
+REFERENCE_ANCHORABLE_TYPES = ("ILLUSTRATION", "REENACTMENT")
 HOST_METHODS = ("approved_pose_composite", "reference_anchored_generation")
 COST_CATEGORIES = ("free_local", "free_api", "paid_api", "derived")
 STATUS_READY = "READY"
@@ -184,7 +200,9 @@ def compute_routes_content_sha256(doc: dict) -> str:
 def check_renderer_registry_drift(doc: dict, registry: dict) -> str | None:
     """None if the stored renderer_registry_sha256 still matches the live
     registry's projection for every renderer this artifact references;
-    otherwise a message naming the mismatch."""
+    otherwise a message naming the mismatch. Also invoked from inside
+    validate_contract()'s main path — this standalone form exists for callers
+    who only want the registry check in isolation."""
     ids = referenced_renderer_ids(doc.get("routes", []))
     try:
         live = compute_renderer_registry_sha256(ids, registry)
@@ -197,11 +215,53 @@ def check_renderer_registry_drift(doc: dict, registry: dict) -> str | None:
     return None
 
 
+# ── output path containment (foundation only — creates nothing) ────────────
+
+def resolve_output_target(images_root, output_file: str) -> Path:
+    """Canonically resolve output_file under images_root, or refuse.
+
+    Foundation-only: this never creates a directory or a file. It exists so a
+    future dispatcher can ask "where would this actually land, and is that
+    safe" before doing anything else. Rejects absolute paths, `..`
+    traversal, both `/` and `\\` separators (regardless of host OS — a
+    Windows-style traversal must be refused even when this runs on a
+    POSIX test box), and resolves symlinks before checking containment so a
+    linked directory cannot smuggle the destination outside images_root.
+    """
+    if not isinstance(output_file, str) or not output_file:
+        raise VisualRoutesError("output_file must be a non-empty string")
+    if "/" in output_file or "\\" in output_file:
+        raise VisualRoutesError(
+            f"output_file {output_file!r} contains a path separator — it must be a "
+            f"bare, contained filename")
+    pw = PureWindowsPath(output_file)
+    if pw.is_absolute() or ".." in pw.parts or pw.name in ("", ".", ".."):
+        raise VisualRoutesError(
+            f"output_file {output_file!r} is not a contained relative filename")
+
+    root = Path(images_root).resolve()
+    resolved = (root / output_file).resolve()
+    if not resolved.is_relative_to(root):
+        raise VisualRoutesError(
+            f"output_file {output_file!r} resolves to {resolved}, outside {root}")
+    return resolved
+
+
 # ── atomic write / adapter ──────────────────────────────────────────────────
+
+def _md_escape(s) -> str:
+    """Safe for both a markdown table cell and a bullet line: no raw pipes,
+    no embedded newlines that would break row/list structure."""
+    if s is None:
+        return ""
+    return str(s).replace("|", "\\|").replace("\r", " ").replace("\n", " ")
+
 
 def render_routes_md(doc: dict) -> str:
     """Deterministic human-readable adapter. Derives mix/paid/needs-review
-    summaries at render time — none of them are stored in the JSON."""
+    summaries at render time — none of them are stored in the JSON. Exposes
+    every field a human reviewer needs to judge a route: typed arguments,
+    renderer/cost, host method/assets, prompt, cue, overlay, review reasons."""
     routes = doc.get("routes", [])
     mix: dict[str, int] = {}
     needs_review = []
@@ -216,13 +276,13 @@ def render_routes_md(doc: dict) -> str:
             paid_shots += 1
 
     lines = [
-        f"# Visual routes — {doc.get('project_id', '?')}",
+        f"# Visual routes — {_md_escape(doc.get('project_id', '?'))}",
         "",
         f"- schema_version: {doc.get('schema_version')}",
         f"- routes_id: {doc.get('routes_id')}",
         f"- generated_at: {doc.get('generated_at')}",
         f"- routes_content_sha256: {doc.get('routes_content_sha256')}",
-        f"- channel: {doc.get('channel', {}).get('channel_id')}",
+        f"- channel: {_md_escape(doc.get('channel', {}).get('channel_id'))}",
         "",
         "## Mix",
         "",
@@ -232,15 +292,42 @@ def render_routes_md(doc: dict) -> str:
             lines.append(f"- {vt}: {mix[vt]}")
     lines += ["", f"paid shots: {paid_shots}", "", f"## Needs review ({len(needs_review)})", ""]
     for r in needs_review:
-        reasons = "; ".join(f"{rr['code']}: {rr['detail']}" for rr in r.get("review_reasons", []))
-        lines.append(f"- {r.get('visual_asset_id')} ({r.get('output_file')}): {reasons}")
+        reasons = "; ".join(f"{rr['code']}: {_md_escape(rr['detail'])}"
+                            for rr in r.get("review_reasons", []))
+        lines.append(f"- {r.get('visual_asset_id')} ({_md_escape(r.get('output_file'))}): {reasons}")
+
     lines += ["", "## Routes", ""]
     lines.append("| visual_asset_id | scene | type | status | file | narration |")
     lines.append("|---|---|---|---|---|---|")
     for r in routes:
-        lines.append(f"| {r.get('visual_asset_id')} | {r.get('scene_id')} | "
+        lines.append(f"| {_md_escape(r.get('visual_asset_id'))} | {_md_escape(r.get('scene_id'))} | "
                      f"{r.get('visual_type') or '(none)'} | {r.get('status')} | "
-                     f"{r.get('output_file')} | {(r.get('narration') or '').replace(chr(10), ' ')} |")
+                     f"{_md_escape(r.get('output_file'))} | {_md_escape(r.get('narration'))} |")
+
+    lines += ["", "## Route detail", ""]
+    for r in routes:
+        args = {k: v for k, v in (r.get("route_args") or {}).items() if v is not None}
+        lines.append(f"### {r.get('visual_asset_id')} — {_md_escape(r.get('output_file'))}")
+        lines.append(f"- visual_type: {r.get('visual_type')}")
+        lines.append(f"- route_args: {_md_escape(json.dumps(args, sort_keys=True))}")
+        lines.append(f"- renderer_id: {r.get('renderer_id')}  ·  "
+                     f"cost_category: {r.get('cost_category')}  ·  paid: {r.get('paid')}")
+        lines.append(f"- host_present: {r.get('host_present')}  ·  host_method: {r.get('host_method')}  ·  "
+                     f"host_renderer_id: {r.get('host_renderer_id')}")
+        if r.get("host_present"):
+            lines.append(f"  - host_pose_id: {r.get('host_pose_id')}  ·  "
+                         f"host_scene_bound: {r.get('host_scene_bound')}  ·  "
+                         f"host_reference_asset_ids: {r.get('host_reference_asset_ids')}  ·  "
+                         f"host_placement: {r.get('host_placement')}")
+        lines.append(f"- prompt: {_md_escape(r.get('prompt'))}")
+        lines.append(f"- overlay: {_md_escape(r.get('overlay_text'))}  ·  cue: {_md_escape(r.get('visual_cue'))}")
+        if r.get("review_reasons"):
+            reasons = "; ".join(f"{rr['code']}: {_md_escape(rr['detail'])}" for rr in r["review_reasons"])
+            lines.append(f"- review_reasons: {reasons}")
+        if r.get("candidate_visual_types"):
+            lines.append(f"- candidate_visual_types: {', '.join(r['candidate_visual_types'])}")
+        lines.append("")
+
     return "\n".join(lines) + "\n"
 
 
@@ -271,12 +358,24 @@ def write_atomic(doc: dict, project_dir) -> None:
     Both temp files are fully validated before either live file is touched.
     The adapter is replaced first; the canonical JSON is the commit point and
     is replaced last. If the process crashes between the two replacements,
-    the on-disk pair is genuinely inconsistent (new adapter, old JSON) — not
-    a disguised-fine prior state. That mismatch is exactly what
-    adapter_drift() detects, and the next successful build (a fresh call to
-    this function) always repairs it by re-staging and re-replacing both.
+    the on-disk pair is genuinely INCONSISTENT (new adapter, old JSON) — this
+    is not claimed to be atomic as a pair, only detectable and recoverable:
+    that exact mismatch is what adapter_drift() catches, and the next
+    successful call to this function always repairs it by re-staging and
+    re-replacing both from scratch.
+
+    Refuses to write a document whose stored routes_content_sha256 has gone
+    stale (does not match a fresh recomputation) — a stale content hash is
+    never written, not even once.
     """
     validate_schema(doc, source=f"{Path(project_dir).name}/{ROUTES_NAME}")
+    fresh_content_hash = compute_routes_content_sha256(doc)
+    if doc.get("routes_content_sha256") != fresh_content_hash:
+        raise VisualRoutesError(
+            f"stale routes_content_sha256: stored {doc.get('routes_content_sha256')} != "
+            f"fresh {fresh_content_hash} — refusing to write a document whose recorded "
+            f"content hash no longer matches its own content")
+
     md_text = render_routes_md(doc)
     json_text = json.dumps(doc, indent=2, ensure_ascii=False)
 
@@ -291,51 +390,196 @@ def empty_route_args() -> dict:
     return {k: None for k in _ROUTE_ARG_KEYS}
 
 
+# ── manifest coverage (identity-keyed, not scene_id-keyed) ──────────────────
+
+def check_manifest_coverage(routes: list[dict], manifest: dict) -> list[str]:
+    """Every manifest scene with a persistent identity must have exactly one
+    route, and every route must correspond to exactly one manifest scene.
+    Lookup and equality are both keyed on visual_asset_id — the persistent
+    identity — never on scene_id, which is display metadata that moves
+    whenever narration is re-split."""
+    problems: list[str] = []
+    scenes = manifest.get("scenes", [])
+
+    manifest_vids = [s.get("visual_asset_id") for s in scenes if s.get("visual_asset_id")]
+    seen = set()
+    for vid in manifest_vids:
+        if vid in seen:
+            problems.append(f"manifest identity {vid!r} appears more than once in the manifest")
+        seen.add(vid)
+    manifest_vid_set = set(manifest_vids)
+
+    if manifest_vid_set and not routes:
+        problems.append(
+            f"routing document has no routes, but the manifest has "
+            f"{len(manifest_vid_set)} scene(s) with a persistent identity")
+
+    route_vids = [r.get("visual_asset_id") for r in routes]
+    for vid, n in Counter(route_vids).items():
+        if n > 1:
+            problems.append(f"duplicate visual_asset_id {vid!r} across {n} routes")
+    for sid, n in Counter(r.get("shot_instance_id") for r in routes).items():
+        if n > 1:
+            problems.append(f"duplicate shot_instance_id {sid!r} across {n} routes")
+    for f, n in Counter(r.get("output_file") for r in routes).items():
+        if n > 1:
+            problems.append(f"duplicate output_file {f!r} across {n} routes")
+
+    for vid in sorted(manifest_vid_set - set(route_vids)):
+        problems.append(f"manifest identity {vid!r} has no corresponding route")
+
+    # "Extra route" is only meaningful for a route that CLAIMS to be
+    # dispatchable (READY) but names an identity the manifest doesn't have.
+    # A NEEDS_REVIEW route carrying a synthetic placeholder id (because its
+    # own identity genuinely could not be resolved — see
+    # MANIFEST_IDENTITY_UNRESOLVED) already says so honestly; re-flagging it
+    # here as a second, differently-worded problem would make it impossible
+    # to ever write an artifact that surfaces that exact ambiguity for
+    # review, which is the whole reason NEEDS_REVIEW exists.
+    ready_vids = {r.get("visual_asset_id") for r in routes if r.get("status") == "READY"}
+    for vid in sorted(v for v in (ready_vids - manifest_vid_set) if v):
+        problems.append(f"route {vid!r} does not correspond to any manifest identity")
+
+    return problems
+
+
+# ── approved-asset resolution (real registry vocabulary, real I/O) ─────────
+
+def _verify_approved_asset(asset_id, record, *, asset_base, root, kind: str,
+                           require_scene_bound: bool | None) -> list[str]:
+    """Mirrors pose_registry.resolve()'s exact contract: status must be
+    approved or approved_scene_bound, the registered path must be relative,
+    non-traversing and free of NON_RENDERABLE_DIRS components, must resolve
+    (after following any symlink) inside `root`, must exist, and its live
+    SHA-256 must match the registered one. A missing expected hash is a
+    failure in its own right — never silently skipped."""
+    problems = []
+    if record is None:
+        problems.append(f"{kind} {asset_id!r} is not a registered asset in the "
+                        f"governing channel")
+        return problems
+    status = record.get("status")
+    if status not in ("approved", "approved_scene_bound"):
+        problems.append(f"{kind} {asset_id!r} has status {status!r}, not approved")
+        return problems
+    if status == "approved_scene_bound" and not require_scene_bound:
+        problems.append(
+            f"{kind} {asset_id!r} is a scene-bound tableau — the route must pass "
+            f"scene_bound=true to use it")
+        return problems
+
+    raw = record.get("path")
+    if not raw or not isinstance(raw, str):
+        problems.append(f"{kind} {asset_id!r} has no registered path")
+        return problems
+    p = Path(raw)
+    if p.is_absolute() or ".." in p.parts:
+        problems.append(f"{kind} {asset_id!r} registered path {raw!r} is absolute or "
+                        f"traverses upward")
+        return problems
+    forbidden = [part for part in p.parts if part in channel_context.NON_RENDERABLE_DIRS]
+    if forbidden:
+        problems.append(f"{kind} {asset_id!r} registered path {raw!r} passes through "
+                        f"{forbidden} — not approved output")
+        return problems
+    if asset_base is None or root is None:
+        problems.append(f"{kind} {asset_id!r}: no asset base/containment root supplied "
+                        f"to verify against")
+        return problems
+
+    resolved = (Path(asset_base) / p).resolve()
+    root_resolved = Path(root).resolve()
+    if not resolved.is_relative_to(root_resolved):
+        problems.append(f"{kind} {asset_id!r} resolved path escapes {root_resolved} "
+                        f"(resolved to {resolved})")
+        return problems
+    if not resolved.exists():
+        problems.append(f"{kind} {asset_id!r}: registered asset missing at {resolved}")
+        return problems
+
+    expected_hash = record.get("sha256")
+    if not expected_hash:
+        problems.append(f"{kind} {asset_id!r}: registry record has no sha256 evidence "
+                        f"to verify against")
+        return problems
+    live_hash = hashlib.sha256(resolved.read_bytes()).hexdigest()
+    if live_hash != expected_hash:
+        problems.append(
+            f"{kind} {asset_id!r}: hash mismatch — the file has changed since approval "
+            f"(expected {expected_hash[:12]}\u2026, found {live_hash[:12]}\u2026)")
+    return problems
+
+
 # ── pure contract validator (library only — not wired into any dispatcher) ──
 
 def validate_contract(
     doc: dict,
     *,
     manifest: dict,
+    manifest_sha256: str,
     governing_channel_binding: dict,
     renderer_capabilities: dict,
     renderer_registry: dict,
     approved_poses: dict | None = None,
+    poses_asset_base=None,
+    poses_root=None,
     approved_references: dict | None = None,
-    live_pose_sha256: dict | None = None,
-    live_reference_sha256: dict | None = None,
+    references_asset_base=None,
+    references_root=None,
 ) -> list[str]:
-    """Every check a future dispatcher/gate would need, run here as a pure
-    function against explicit, caller-supplied inputs. Returns a list of
-    problem strings (empty = the artifact is fully honourable against the
-    supplied governing state). Never touches disk, never imports a live
-    channel or registry itself — the caller decides what "current" means.
+    """Every ARTIFACT-INTEGRITY check a future dispatcher/gate would need,
+    run here as a pure function against explicit, caller-supplied inputs.
+    Returns a list of problem strings (empty = the artifact is internally
+    honest against the supplied governing state).
+
+    This answers "is the artifact telling the truth about itself and the
+    governing channel" — NOT "is it safe to dispatch." A fully integral
+    artifact may still contain NEEDS_REVIEW routes; see execution_blockers().
+
+    Hash/binding checks run in this main path, not only via the standalone
+    check_renderer_registry_drift() helper — a stale manifest hash, a stale
+    routes_content_sha256, a renderer registry drift, or a channel-binding
+    mismatch are all caught here directly.
     """
     problems: list[str] = []
     approved_poses = approved_poses or {}
     approved_references = approved_references or {}
-    live_pose_sha256 = live_pose_sha256 or {}
-    live_reference_sha256 = live_reference_sha256 or {}
+
+    # ── top-level hashes and bindings ────────────────────────────────────
+    if doc.get("inputs", {}).get("manifest_sha256") != manifest_sha256:
+        problems.append(
+            f"inputs.manifest_sha256 {doc.get('inputs', {}).get('manifest_sha256')!r} != "
+            f"the current manifest hash {manifest_sha256!r} — the manifest changed since "
+            f"routes were built")
+
+    fresh_content_hash = compute_routes_content_sha256(doc)
+    if doc.get("routes_content_sha256") != fresh_content_hash:
+        problems.append(
+            f"routes_content_sha256 {doc.get('routes_content_sha256')!r} != a fresh "
+            f"recomputation {fresh_content_hash!r} — the stored content hash is stale")
+
+    registry_drift = check_renderer_registry_drift(doc, renderer_registry)
+    if registry_drift:
+        problems.append(registry_drift)
 
     if doc.get("channel") != governing_channel_binding:
         problems.append(
             f"channel binding {doc.get('channel')} does not match the governing "
             f"Channel Pack {governing_channel_binding}")
 
-    scenes_by_id = {s.get("id"): s for s in manifest.get("scenes", [])}
+    routes = doc.get("routes", [])
 
-    for route in doc.get("routes", []):
+    # ── manifest coverage, keyed by persistent identity ─────────────────
+    problems.extend(check_manifest_coverage(routes, manifest))
+    scenes_by_vid = {s.get("visual_asset_id"): s for s in manifest.get("scenes", [])
+                     if s.get("visual_asset_id")}
+
+    for route in routes:
         rid = route.get("visual_asset_id", "<unknown>")
 
-        scene = scenes_by_id.get(route.get("scene_id"))
-        if scene is None:
-            problems.append(f"{rid}: scene_id {route.get('scene_id')!r} not found in manifest")
-        else:
+        scene = scenes_by_vid.get(route.get("visual_asset_id"))
+        if scene is not None:
             manifest_output = Path(scene.get("image", "")).name
-            if scene.get("visual_asset_id") != route.get("visual_asset_id"):
-                problems.append(
-                    f"{rid}: visual_asset_id {route.get('visual_asset_id')!r} != "
-                    f"manifest {scene.get('visual_asset_id')!r}")
             if scene.get("source_ids") != route.get("source_ids"):
                 problems.append(
                     f"{rid}: source_ids {route.get('source_ids')!r} != "
@@ -344,44 +588,63 @@ def validate_contract(
                 problems.append(
                     f"{rid}: shot_instance_id {route.get('shot_instance_id')!r} != "
                     f"manifest {scene.get('shot_instance_id')!r}")
+            if scene.get("id") != route.get("scene_id"):
+                problems.append(
+                    f"{rid}: scene_id {route.get('scene_id')!r} != "
+                    f"manifest {scene.get('id')!r} (display metadata mismatch)")
             if manifest_output != route.get("output_file"):
                 problems.append(
                     f"{rid}: output_file {route.get('output_file')!r} != "
                     f"manifest-derived {manifest_output!r}")
+        # A route with no matching manifest scene is already reported by
+        # check_manifest_coverage() above — not duplicated here.
 
         vt = route.get("visual_type")
         renderer_id = route.get("renderer_id")
-        renderer_entry = None
-        if vt is not None:
+        renderer_entry = renderer_registry.get(renderer_id) if renderer_id else None
+
+        if route.get("status") == STATUS_READY and vt is not None:
             expected_renderer = renderer_capabilities.get(vt)
-            if expected_renderer != renderer_id:
+            if expected_renderer is None:
+                # A missing capability is an error even when renderer_id is
+                # null — a READY route naming a type the pack cannot render
+                # at all is not "unresolved," it is wrong.
+                problems.append(
+                    f"{rid}: the governing Channel Pack declares no renderer "
+                    f"capability for {vt}, but the route is READY")
+            elif expected_renderer != renderer_id:
                 problems.append(
                     f"{rid}: renderer_id {renderer_id!r} != current capability "
                     f"{expected_renderer!r} for {vt}")
-            if renderer_id is not None:
-                renderer_entry = renderer_registry.get(renderer_id)
-                if renderer_entry is None:
-                    problems.append(f"{rid}: renderer {renderer_id!r} is not in the "
-                                    f"code-owned registry")
-                else:
-                    if not renderer_entry.get("implemented"):
-                        problems.append(f"{rid}: renderer {renderer_id!r} is not implemented")
-                    if renderer_entry.get("cost_category") != route.get("cost_category"):
-                        problems.append(
-                            f"{rid}: cost_category {route.get('cost_category')!r} != "
-                            f"registry {renderer_entry.get('cost_category')!r} for "
-                            f"{renderer_id!r}")
-                    expected_paid = renderer_entry.get("cost_category") == "paid_api"
-                    if bool(route.get("paid")) != expected_paid:
-                        problems.append(
-                            f"{rid}: paid={route.get('paid')!r} disagrees with cost_category "
-                            f"{renderer_entry.get('cost_category')!r}")
+
+            if renderer_id is None:
+                problems.append(f"{rid}: READY {vt} route has no renderer_id")
+            elif renderer_entry is None:
+                problems.append(f"{rid}: renderer {renderer_id!r} is not in the "
+                                f"code-owned registry")
+            else:
+                if not renderer_entry.get("implemented"):
+                    problems.append(f"{rid}: renderer {renderer_id!r} is not implemented")
+                if renderer_entry.get("cost_category") != route.get("cost_category"):
+                    problems.append(
+                        f"{rid}: cost_category {route.get('cost_category')!r} != "
+                        f"registry {renderer_entry.get('cost_category')!r} for "
+                        f"{renderer_id!r}")
+                expected_paid = renderer_entry.get("cost_category") == "paid_api"
+                if bool(route.get("paid")) != expected_paid:
+                    problems.append(
+                        f"{rid}: paid={route.get('paid')!r} disagrees with cost_category "
+                        f"{renderer_entry.get('cost_category')!r}")
 
         host_method = route.get("host_method")
         if route.get("host_present") and host_method == "approved_pose_composite":
             expected_host_renderer = renderer_capabilities.get("HOST_COMPOSITE")
             host_renderer_id = route.get("host_renderer_id")
-            if expected_host_renderer != host_renderer_id:
+            if expected_host_renderer is None:
+                problems.append(
+                    f"{rid}: the governing Channel Pack declares no HOST_COMPOSITE "
+                    f"capability")
+            elif expected_host_renderer != host_renderer_id:
                 problems.append(
                     f"{rid}: host_renderer_id {host_renderer_id!r} != current "
                     f"HOST_COMPOSITE capability {expected_host_renderer!r}")
@@ -390,56 +653,54 @@ def validate_contract(
                 if hentry is None or not hentry.get("implemented"):
                     problems.append(f"{rid}: HOST_COMPOSITE renderer "
                                     f"{host_renderer_id!r} is unavailable")
-            pose_id = route.get("host_pose_id")
-            record = approved_poses.get(pose_id)
-            if record is None:
-                problems.append(f"{rid}: pose {pose_id!r} is not an approved active pose")
-            else:
-                if record.get("state") != "active":
-                    problems.append(
-                        f"{rid}: pose {pose_id!r} is {record.get('state')!r}, not active")
-                if record.get("channel_id") != governing_channel_binding.get("channel_id"):
-                    problems.append(
-                        f"{rid}: pose {pose_id!r} belongs to {record.get('channel_id')!r}, "
-                        f"not {governing_channel_binding.get('channel_id')!r}")
-                if pose_id in live_pose_sha256 and live_pose_sha256[pose_id] != record.get("sha256"):
-                    problems.append(f"{rid}: pose {pose_id!r} hash mismatch")
+
+            problems.extend(_verify_approved_asset(
+                route.get("host_pose_id"), approved_poses.get(route.get("host_pose_id")),
+                asset_base=poses_asset_base, root=poses_root, kind="pose",
+                require_scene_bound=bool(route.get("host_scene_bound"))))
 
         elif route.get("host_present") and host_method == "reference_anchored_generation":
-            if vt in ("MAP", "CHART", "PHOTO", "DOCUMENT"):
+            if route.get("host_renderer_id") is not None:
                 problems.append(
-                    f"{rid}: reference_anchored_generation is not permitted for "
-                    f"deterministic visual_type {vt} — it must never substitute for "
-                    f"deterministic MAP/CHART/PHOTO/DOCUMENT rendering")
-            if renderer_entry is not None and not renderer_entry.get("supports_reference_input"):
+                    f"{rid}: reference_anchored_generation must not have a "
+                    f"host_renderer_id — the base renderer performs the anchored "
+                    f"generation directly")
+            if vt not in REFERENCE_ANCHORABLE_TYPES:
                 problems.append(
-                    f"{rid}: renderer {renderer_id!r} does not declare "
-                    f"supports_reference_input; reference_anchored_generation is not "
-                    f"permitted through it")
+                    f"{rid}: reference_anchored_generation is only permitted for "
+                    f"{'/'.join(REFERENCE_ANCHORABLE_TYPES)} — refused for visual_type "
+                    f"{vt!r}, which must never be substituted by anchored generation")
+            if renderer_id is not None and renderer_entry is not None:
+                if not renderer_entry.get("supports_reference_input"):
+                    problems.append(
+                        f"{rid}: renderer {renderer_id!r} does not declare "
+                        f"supports_reference_input; reference_anchored_generation is "
+                        f"not permitted through it")
             elif renderer_id is not None and renderer_entry is None:
                 problems.append(
                     f"{rid}: reference_anchored_generation requires a resolvable "
                     f"renderer declaring supports_reference_input")
+
             for ref_id in (route.get("host_reference_asset_ids") or []):
-                record = approved_references.get(ref_id)
-                if record is None:
-                    problems.append(
-                        f"{rid}: reference {ref_id!r} is not an approved active reference")
-                else:
-                    if record.get("state") != "active":
-                        problems.append(
-                            f"{rid}: reference {ref_id!r} is {record.get('state')!r}, "
-                            f"not active")
-                    if record.get("channel_id") != governing_channel_binding.get("channel_id"):
-                        problems.append(
-                            f"{rid}: reference {ref_id!r} belongs to "
-                            f"{record.get('channel_id')!r}, not "
-                            f"{governing_channel_binding.get('channel_id')!r}")
-                    if (ref_id in live_reference_sha256
-                            and live_reference_sha256[ref_id] != record.get("sha256")):
-                        problems.append(f"{rid}: reference {ref_id!r} hash mismatch")
+                problems.extend(_verify_approved_asset(
+                    ref_id, approved_references.get(ref_id),
+                    asset_base=references_asset_base, root=references_root,
+                    kind="reference", require_scene_bound=True))
 
     return problems
+
+
+def execution_blockers(doc: dict) -> list[str]:
+    """Every route that is not execution-ready, independent of whether the
+    artifact is otherwise fully integral. A NEEDS_REVIEW route always blocks
+    — that is what the status means. Non-empty means "do not dispatch"."""
+    return [f"{r.get('visual_asset_id')}: status {r.get('status')!r} blocks execution "
+            f"— NEEDS_REVIEW routes are never dispatchable"
+            for r in doc.get("routes", []) if r.get("status") != STATUS_READY]
+
+
+def is_executable(doc: dict) -> bool:
+    return not execution_blockers(doc)
 
 
 # ── provenance sidecar (structural validation only — no writer, no I/O) ─────

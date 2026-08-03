@@ -17,9 +17,27 @@ It preserves every legacy ambiguity honestly rather than guessing:
     needs_review, carries that forward as a structured reason — never
     silently repaired.
 
+For an unambiguous MAP, CHART or PHOTO route it resolves and stores a real
+renderer binding from the *governing Channel Pack*: renderer_id, cost_category
+and paid are set from the pack's own capability and the code-owned registry,
+and the route is marked READY only when that renderer is both registered and
+implemented. A route whose visual_type would otherwise be clean but whose
+pack declares no usable renderer for it is downgraded to NEEDS_REVIEW with a
+RENDERER_UNAVAILABLE reason — migration never writes a READY route with a
+null renderer_id or cost_category.
+
+Before writing anything, the complete built artifact is run through
+visual_routes.validate_contract() against the real manifest, the real
+manifest hash, the governing channel's binding and capabilities, and the
+current renderer registry — a migration that would produce an
+integrity-broken artifact refuses to write it at all.
+
 Never modifies the legacy input, the project's manifest, any approval, or
 any other project file. Never creates a missing project directory. Never
-overwrites an existing visual_routes.json/.md (there is no --force).
+overwrites an existing visual_routes.json/.md (there is no --force). Refuses
+a legacy input that is external to the pipeline root, unmanifested, or
+belongs to a different channel than the target project — before any temp
+file or output is created.
 
     python migrate_routes_from_markdown.py \\
         --legacy-md ep01/image_prompts_one_line_per_prompt.md --project ep01
@@ -252,12 +270,50 @@ def migrate_legacy_shot(shot: dict, manifest_scene: dict | None,
     }
 
 
+def _resolve_renderer_or_downgrade(route: dict, renderer_capabilities: dict,
+                                   registry: dict) -> None:
+    """Mutates route in place. A route that is still READY after
+    migrate_legacy_shot() and names a canonical visual_type gets a real
+    renderer_id/cost_category/paid resolved from the governing Channel Pack —
+    never left null on a READY route. If the pack declares no capability for
+    the type, or the capability names an unregistered/unimplemented
+    renderer, the route is downgraded to NEEDS_REVIEW with a structured
+    reason rather than written READY with nothing to actually dispatch."""
+    vt = route["visual_type"]
+    if vt is None or route["status"] != vr.STATUS_READY:
+        return
+    renderer_id = renderer_capabilities.get(vt)
+    entry = registry.get(renderer_id) if renderer_id else None
+    if renderer_id is None or entry is None or not entry.get("implemented"):
+        route["status"] = vr.STATUS_NEEDS_REVIEW
+        route["review_reasons"].append({
+            "code": "RENDERER_UNAVAILABLE",
+            "detail": f"the governing Channel Pack has no implemented renderer for "
+                     f"{vt} (capability: {renderer_id!r})",
+        })
+        return
+    route["renderer_id"] = renderer_id
+    route["cost_category"] = entry["cost_category"]
+    route["paid"] = entry["cost_category"] == "paid_api"
+
+
 def migrate(legacy_md, project, *, dry_run: bool = False) -> dict:
     """Full migration, all refusal checks before any directory/temp-file/output
     creation. Returns {"routes": n, "needs_review": n, "doc": doc, "written": bool}."""
     legacy_path = Path(legacy_md)
     if not legacy_path.is_file():
         raise MigrationError(f"legacy markdown not found: {legacy_path}")
+
+    legacy_resolved = legacy_path.resolve()
+    if not legacy_resolved.is_relative_to(PIPELINE_DIR.resolve()):
+        raise MigrationError(
+            f"{legacy_path} resolves to {legacy_resolved}, outside the pipeline root — "
+            f"refusing an external legacy input")
+    legacy_project_dir = legacy_resolved.parent
+    if not (legacy_project_dir / "manifest.json").is_file():
+        raise MigrationError(
+            f"{legacy_path} does not live inside a project with a manifest.json — "
+            f"refusing an unmanifested legacy input")
 
     project_dir = Path(project)
     if not project_dir.is_absolute():
@@ -286,7 +342,6 @@ def migrate(legacy_md, project, *, dry_run: bool = False) -> dict:
             f"{project_dir} — migration refuses to overwrite an existing canonical "
             f"artifact")
 
-    legacy_project_dir = legacy_path.resolve().parent
     target_channel_id, _ = channel_context.read_manifest_channel(project_dir)
     if legacy_project_dir != project_dir:
         src_channel_id, _ = channel_context.read_manifest_channel(legacy_project_dir)
@@ -317,11 +372,14 @@ def migrate(legacy_md, project, *, dry_run: bool = False) -> dict:
 
     shots = route_images.parse_shots(legacy_path, context=ctx)
 
+    renderer_capabilities = dict(ctx.renderer_capabilities)
     routes = []
     for shot in shots:
         scene = scenes_by_id.get(shot["scene_id"]) or scenes_by_file.get(shot["file"])
         prompt, overlay, cue = _extract_prompt_overlay_cue(raw_lines.get(shot["shot_num"], ""))
-        routes.append(migrate_legacy_shot(shot, scene, prompt, overlay, cue))
+        route = migrate_legacy_shot(shot, scene, prompt, overlay, cue)
+        _resolve_renderer_or_downgrade(route, renderer_capabilities, renderers.RENDERERS)
+        routes.append(route)
 
     doc = {
         "schema_version": vr.SCHEMA_VERSION,
@@ -338,6 +396,20 @@ def migrate(legacy_md, project, *, dry_run: bool = False) -> dict:
     doc["routes_content_sha256"] = vr.compute_routes_content_sha256(doc)
 
     vr.validate_schema(doc, source=f"migrated {project_dir.name}")
+
+    integrity_problems = vr.validate_contract(
+        doc,
+        manifest=manifest,
+        manifest_sha256=manifest_sha256,
+        governing_channel_binding=ctx.plan_binding(),
+        renderer_capabilities=renderer_capabilities,
+        renderer_registry=renderers.RENDERERS,
+    )
+    if integrity_problems:
+        detail = "\n".join(f"  - {p}" for p in integrity_problems[:20])
+        raise MigrationError(
+            f"migrated output for {project_dir.name} failed artifact-integrity "
+            f"validation — refusing to write it:\n{detail}")
 
     if not dry_run:
         vr.write_atomic(doc, project_dir)

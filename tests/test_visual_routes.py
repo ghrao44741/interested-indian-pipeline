@@ -2,6 +2,11 @@
 
 What this covers, and why each one is not obvious:
 
+  - **Integrity is not executability.** A NEEDS_REVIEW route can pass every
+    hash/binding/schema check there is and still be forbidden to dispatch.
+    Section 5a/5j prove validate_contract() never calls that "executable,"
+    and that execution_blockers()/is_executable() are the only functions
+    that answer the dispatch question.
   - **A schema that accepts everything is not a schema.** Section 1 proves
     every required/forbidden field combination — including the corrected
     host/migration invariant (READY requires an explicit host_method; a
@@ -11,27 +16,35 @@ What this covers, and why each one is not obvious:
     route can never carry a "timeline" chart_type — that value now belongs
     to its own canonical visual_type.
   - **A renderer-registry hash that only covers cost/implemented would miss
-    a redirect.** Section 2 proves module/entry participate in the hash too.
-  - **routes_content_sha256 must ignore the nonce and the clock, nothing
-    else.** Section 3 proves both directions.
+    a redirect.** Section 2 proves module/entry participate in the hash too,
+    and section 5 proves the MAIN validate_contract() path catches a
+    redirect, a stale manifest hash and a stale content hash — not only the
+    standalone check_renderer_registry_drift() helper.
   - **"Replace JSON last" is a detectable protocol, not true pairwise
-    atomicity.** Section 4 proves a simulated crash between the two
-    replacements is caught by adapter_drift(), never silently accepted.
-  - **The pure contract validator is exercised against synthetic inputs
-    only** — manifest equality, renderer/cost drift, and host-asset
-    rejection (missing / cross-channel / wrong state / hash-mismatched) are
-    all proven in section 5, without wiring anything into a live dispatcher.
-  - **Migration preserves ambiguity; it never resolves it.** Section 6 is
-    the full legacy markdown -> canonical artifact path: CARTOON and HOST
-    both come out NEEDS_REVIEW with candidates recorded as data, never a
-    silent guess, and confidence is null, never a fabricated 0.5.
+    atomicity.** Section 4 simulates an actual failure on the second
+    replacement (not just a hand-edited file afterwards) and proves no temp
+    file is left behind, the mismatch is detected, and the next build
+    repairs it.
+  - **The pure contract validator uses the real character-registry
+    vocabulary** (status=approved/approved_scene_bound, path, sha256,
+    generic_compositing_allowed) and does real file-hash verification against
+    real temp files — missing file, missing hash evidence, and a genuine
+    hash mismatch are three distinct, separately tested failures.
+  - **Migration preserves ambiguity; it never resolves it** — and never
+    writes a READY route with a null renderer. Section 6 proves an
+    unambiguous MAP/CHART/PHOTO route gets a real renderer/cost binding from
+    the governing Channel Pack, downgrading to NEEDS_REVIEW when the pack
+    has nothing to render it with, and that the full migrated artifact must
+    pass validate_contract() before a single byte is written.
 
 Fixtures and mocks only. No paid calls, no synthesis, no live-project writes.
 
     python tests/test_visual_routes.py
 """
 
+import hashlib
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -72,6 +85,10 @@ def temp_root() -> Path:
     _temps.append(td)
     (td / "channels").mkdir()
     return td
+
+
+def sha(p: Path) -> str:
+    return hashlib.sha256(Path(p).read_bytes()).hexdigest()
 
 
 class World:
@@ -206,15 +223,23 @@ def _base_route(**kw) -> dict:
     return base
 
 
-def _doc(routes, *, channel_id="c1") -> dict:
-    return {
+MANIFEST_SHA = "m" * 64
+
+
+def _doc(routes, *, channel_id="c1", manifest_sha256=MANIFEST_SHA,
+        renderer_ids=(), registry=None) -> dict:
+    d = {
         "schema_version": 1, "project_id": "p", "routes_id": "r1",
         "generated_at": "2026-01-01T00:00:00+00:00",
-        "inputs": {"manifest_sha256": "m" * 64},
+        "inputs": {"manifest_sha256": manifest_sha256},
         "channel": _channel_binding(channel_id),
-        "renderer_registry_sha256": "h" * 64, "routes_content_sha256": "h" * 64,
+        "renderer_registry_sha256": (
+            vr.compute_renderer_registry_sha256(renderer_ids, registry)
+            if renderer_ids else "h" * 64),
+        "routes_content_sha256": "h" * 64,
         "routes": routes,
     }
+    return d
 
 
 REGISTRY = {
@@ -236,7 +261,27 @@ REGISTRY = {
     "deterministic_document": {"module": "generate_document.py", "entry": "main",
                               "cost_category": "free_local", "implemented": False,
                               "supports_reference_input": False},
+    "deterministic_timeline": {"module": "generate_timeline.py", "entry": "main",
+                              "cost_category": "free_local", "implemented": False,
+                              "supports_reference_input": False},
 }
+
+
+def _finalize(doc: dict) -> dict:
+    """Fill in a self-consistent renderer_registry_sha256/routes_content_sha256
+    for a doc built from _doc()/_base_route(), so 'no problems expected' tests
+    don't spuriously fail on the new hash checks."""
+    ids = vr.referenced_renderer_ids(doc["routes"])
+    doc["renderer_registry_sha256"] = vr.compute_renderer_registry_sha256(ids, REGISTRY)
+    doc["routes_content_sha256"] = vr.compute_routes_content_sha256(doc)
+    return doc
+
+
+def _manifest_for(route):
+    return {"scenes": [{"id": route["scene_id"], "image": route["output_file"],
+                        "visual_asset_id": route["visual_asset_id"],
+                        "source_ids": route["source_ids"],
+                        "shot_instance_id": route["shot_instance_id"]}]}
 
 
 # ── 1. schema invariants ─────────────────────────────────────────────────────
@@ -255,7 +300,6 @@ def s1_ready_map_empty_regions_rejected():
 
 
 def s1_chart_never_accepts_timeline_type():
-    bad = json.loads(json.dumps(vr._validator().schema))  # noqa: SLF001 - reading, not calling
     route = _base_route(visual_type="CHART",
                         route_args={"map": None, "chart": {"chart_type": "timeline",
                                                             "data": [{"label": "x", "value": 1}]},
@@ -282,6 +326,30 @@ def s1_needs_review_requires_a_reason():
     check("NEEDS_REVIEW with no review_reasons is rejected", len(errs) > 0)
 
 
+def s1_ready_forbids_review_reasons_and_candidates():
+    route = _base_route(review_reasons=[{"code": "OTHER", "detail": "x"}])
+    errs = vr.schema_errors(_doc([route]))
+    check("READY with a non-empty review_reasons is rejected", len(errs) > 0)
+    route2 = _base_route(candidate_visual_types=["CHART"])
+    errs2 = vr.schema_errors(_doc([route2]))
+    check("READY with a non-empty candidate_visual_types is rejected", len(errs2) > 0)
+
+
+def s1_ready_requires_nonempty_source_ids():
+    route = _base_route(source_ids=[])
+    errs = vr.schema_errors(_doc([route]))
+    check("READY with empty source_ids is rejected", len(errs) > 0)
+
+
+def s1_ready_requires_renderer_id_and_cost_category():
+    route = _base_route(renderer_id=None)
+    errs = vr.schema_errors(_doc([route]))
+    check("READY with renderer_id=null is rejected", len(errs) > 0)
+    route2 = _base_route(cost_category=None)
+    errs2 = vr.schema_errors(_doc([route2]))
+    check("READY with cost_category=null is rejected", len(errs2) > 0)
+
+
 def s1_strict_variants_for_all_seven_types():
     cases = {
         "MAP": _base_route(),
@@ -290,14 +358,15 @@ def s1_strict_variants_for_all_seven_types():
                                          "data": [{"label": "a", "value": 1}]},
                                          "timeline": None, "document": None, "photo": None,
                                          "illustration": None, "reenactment": None}),
-        "TIMELINE": _base_route(visual_type="TIMELINE", renderer_id=None,
-                                cost_category=None,
+        "TIMELINE": _base_route(visual_type="TIMELINE", renderer_id="deterministic_timeline",
+                                cost_category="free_local",
                                 route_args={"map": None, "chart": None,
                                             "timeline": {"events": [{"label": "a",
                                                                      "order_or_date": "2024"}]},
                                             "document": None, "photo": None,
                                             "illustration": None, "reenactment": None}),
-        "DOCUMENT": _base_route(visual_type="DOCUMENT", renderer_id=None, cost_category=None,
+        "DOCUMENT": _base_route(visual_type="DOCUMENT", renderer_id="deterministic_document",
+                                cost_category="free_local",
                                 route_args={"map": None, "chart": None, "timeline": None,
                                             "document": {"doc_kind": "notification",
                                                          "fields": [{"name": "title", "value": "x"}],
@@ -356,17 +425,19 @@ def s1_needs_review_host_may_leave_method_null():
     check("the identical shape marked READY is rejected", len(errs2) > 0)
 
 
-def s1_approved_pose_composite_requires_pose_and_scene_bound():
+def s1_approved_pose_composite_requires_pose_scene_bound_and_host_renderer():
     route = _base_route(host_present=True, host_method="approved_pose_composite",
-                        host_pose_id=None, host_scene_bound=None,
-                        host_renderer_id="approved_pose_compositor")
+                        host_pose_id=None, host_scene_bound=None, host_renderer_id=None)
     errs = vr.schema_errors(_doc([route]))
-    check("approved_pose_composite without pose_id/scene_bound is rejected", len(errs) > 0)
+    check("approved_pose_composite without pose_id/scene_bound/host_renderer_id is rejected",
+          len(errs) > 0)
     good = dict(route)
     good["host_pose_id"] = "neutral_presenter"
     good["host_scene_bound"] = False
+    good["host_renderer_id"] = "approved_pose_compositor"
     errs2 = vr.schema_errors(_doc([good]))
-    check("approved_pose_composite with pose_id/scene_bound validates", errs2 == [], str(errs2))
+    check("approved_pose_composite with pose_id/scene_bound/host_renderer_id validates",
+          errs2 == [], str(errs2))
 
 
 def s1_approved_pose_composite_forbids_reference_ids():
@@ -389,15 +460,20 @@ def s1_reference_anchored_requires_nonempty_reference_ids():
     check("reference_anchored_generation with reference ids validates", errs2 == [], str(errs2))
 
 
-def s1_reference_anchored_forbids_pose_fields():
+def s1_reference_anchored_forbids_pose_fields_and_host_renderer_id():
     route = _base_route(host_present=True, host_method="reference_anchored_generation",
                         host_reference_asset_ids=["r1"], host_pose_id="p")
     errs = vr.schema_errors(_doc([route]))
     check("reference_anchored_generation forbids host_pose_id", len(errs) > 0)
+    route2 = _base_route(host_present=True, host_method="reference_anchored_generation",
+                         host_reference_asset_ids=["r1"], host_renderer_id="approved_pose_compositor")
+    errs2 = vr.schema_errors(_doc([route2]))
+    check("reference_anchored_generation forbids a non-null host_renderer_id", len(errs2) > 0)
 
 
 def s1_ready_document_requires_source_refs():
-    route = _base_route(visual_type="DOCUMENT", renderer_id=None, cost_category=None,
+    route = _base_route(visual_type="DOCUMENT", renderer_id="deterministic_document",
+                        cost_category="free_local",
                         route_args={"map": None, "chart": None, "timeline": None,
                                     "document": {"doc_kind": "notification",
                                                  "fields": [{"name": "a", "value": "b"}],
@@ -431,6 +507,16 @@ def s1_no_top_level_summary_fields_stored():
         errs = vr.schema_errors(bad)
         check(f"a stored top-level {forbidden!r} summary is rejected (additionalProperties)",
               len(errs) > 0)
+
+
+def s1_output_file_rejects_paths_and_traversal():
+    for bad_name in ("../x.png", "a/b.png", "a\\b.png", "C:\\evil.png", "..", "."):
+        route = _base_route(output_file=bad_name)
+        errs = vr.schema_errors(_doc([route]))
+        check(f"output_file {bad_name!r} is rejected by the schema", len(errs) > 0)
+    good = _base_route(output_file="shot-01.png")
+    errs = vr.schema_errors(_doc([good]))
+    check("a bare contained filename validates", errs == [], str(errs))
 
 
 # ── 2. renderer registry projection / drift ─────────────────────────────────
@@ -469,9 +555,7 @@ def s2_unregistered_renderer_refused():
 
 
 def s2_drift_check_against_live_doc():
-    doc = _doc([_base_route(renderer_id="india_geojson")])
-    doc["renderer_registry_sha256"] = vr.compute_renderer_registry_sha256(
-        {"india_geojson"}, REGISTRY)
+    doc = _finalize(_doc([_base_route(renderer_id="india_geojson")]))
     drift = vr.check_renderer_registry_drift(doc, REGISTRY)
     check("no drift reported when the stored hash matches the live registry", drift is None,
           str(drift))
@@ -535,69 +619,168 @@ def s4_write_atomic_produces_a_matching_pair():
           str(vr.adapter_drift(proj)))
 
 
+def s4_write_atomic_refuses_a_stale_content_hash():
+    root = temp_root()
+    proj = root / "proj"
+    proj.mkdir()
+    doc = _doc([_base_route()])
+    doc["routes_content_sha256"] = "not-the-real-hash"
+    try:
+        vr.write_atomic(doc, proj)
+        check("write_atomic refuses a stale routes_content_sha256", False, "it wrote anyway")
+    except vr.VisualRoutesError:
+        check("write_atomic refuses a stale routes_content_sha256", True)
+    check("nothing was written when the content hash was stale",
+          not (proj / vr.ROUTES_NAME).exists() and not (proj / vr.ROUTES_MD_NAME).exists())
+
+
 def s4_adapter_drift_detects_hand_edit():
     root = temp_root()
     proj = root / "proj"
     proj.mkdir()
     doc = _doc([_base_route()])
+    doc["routes_content_sha256"] = vr.compute_routes_content_sha256(doc)
     vr.write_atomic(doc, proj)
     (proj / vr.ROUTES_MD_NAME).write_text("hand-edited nonsense", encoding="utf-8")
     check("a hand-edited adapter is detected as drift", vr.adapter_drift(proj) is not None)
 
 
-def s4_simulated_partial_commit_is_detected():
-    """Crash between the two replacements: new adapter, old JSON. Never a
-    disguised-fine prior state — adapter_drift() must catch it."""
+def s4_adapter_escapes_table_breaking_content():
+    root = temp_root()
+    proj = root / "proj"
+    proj.mkdir()
+    route = _base_route(narration='a | pipe\nand a newline', overlay_text="x|y")
+    doc = _doc([route])
+    doc["routes_content_sha256"] = vr.compute_routes_content_sha256(doc)
+    vr.write_atomic(doc, proj)
+    text = (proj / vr.ROUTES_MD_NAME).read_text(encoding="utf-8")
+    check("pipe-breaking narration does not corrupt the routes table",
+          "| a \\| pipe and a newline |" in text or "a \\| pipe and a newline" in text, text)
+    check("adapter includes typed route_args/renderer/host/prompt/cue/overlay detail",
+          "route_args:" in text and "renderer_id:" in text and "host_present:" in text
+          and "cue:" in text)
+
+
+def s4_simulated_second_replacement_failure_cleans_temp_files_and_is_detected():
+    """An ACTUAL failure during the JSON replacement (not a hand-edit
+    afterwards): the adapter replacement succeeds for real, then os.replace
+    is made to fail only for the JSON file. No .tmp file may remain, the
+    mismatch must be detected, and the next successful build must repair it.
+    """
     root = temp_root()
     proj = root / "proj"
     proj.mkdir()
     old_doc = _doc([_base_route(narration="before")])
+    old_doc["routes_content_sha256"] = vr.compute_routes_content_sha256(old_doc)
     vr.write_atomic(old_doc, proj)
 
     new_doc = _doc([_base_route(narration="after")])
-    # Simulate write_atomic() crashing after replacing the adapter but before
-    # replacing the JSON: adapter reflects new_doc, JSON on disk still old_doc.
-    (proj / vr.ROUTES_MD_NAME).write_text(vr.render_routes_md(new_doc), encoding="utf-8")
-    drift = vr.adapter_drift(proj)
-    check("a crash between adapter and JSON replacement is detected as a mismatch",
-          drift is not None, str(drift))
+    new_doc["routes_content_sha256"] = vr.compute_routes_content_sha256(new_doc)
 
-    # The next successful build repairs it.
+    real_replace = os.replace
+
+    def failing_replace(src, dst):
+        if Path(dst).name == vr.ROUTES_NAME:
+            raise OSError("simulated failure replacing the canonical JSON")
+        return real_replace(src, dst)
+
+    with mock.patch("os.replace", side_effect=failing_replace):
+        try:
+            vr.write_atomic(new_doc, proj)
+            check("write_atomic propagates a failed JSON replacement", False, "it succeeded")
+        except OSError:
+            check("write_atomic propagates a failed JSON replacement", True)
+
+    check("the adapter was actually replaced before the failure",
+          (proj / vr.ROUTES_MD_NAME).read_text(encoding="utf-8") == vr.render_routes_md(new_doc))
+    check("the canonical JSON on disk is still the old one",
+          json.loads((proj / vr.ROUTES_NAME).read_text(encoding="utf-8"))["routes"][0]["narration"]
+          == "before")
+    leftover = list(proj.glob("*.tmp"))
+    check("no temporary file remains after the failed replacement", leftover == [], str(leftover))
+    check("the mismatch (new adapter, old JSON) is detected", vr.adapter_drift(proj) is not None)
+
     vr.write_atomic(new_doc, proj)
     check("the next successful build repairs the mismatch", vr.adapter_drift(proj) is None)
 
 
-# ── 5. pure contract validator ───────────────────────────────────────────────
+# ── 5. pure contract validator: integrity vs executability ─────────────────
 
-def _manifest_for(route):
-    return {"scenes": [{"id": route["scene_id"], "image": route["output_file"],
-                        "visual_asset_id": route["visual_asset_id"],
-                        "source_ids": route["source_ids"],
-                        "shot_instance_id": route["shot_instance_id"]}]}
-
-
-def s5_manifest_exact_equality_all_fields():
+def s5_ready_route_no_problems():
     route = _base_route()
-    manifest = _manifest_for(route)
+    doc = _finalize(_doc([route]))
     problems = vr.validate_contract(
-        _doc([route]), manifest=manifest, governing_channel_binding=_channel_binding(),
+        doc, manifest=_manifest_for(route), manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(),
         renderer_capabilities={"MAP": "india_geojson"}, renderer_registry=REGISTRY)
-    check("a fully matching route has no manifest problems", problems == [], str(problems))
+    check("a fully consistent READY route has no integrity problems", problems == [], str(problems))
 
-    for field, wrong in (("visual_asset_id", "VIS-999-A"), ("source_ids", ["SRC-999"]),
-                         ("shot_instance_id", "SRC-999-I01"), ("output_file", "wrong.png")):
-        bad_manifest = json.loads(json.dumps(manifest))
-        bad_manifest["scenes"][0][field if field != "output_file" else "image"] = wrong
-        problems = vr.validate_contract(
-            _doc([route]), manifest=bad_manifest, governing_channel_binding=_channel_binding(),
-            renderer_capabilities={"MAP": "india_geojson"}, renderer_registry=REGISTRY)
-        check(f"a manifest mismatch on {field} is caught", len(problems) > 0, str(problems))
+
+def s5_integrity_valid_but_needs_review_is_not_executable():
+    route = _base_route(status="NEEDS_REVIEW", visual_type=None, renderer_id=None,
+                        cost_category=None,
+                        review_reasons=[{"code": "OTHER", "detail": "x"}],
+                        route_args={"map": None, "chart": None, "timeline": None,
+                                    "document": None, "photo": None, "illustration": None,
+                                    "reenactment": None})
+    doc = _finalize(_doc([route]))
+    problems = vr.validate_contract(
+        doc, manifest=_manifest_for(route), manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(),
+        renderer_capabilities={"MAP": "india_geojson"}, renderer_registry=REGISTRY)
+    check("a schema/integrity-valid NEEDS_REVIEW artifact has no integrity problems",
+          problems == [], str(problems))
+    check("but it is NOT executable", not vr.is_executable(doc))
+    check("execution_blockers names the NEEDS_REVIEW route",
+          any("NEEDS_REVIEW" in b for b in vr.execution_blockers(doc)))
+    ready_doc = _finalize(_doc([_base_route()]))
+    check("a fully READY artifact IS executable", vr.is_executable(ready_doc))
+    check("a fully READY artifact has no execution blockers",
+          vr.execution_blockers(ready_doc) == [])
+
+
+def s5_stale_manifest_hash_rejected_by_main_validator():
+    route = _base_route()
+    doc = _finalize(_doc([route]))
+    problems = vr.validate_contract(
+        doc, manifest=_manifest_for(route), manifest_sha256="different-hash",
+        governing_channel_binding=_channel_binding(),
+        renderer_capabilities={"MAP": "india_geojson"}, renderer_registry=REGISTRY)
+    check("a stale manifest hash is caught by validate_contract itself",
+          any("manifest_sha256" in p for p in problems), str(problems))
+
+
+def s5_stale_content_hash_rejected_by_main_validator():
+    route = _base_route()
+    doc = _finalize(_doc([route]))
+    doc["routes_content_sha256"] = "stale"
+    problems = vr.validate_contract(
+        doc, manifest=_manifest_for(route), manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(),
+        renderer_capabilities={"MAP": "india_geojson"}, renderer_registry=REGISTRY)
+    check("a stale routes_content_sha256 is caught by validate_contract itself",
+          any("routes_content_sha256" in p for p in problems), str(problems))
+
+
+def s5_renderer_redirect_rejected_by_main_validator():
+    route = _base_route()
+    doc = _finalize(_doc([route]))
+    redirected = json.loads(json.dumps(REGISTRY))
+    redirected["india_geojson"]["module"] = "some_other_module.py"
+    problems = vr.validate_contract(
+        doc, manifest=_manifest_for(route), manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(),
+        renderer_capabilities={"MAP": "india_geojson"}, renderer_registry=redirected)
+    check("a renderer module redirect is caught by validate_contract itself, "
+          "not only check_renderer_registry_drift",
+          any("registry" in p.lower() or "drift" in p.lower() for p in problems), str(problems))
 
 
 def s5_channel_binding_mismatch():
     route = _base_route()
+    doc = _finalize(_doc([route], channel_id="c1"))
     problems = vr.validate_contract(
-        _doc([route], channel_id="c1"), manifest=_manifest_for(route),
+        doc, manifest=_manifest_for(route), manifest_sha256=MANIFEST_SHA,
         governing_channel_binding=_channel_binding("c2"),
         renderer_capabilities={"MAP": "india_geojson"}, renderer_registry=REGISTRY)
     check("a channel binding mismatch is caught",
@@ -606,23 +789,42 @@ def s5_channel_binding_mismatch():
 
 def s5_renderer_id_must_match_current_capability():
     route = _base_route(renderer_id="india_geojson")
+    doc = _finalize(_doc([route]))
     problems = vr.validate_contract(
-        _doc([route]), manifest=_manifest_for(route),
+        doc, manifest=_manifest_for(route), manifest_sha256=MANIFEST_SHA,
         governing_channel_binding=_channel_binding(),
         renderer_capabilities={"MAP": "some_other_renderer"}, renderer_registry=REGISTRY)
     check("a renderer_id that no longer matches the pack's capability is caught",
           len(problems) > 0, str(problems))
 
 
+def s5_ready_without_capability_rejected_even_with_null_renderer_id():
+    route = _base_route(renderer_id=None, cost_category=None)
+    # This route is schema-invalid on its own (READY requires renderer_id),
+    # but validate_contract is exercised directly (not via schema_errors) to
+    # prove ITS OWN capability-missing check fires independent of schema.
+    doc = _doc([route])
+    doc["renderer_registry_sha256"] = vr.compute_renderer_registry_sha256(set(), REGISTRY)
+    doc["routes_content_sha256"] = vr.compute_routes_content_sha256(doc)
+    problems = vr.validate_contract(
+        doc, manifest=_manifest_for(route), manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(),
+        renderer_capabilities={}, renderer_registry=REGISTRY)
+    check("a missing capability is an error even when renderer_id is null",
+          any("declares no renderer capability" in p for p in problems), str(problems))
+
+
 def s5_unimplemented_renderer_refused():
     route = _base_route(visual_type="DOCUMENT", renderer_id="deterministic_document",
                         cost_category="free_local",
                         route_args={"map": None, "chart": None, "timeline": None,
-                                    "document": {"doc_kind": "notification", "fields": [],
-                                                "source_refs": []},
+                                    "document": {"doc_kind": "notification",
+                                                "fields": [{"name": "a", "value": "b"}],
+                                                "source_refs": [{"label": "a", "citation": "b"}]},
                                     "photo": None, "illustration": None, "reenactment": None})
+    doc = _finalize(_doc([route]))
     problems = vr.validate_contract(
-        _doc([route]), manifest=_manifest_for(route),
+        doc, manifest=_manifest_for(route), manifest_sha256=MANIFEST_SHA,
         governing_channel_binding=_channel_binding(),
         renderer_capabilities={"DOCUMENT": "deterministic_document"}, renderer_registry=REGISTRY)
     check("an unimplemented renderer is refused", any("not implemented" in p for p in problems),
@@ -631,8 +833,9 @@ def s5_unimplemented_renderer_refused():
 
 def s5_cost_and_paid_disagreement():
     route = _base_route(renderer_id="india_geojson", cost_category="paid_api", paid=False)
+    doc = _finalize(_doc([route]))
     problems = vr.validate_contract(
-        _doc([route]), manifest=_manifest_for(route),
+        doc, manifest=_manifest_for(route), manifest_sha256=MANIFEST_SHA,
         governing_channel_binding=_channel_binding(),
         renderer_capabilities={"MAP": "india_geojson"}, renderer_registry=REGISTRY)
     check("a cost_category disagreement with the registry is caught",
@@ -643,58 +846,280 @@ def s5_cost_and_paid_disagreement():
                                      "document": None, "photo": None,
                                      "illustration": {"prompt": "x", "style_tags": []},
                                      "reenactment": None})
+    doc2 = _finalize(_doc([route2]))
     problems2 = vr.validate_contract(
-        _doc([route2]), manifest=_manifest_for(route2),
+        doc2, manifest=_manifest_for(route2), manifest_sha256=MANIFEST_SHA,
         governing_channel_binding=_channel_binding(),
         renderer_capabilities={"ILLUSTRATION": "flux_illustration"}, renderer_registry=REGISTRY)
     check("paid disagreeing with a paid_api renderer is caught",
           any("paid=" in p for p in problems2), str(problems2))
 
 
-def s5_host_pose_missing_cross_channel_state_hash():
-    route = _base_route(host_present=True, host_method="approved_pose_composite",
-                        host_pose_id="p1", host_scene_bound=True,
-                        host_renderer_id="approved_pose_compositor")
+def s5_manifest_exact_equality_all_fields():
+    route = _base_route()
     manifest = _manifest_for(route)
+    doc = _finalize(_doc([route]))
+    problems = vr.validate_contract(
+        doc, manifest=manifest, manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(),
+        renderer_capabilities={"MAP": "india_geojson"}, renderer_registry=REGISTRY)
+    check("a fully matching route has no manifest problems", problems == [], str(problems))
+
+    for field, wrong in (("visual_asset_id", "VIS-999-A"), ("source_ids", ["SRC-999"]),
+                         ("shot_instance_id", "SRC-999-I01"), ("output_file", "wrong.png"),
+                         ("scene_id", "SCENE-999")):
+        bad_manifest = json.loads(json.dumps(manifest))
+        key = {"output_file": "image", "scene_id": "id"}.get(field, field)
+        bad_manifest["scenes"][0][key] = wrong
+        problems = vr.validate_contract(
+            doc, manifest=bad_manifest, manifest_sha256=MANIFEST_SHA,
+            governing_channel_binding=_channel_binding(),
+            renderer_capabilities={"MAP": "india_geojson"}, renderer_registry=REGISTRY)
+        check(f"a manifest mismatch on {field} is caught", len(problems) > 0, str(problems))
+
+
+def s5_manifest_coverage_empty_missing_extra_duplicates():
+    route = _base_route()
+    manifest = _manifest_for(route)
+
+    empty_doc = _finalize(_doc([]))
+    problems = vr.validate_contract(
+        empty_doc, manifest=manifest, manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(),
+        renderer_capabilities={"MAP": "india_geojson"}, renderer_registry=REGISTRY)
+    check("an empty routing document against a non-empty manifest is rejected",
+          any("no routes" in p for p in problems), str(problems))
+
+    two_scene_manifest = json.loads(json.dumps(manifest))
+    two_scene_manifest["scenes"].append({"id": "SCENE-002", "image": "shot-02.png",
+                                         "visual_asset_id": "VIS-002-A",
+                                         "source_ids": ["SRC-002"],
+                                         "shot_instance_id": "SRC-002-I01"})
+    doc_missing = _finalize(_doc([route]))
+    problems2 = vr.validate_contract(
+        doc_missing, manifest=two_scene_manifest, manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(),
+        renderer_capabilities={"MAP": "india_geojson"}, renderer_registry=REGISTRY)
+    check("a manifest identity with no corresponding route is rejected",
+          any("VIS-002-A" in p and "no corresponding route" in p for p in problems2), str(problems2))
+
+    extra_route = _base_route(visual_asset_id="VIS-999-A", scene_id="SCENE-999",
+                              output_file="shot-999.png", shot_instance_id="SRC-999-I01")
+    doc_extra = _finalize(_doc([route, extra_route]))
+    problems3 = vr.validate_contract(
+        doc_extra, manifest=manifest, manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(),
+        renderer_capabilities={"MAP": "india_geojson"}, renderer_registry=REGISTRY)
+    check("a route with no corresponding manifest identity is rejected",
+          any("VIS-999-A" in p and "does not correspond" in p for p in problems3), str(problems3))
+
+    dup_vid = _base_route()
+    doc_dup_vid = _finalize(_doc([route, dup_vid]))
+    problems4 = vr.validate_contract(
+        doc_dup_vid, manifest=manifest, manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(),
+        renderer_capabilities={"MAP": "india_geojson"}, renderer_registry=REGISTRY)
+    check("a duplicate visual_asset_id across routes is rejected",
+          any("duplicate visual_asset_id" in p for p in problems4), str(problems4))
+
+    dup_file = _base_route(visual_asset_id="VIS-001-A")
+    dup_file["output_file"] = route["output_file"]
+    dup_file["shot_instance_id"] = "SRC-002-I01"
+    dup_manifest = json.loads(json.dumps(manifest))
+    problems5 = vr.check_manifest_coverage([route, dict(route, visual_asset_id="VIS-002-A")],
+                                           dup_manifest)
+    check("a duplicate output_file across routes is rejected",
+          any("duplicate output_file" in p for p in problems5), str(problems5))
+
+    dup_identity_manifest = json.loads(json.dumps(manifest))
+    dup_identity_manifest["scenes"].append(dict(dup_identity_manifest["scenes"][0]))
+    problems6 = vr.check_manifest_coverage([route], dup_identity_manifest)
+    check("a manifest identity appearing more than once in the manifest is rejected",
+          any("appears more than once in the manifest" in p for p in problems6), str(problems6))
+
+
+# ── real approved-asset vocabulary: pose/reference resolution ───────────────
+
+def _write_asset(base: Path, rel: str, content: bytes = b"asset-bytes") -> tuple[Path, str]:
+    p = base / rel
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_bytes(content)
+    return p, sha(p)
+
+
+def s5_host_pose_real_vocabulary_approved_and_approved_scene_bound():
+    root = temp_root()
+    asset_base = root / "pack"
+    poses_root = asset_base / "poses"
+    _, good_hash = _write_asset(asset_base, "poses/neutral.png")
+    _, scene_hash = _write_asset(asset_base, "poses/desk.png")
+
+    route = _base_route(host_present=True, host_method="approved_pose_composite",
+                        host_pose_id="neutral", host_scene_bound=False,
+                        host_renderer_id="approved_pose_compositor")
     caps = {"MAP": "india_geojson", "HOST_COMPOSITE": "approved_pose_compositor"}
+    manifest = _manifest_for(route)
+
+    approved = {"neutral": {"status": "approved", "path": "poses/neutral.png",
+                            "sha256": good_hash, "generic_compositing_allowed": True,
+                            "includes_geometry": []}}
+    doc = _finalize(_doc([route]))
+    problems = vr.validate_contract(
+        doc, manifest=manifest, manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(), renderer_capabilities=caps,
+        renderer_registry=REGISTRY, approved_poses=approved,
+        poses_asset_base=asset_base, poses_root=poses_root)
+    check("a real approved pose record (status=approved) resolves cleanly",
+          problems == [], str(problems))
+
+    scene_route = _base_route(host_present=True, host_method="approved_pose_composite",
+                              host_pose_id="desk", host_scene_bound=True,
+                              host_renderer_id="approved_pose_compositor")
+    scene_manifest = _manifest_for(scene_route)
+    scene_doc = _finalize(_doc([scene_route]))
+    scene_approved = {"desk": {"status": "approved_scene_bound", "path": "poses/desk.png",
+                              "sha256": scene_hash, "generic_compositing_allowed": False,
+                              "includes_geometry": ["desk", "chair"]}}
+    problems2 = vr.validate_contract(
+        scene_doc, manifest=scene_manifest, manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(), renderer_capabilities=caps,
+        renderer_registry=REGISTRY, approved_poses=scene_approved,
+        poses_asset_base=asset_base, poses_root=poses_root)
+    check("a real approved_scene_bound pose with host_scene_bound=true resolves cleanly",
+          problems2 == [], str(problems2))
+
+    scene_route_unbound = dict(scene_route)
+    scene_route_unbound["host_scene_bound"] = False
+    unbound_doc = _finalize(_doc([scene_route_unbound]))
+    problems3 = vr.validate_contract(
+        unbound_doc, manifest=_manifest_for(scene_route_unbound), manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(), renderer_capabilities=caps,
+        renderer_registry=REGISTRY, approved_poses=scene_approved,
+        poses_asset_base=asset_base, poses_root=poses_root)
+    check("approved_scene_bound with host_scene_bound=false is refused (mirrors pose_registry.resolve())",
+          any("scene-bound tableau" in p for p in problems3), str(problems3))
+
+
+def s5_host_pose_missing_record_and_bad_status_and_traversal():
+    root = temp_root()
+    asset_base = root / "pack"
+    poses_root = asset_base / "poses"
+    route = _base_route(host_present=True, host_method="approved_pose_composite",
+                        host_pose_id="neutral", host_scene_bound=False,
+                        host_renderer_id="approved_pose_compositor")
+    caps = {"MAP": "india_geojson", "HOST_COMPOSITE": "approved_pose_compositor"}
+    manifest = _manifest_for(route)
+    doc = _finalize(_doc([route]))
 
     problems = vr.validate_contract(
-        _doc([route]), manifest=manifest, governing_channel_binding=_channel_binding(),
-        renderer_capabilities=caps, renderer_registry=REGISTRY, approved_poses={})
-    check("a missing pose record is rejected", any("not an approved active pose" in p
-                                                   for p in problems), str(problems))
+        doc, manifest=manifest, manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(), renderer_capabilities=caps,
+        renderer_registry=REGISTRY, approved_poses={},
+        poses_asset_base=asset_base, poses_root=poses_root)
+    check("a pose with no registered record at all is rejected (this is what 'cross-channel' "
+          "collapses to — a pose from another channel simply is not in this registry)",
+          any("not a registered asset" in p for p in problems), str(problems))
 
-    cross = {"p1": {"channel_id": "other_channel", "state": "active", "sha256": "a"}}
+    bad_status = {"neutral": {"status": "candidate", "path": "poses/neutral.png",
+                              "sha256": "x", "generic_compositing_allowed": True}}
     problems2 = vr.validate_contract(
-        _doc([route]), manifest=manifest, governing_channel_binding=_channel_binding(),
-        renderer_capabilities=caps, renderer_registry=REGISTRY, approved_poses=cross)
-    check("a cross-channel pose is rejected", any("belongs to" in p for p in problems2),
-          str(problems2))
+        doc, manifest=manifest, manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(), renderer_capabilities=caps,
+        renderer_registry=REGISTRY, approved_poses=bad_status,
+        poses_asset_base=asset_base, poses_root=poses_root)
+    check("a non-approved status (e.g. candidate) is rejected",
+          any("not approved" in p for p in problems2), str(problems2))
 
-    candidate = {"p1": {"channel_id": "c1", "state": "candidate", "sha256": "a"}}
+    traversal = {"neutral": {"status": "approved", "path": "../../escape.png",
+                             "sha256": "x"}}
     problems3 = vr.validate_contract(
-        _doc([route]), manifest=manifest, governing_channel_binding=_channel_binding(),
-        renderer_capabilities=caps, renderer_registry=REGISTRY, approved_poses=candidate)
-    check("a non-active (candidate) pose is rejected", any("not active" in p for p in problems3),
-          str(problems3))
+        doc, manifest=manifest, manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(), renderer_capabilities=caps,
+        renderer_registry=REGISTRY, approved_poses=traversal,
+        poses_asset_base=asset_base, poses_root=poses_root)
+    check("a traversing registered path is rejected",
+          any("traverses upward" in p for p in problems3), str(problems3))
 
-    active = {"p1": {"channel_id": "c1", "state": "active", "sha256": "expected"}}
+    forbidden_dir = {"neutral": {"status": "approved", "path": "poses/archive/neutral.png",
+                                 "sha256": "x"}}
     problems4 = vr.validate_contract(
-        _doc([route]), manifest=manifest, governing_channel_binding=_channel_binding(),
-        renderer_capabilities=caps, renderer_registry=REGISTRY, approved_poses=active,
-        live_pose_sha256={"p1": "different"})
-    check("a hash-mismatched pose is rejected", any("hash mismatch" in p for p in problems4),
-          str(problems4))
+        doc, manifest=manifest, manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(), renderer_capabilities=caps,
+        renderer_registry=REGISTRY, approved_poses=forbidden_dir,
+        poses_asset_base=asset_base, poses_root=poses_root)
+    check("a path through archive/ (candidate/raw/pending/archive) is rejected",
+          any("not approved output" in p for p in problems4), str(problems4))
 
-    problems5 = vr.validate_contract(
-        _doc([route]), manifest=manifest, governing_channel_binding=_channel_binding(),
-        renderer_capabilities=caps, renderer_registry=REGISTRY, approved_poses=active,
-        live_pose_sha256={"p1": "expected"})
-    check("a valid, active, same-channel, hash-matching pose is accepted", problems5 == [],
-          str(problems5))
+
+def s5_host_pose_missing_file_missing_hash_evidence_and_hash_mismatch():
+    root = temp_root()
+    asset_base = root / "pack"
+    poses_root = asset_base / "poses"
+    _, real_hash = _write_asset(asset_base, "poses/neutral.png")
+
+    route = _base_route(host_present=True, host_method="approved_pose_composite",
+                        host_pose_id="neutral", host_scene_bound=False,
+                        host_renderer_id="approved_pose_compositor")
+    caps = {"MAP": "india_geojson", "HOST_COMPOSITE": "approved_pose_compositor"}
+    manifest = _manifest_for(route)
+    doc = _finalize(_doc([route]))
+
+    missing_file = {"neutral": {"status": "approved", "path": "poses/does_not_exist.png",
+                                "sha256": real_hash}}
+    problems = vr.validate_contract(
+        doc, manifest=manifest, manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(), renderer_capabilities=caps,
+        renderer_registry=REGISTRY, approved_poses=missing_file,
+        poses_asset_base=asset_base, poses_root=poses_root)
+    check("a registered pose whose file is missing is rejected",
+          any("registered asset missing" in p for p in problems), str(problems))
+
+    missing_hash = {"neutral": {"status": "approved", "path": "poses/neutral.png"}}
+    problems2 = vr.validate_contract(
+        doc, manifest=manifest, manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(), renderer_capabilities=caps,
+        renderer_registry=REGISTRY, approved_poses=missing_hash,
+        poses_asset_base=asset_base, poses_root=poses_root)
+    check("a pose record with no sha256 evidence is rejected outright, not silently skipped",
+          any("no sha256 evidence" in p for p in problems2), str(problems2))
+
+    wrong_hash = {"neutral": {"status": "approved", "path": "poses/neutral.png",
+                             "sha256": "0" * 64}}
+    problems3 = vr.validate_contract(
+        doc, manifest=manifest, manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(), renderer_capabilities=caps,
+        renderer_registry=REGISTRY, approved_poses=wrong_hash,
+        poses_asset_base=asset_base, poses_root=poses_root)
+    check("a genuine live hash mismatch is rejected, distinct from a missing file",
+          any("hash mismatch" in p for p in problems3), str(problems3))
+
+    if hasattr(os, "symlink"):
+        outside = root / "outside"
+        outside.mkdir()
+        _, outside_hash = _write_asset(outside, "evil.png")
+        link = asset_base / "poses" / "linked.png"
+        try:
+            os.symlink(outside / "evil.png", link)
+        except OSError:
+            print("  SKIP  pose symlink escape — this account cannot create symlinks")
+        else:
+            linked = {"neutral": {"status": "approved", "path": "poses/linked.png",
+                                  "sha256": outside_hash}}
+            problems4 = vr.validate_contract(
+                doc, manifest=manifest, manifest_sha256=MANIFEST_SHA,
+                governing_channel_binding=_channel_binding(), renderer_capabilities=caps,
+                renderer_registry=REGISTRY, approved_poses=linked,
+                poses_asset_base=asset_base, poses_root=poses_root)
+            check("a symlinked pose escaping poses_root is rejected",
+                  any("escapes" in p for p in problems4), str(problems4))
 
 
 def s5_reference_anchored_requires_supporting_renderer_and_active_reference():
+    root = temp_root()
+    ref_base = root / "refs"
+    refs_root = ref_base / "reference"
+    _, ref_hash = _write_asset(ref_base, "reference/ref1.png")
+
     route = _base_route(visual_type="ILLUSTRATION", renderer_id="flux_illustration",
                         cost_category="paid_api", paid=True,
                         route_args={"map": None, "chart": None, "timeline": None,
@@ -705,65 +1130,93 @@ def s5_reference_anchored_requires_supporting_renderer_and_active_reference():
                         host_reference_asset_ids=["ref1"])
     manifest = _manifest_for(route)
     caps = {"ILLUSTRATION": "flux_illustration"}
+    doc = _finalize(_doc([route]))
 
     problems = vr.validate_contract(
-        _doc([route]), manifest=manifest, governing_channel_binding=_channel_binding(),
-        renderer_capabilities=caps, renderer_registry=REGISTRY, approved_references={})
-    check("a missing reference record is rejected", any("not an approved active reference" in p
+        doc, manifest=manifest, manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(), renderer_capabilities=caps,
+        renderer_registry=REGISTRY, approved_references={},
+        references_asset_base=ref_base, references_root=refs_root)
+    check("a missing reference record is rejected", any("not a registered asset" in p
                                                         for p in problems), str(problems))
 
     no_ref_support = json.loads(json.dumps(REGISTRY))
     no_ref_support["flux_illustration"]["supports_reference_input"] = False
-    active_ref = {"ref1": {"channel_id": "c1", "state": "active", "sha256": "a"}}
+    active_ref = {"ref1": {"status": "approved", "path": "reference/ref1.png",
+                          "sha256": ref_hash}}
     problems2 = vr.validate_contract(
-        _doc([route]), manifest=manifest, governing_channel_binding=_channel_binding(),
-        renderer_capabilities=caps, renderer_registry=no_ref_support,
-        approved_references=active_ref)
+        doc, manifest=manifest, manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(), renderer_capabilities=caps,
+        renderer_registry=no_ref_support, approved_references=active_ref,
+        references_asset_base=ref_base, references_root=refs_root)
     check("a renderer without supports_reference_input refuses reference-anchored generation",
           any("does not declare" in p for p in problems2), str(problems2))
 
     ok = vr.validate_contract(
-        _doc([route]), manifest=manifest, governing_channel_binding=_channel_binding(),
-        renderer_capabilities=caps, renderer_registry=REGISTRY, approved_references=active_ref)
+        doc, manifest=manifest, manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(), renderer_capabilities=caps,
+        renderer_registry=REGISTRY, approved_references=active_ref,
+        references_asset_base=ref_base, references_root=refs_root)
     check("a valid reference-anchored generation route with a supporting renderer is accepted",
           ok == [], str(ok))
 
 
 def s5_reference_anchored_never_substitutes_for_deterministic_types():
-    route = _base_route(visual_type="MAP", renderer_id="india_geojson",
-                        host_present=True, host_method="reference_anchored_generation",
-                        host_reference_asset_ids=["ref1"])
-    problems = vr.validate_contract(
-        _doc([route]), manifest=_manifest_for(route),
-        governing_channel_binding=_channel_binding(),
-        renderer_capabilities={"MAP": "india_geojson"}, renderer_registry=REGISTRY,
-        approved_references={"ref1": {"channel_id": "c1", "state": "active", "sha256": "a"}})
-    check("reference_anchored_generation is refused for a deterministic MAP route",
-          any("never substitute" in p for p in problems), str(problems))
+    root = temp_root()
+    ref_base = root / "refs"
+    refs_root = ref_base / "reference"
+    _, ref_hash = _write_asset(ref_base, "reference/ref1.png")
+    active_ref = {"ref1": {"status": "approved", "path": "reference/ref1.png", "sha256": ref_hash}}
+
+    for vt, renderer_id, caps in (
+        ("MAP", "india_geojson", {"MAP": "india_geojson"}),
+        ("CHART", "matplotlib_chart", {"CHART": "matplotlib_chart"}),
+        ("TIMELINE", "deterministic_timeline", {"TIMELINE": "deterministic_timeline"}),
+        ("DOCUMENT", "deterministic_document", {"DOCUMENT": "deterministic_document"}),
+        ("PHOTO", "pexels", {"PHOTO": "pexels"}),
+    ):
+        route = _base_route(visual_type=vt, renderer_id=renderer_id,
+                            host_present=True, host_method="reference_anchored_generation",
+                            host_reference_asset_ids=["ref1"],
+                            route_args={k: None for k in
+                                       ("map", "chart", "timeline", "document", "photo",
+                                        "illustration", "reenactment")})
+        problems = vr.validate_contract(
+            _doc([route]), manifest=_manifest_for(route), manifest_sha256=MANIFEST_SHA,
+            governing_channel_binding=_channel_binding(),
+            renderer_capabilities=caps, renderer_registry=REGISTRY,
+            approved_references=active_ref, references_asset_base=ref_base,
+            references_root=refs_root)
+        check(f"reference_anchored_generation is refused for deterministic {vt}",
+              any("only permitted for" in p for p in problems), str(problems))
 
 
 def s5_second_channel_capability_isolation():
-    route = _base_route(visual_type="DOCUMENT", renderer_id="deterministic_document",
-                        cost_category="free_local",
-                        route_args={"map": None, "chart": None, "timeline": None,
-                                    "document": {"doc_kind": "notification", "fields": [],
-                                                "source_refs": []},
-                                    "photo": None, "illustration": None, "reenactment": None})
-    caps_a = {"DOCUMENT": "deterministic_document"}
-    caps_b = {"MAP": "india_geojson"}  # second pack declares no DOCUMENT capability at all
+    """Same route, same manifest — only the governing pack's capability map
+    differs. channel_id is matched to the binding in both cases so the only
+    variable under test is whether MAP is declared, not a channel-binding
+    mismatch (which would confound the assertion)."""
+    route = _base_route(visual_type="MAP", renderer_id="india_geojson",
+                        cost_category="free_local")
+    caps_a = {"MAP": "india_geojson"}
+    caps_b = {"PHOTO": "pexels"}  # second pack declares no MAP capability at all
+    doc_a = _finalize(_doc([route], channel_id="a"))
+    doc_b = _finalize(_doc([route], channel_id="b"))
     problems_a = vr.validate_contract(
-        _doc([route], channel_id="a"), manifest=_manifest_for(route),
+        doc_a, manifest=_manifest_for(route), manifest_sha256=MANIFEST_SHA,
         governing_channel_binding=_channel_binding("a"),
         renderer_capabilities=caps_a, renderer_registry=REGISTRY)
     problems_b = vr.validate_contract(
-        _doc([route], channel_id="a"), manifest=_manifest_for(route),
+        doc_b, manifest=_manifest_for(route), manifest_sha256=MANIFEST_SHA,
         governing_channel_binding=_channel_binding("b"),
         renderer_capabilities=caps_b, renderer_registry=REGISTRY)
-    check("a route valid under its own pack's capability map is unaffected by a second pack",
-          any("renderer_id" not in p for p in problems_a) or True)
-    check("the same route is refused under a pack that declares no matching capability",
-          any("!= current capability None" in p or "current capability None" in p
-              for p in problems_b), str(problems_b))
+    check("a route valid under its own pack's capability map has no integrity problems",
+          problems_a == [], str(problems_a))
+    check("the identical route is refused under a second pack that declares no matching "
+          "capability, and refused specifically because of that (this assertion genuinely "
+          "fails if capability-checking is ever accidentally removed)",
+          problems_b != [] and any("declares no renderer capability" in p for p in problems_b),
+          str(problems_b))
 
 
 # ── 6. migration ─────────────────────────────────────────────────────────────
@@ -779,7 +1232,9 @@ def s6_migration_end_to_end():
     by_scene = {r["scene_id"]: r for r in result["doc"]["routes"]}
 
     r1 = by_scene["SCENE-001"]
-    check("valid legacy PHOTO -> READY", r1["status"] == "READY" and r1["visual_type"] == "PHOTO")
+    check("valid legacy PHOTO -> READY with a real renderer/cost binding",
+          r1["status"] == "READY" and r1["visual_type"] == "PHOTO"
+          and r1["renderer_id"] == "pexels" and r1["cost_category"] == "free_api")
 
     r2 = by_scene["SCENE-002"]
     check("legacy HOST -> NEEDS_REVIEW, host_present, host_method null, visual_type null",
@@ -789,15 +1244,19 @@ def s6_migration_end_to_end():
           any(rr["code"] == "AMBIGUOUS_LEGACY_HOST" for rr in r2["review_reasons"]))
 
     r3 = by_scene["SCENE-003"]
-    check("valid legacy MAP -> READY", r3["status"] == "READY" and r3["visual_type"] == "MAP")
+    check("valid legacy MAP -> READY with a real renderer/cost binding",
+          r3["status"] == "READY" and r3["visual_type"] == "MAP"
+          and r3["renderer_id"] == "india_geojson" and r3["cost_category"] == "free_local")
 
     r4 = by_scene["SCENE-004"]
-    check("incomplete legacy MAP -> NEEDS_REVIEW, visual_type still MAP",
-          r4["status"] == "NEEDS_REVIEW" and r4["visual_type"] == "MAP")
+    check("incomplete legacy MAP -> NEEDS_REVIEW, visual_type still MAP, renderer_id null",
+          r4["status"] == "NEEDS_REVIEW" and r4["visual_type"] == "MAP"
+          and r4["renderer_id"] is None)
 
     r5 = by_scene["SCENE-005"]
-    check("valid legacy CHART (bar) -> READY", r5["status"] == "READY"
-          and r5["visual_type"] == "CHART")
+    check("valid legacy CHART (bar) -> READY with a real renderer/cost binding",
+          r5["status"] == "READY" and r5["visual_type"] == "CHART"
+          and r5["renderer_id"] == "matplotlib_chart" and r5["cost_category"] == "free_local")
 
     r6 = by_scene["SCENE-006"]
     check("legacy CHART --type timeline -> NEEDS_REVIEW, candidate TIMELINE, visual_type null",
@@ -824,12 +1283,54 @@ def s6_migration_end_to_end():
 
     check("every migrated route carries confidence=null, never a fabricated sentinel",
           all(r["routing_confidence"] is None for r in result["doc"]["routes"]))
+    check("no READY route was ever written with a null renderer_id or cost_category",
+          all(not (r["status"] == "READY" and (r["renderer_id"] is None
+                                               or r["cost_category"] is None))
+              for r in result["doc"]["routes"]))
 
     errs = vr.schema_errors(result["doc"])
     check("the full migrated artifact is schema-valid", errs == [], str(errs))
     check("visual_routes.json and .md were written",
           (proj / vr.ROUTES_NAME).is_file() and (proj / vr.ROUTES_MD_NAME).is_file())
     check("adapter matches a fresh render", vr.adapter_drift(proj) is None)
+
+
+def s6_migration_downgrades_to_needs_review_without_a_usable_renderer():
+    root = temp_root()
+    # Non-empty (the schema requires minProperties:1) but declares no
+    # MAP/CHART/PHOTO capability at all.
+    make_pack(root / "channels", "testchan", capabilities={"DOCUMENT": "deterministic_document"})
+    proj = make_project(root, "proj", "testchan")
+    with World(root):
+        result = mig.migrate(proj / "image_prompts_one_line_per_prompt.md", proj, dry_run=True)
+    by_scene = {r["scene_id"]: r for r in result["doc"]["routes"]}
+    r1 = by_scene["SCENE-001"]  # would otherwise be a clean READY PHOTO
+    check("an otherwise-clean PHOTO route downgrades to NEEDS_REVIEW when the pack has no "
+          "PHOTO capability", r1["status"] == "NEEDS_REVIEW"
+          and any(rr["code"] == "RENDERER_UNAVAILABLE" for rr in r1["review_reasons"]))
+    check("the downgraded route never carries a renderer_id or cost_category",
+          r1["renderer_id"] is None and r1["cost_category"] is None)
+
+
+def s6_migrated_output_passes_integrity_validation_before_writing():
+    root = temp_root()
+    make_pack(root / "channels", "testchan")
+    proj = make_project(root, "proj", "testchan")
+    with World(root):
+        result = mig.migrate(proj / "image_prompts_one_line_per_prompt.md", proj, dry_run=True)
+        ctx = cc.load_channel_for_project(proj)
+    manifest = json.loads((proj / "manifest.json").read_text(encoding="utf-8"))
+    manifest_sha256 = hashlib_sha_file(proj / "manifest.json")
+    problems = vr.validate_contract(
+        result["doc"], manifest=manifest, manifest_sha256=manifest_sha256,
+        governing_channel_binding=ctx.plan_binding(),
+        renderer_capabilities=dict(ctx.renderer_capabilities), renderer_registry=renderers.RENDERERS)
+    check("the migrated artifact passes full artifact-integrity validation before writing",
+          problems == [], str(problems))
+
+
+def hashlib_sha_file(p: Path) -> str:
+    return hashlib.sha256(Path(p).read_bytes()).hexdigest()
 
 
 def s6_migrated_host_shape_fails_if_marked_ready():
@@ -867,6 +1368,53 @@ def s6_refuses_missing_legacy_file():
             check("a missing legacy file is refused", False, "it succeeded")
         except mig.MigrationError:
             check("a missing legacy file is refused", True)
+
+
+def s6_refuses_external_legacy_input():
+    root = temp_root()
+    make_pack(root / "channels", "testchan")
+    proj = make_project(root, "proj", "testchan")
+    outside = Path(tempfile.mkdtemp())
+    _temps.append(outside)
+    external_md = outside / "image_prompts_one_line_per_prompt.md"
+    external_md.write_text(LEGACY_PROMPTS, encoding="utf-8")
+    with World(root):
+        try:
+            mig.migrate(external_md, proj)
+            check("a legacy input outside the pipeline root is refused", False, "it succeeded")
+        except mig.MigrationError:
+            check("a legacy input outside the pipeline root is refused", True)
+
+
+def s6_refuses_unmanifested_legacy_input():
+    root = temp_root()
+    make_pack(root / "channels", "testchan")
+    proj = make_project(root, "proj", "testchan")
+    (root / "no_manifest_here").mkdir()
+    orphan_md = root / "no_manifest_here" / "image_prompts_one_line_per_prompt.md"
+    orphan_md.write_text(LEGACY_PROMPTS, encoding="utf-8")
+    with World(root):
+        try:
+            mig.migrate(orphan_md, proj)
+            check("a legacy input with no manifest.json alongside it is refused", False,
+                  "it succeeded")
+        except mig.MigrationError:
+            check("a legacy input with no manifest.json alongside it is refused", True)
+
+
+def s6_refuses_cross_channel_legacy_input():
+    root = temp_root()
+    make_pack(root / "channels", "testchan")
+    make_pack(root / "channels", "otherchan")
+    proj = make_project(root, "proj", "testchan")
+    other_proj = make_project(root, "other_proj", "otherchan")
+    with World(root):
+        try:
+            mig.migrate(other_proj / "image_prompts_one_line_per_prompt.md", proj)
+            check("a legacy input belonging to a different channel is refused", False,
+                  "it succeeded")
+        except mig.MigrationError:
+            check("a legacy input belonging to a different channel is refused", True)
 
 
 def s6_never_creates_a_missing_project_directory():
@@ -936,6 +1484,49 @@ def s6_provenance_sidecar_structural_validation_only():
     check("a sidecar missing routes_id is rejected", len(problems2) > 0)
 
 
+# ── 7. output path containment (resolve_output_target) ─────────────────────
+
+def s7_resolve_output_target_accepts_a_contained_filename():
+    root = temp_root()
+    images_root = root / "images"
+    images_root.mkdir()
+    resolved = vr.resolve_output_target(images_root, "shot-01.png")
+    check("a bare filename resolves inside images_root",
+          resolved.parent.resolve() == images_root.resolve())
+
+
+def s7_resolve_output_target_rejects_traversal_and_separators():
+    root = temp_root()
+    images_root = root / "images"
+    images_root.mkdir()
+    for bad in ("../escape.png", "sub/escape.png", "sub\\escape.png",
+               "..\\escape.png", "C:\\evil.png", "", ".", ".."):
+        try:
+            vr.resolve_output_target(images_root, bad)
+            check(f"resolve_output_target rejects {bad!r}", False, "it resolved")
+        except vr.VisualRoutesError:
+            check(f"resolve_output_target rejects {bad!r}", True)
+
+
+def s7_resolve_output_target_rejects_symlink_escape():
+    root = temp_root()
+    images_root = root / "images"
+    images_root.mkdir()
+    outside = root / "outside"
+    outside.mkdir()
+    link = images_root / "linked_dir"
+    try:
+        os.symlink(outside, link, target_is_directory=True)
+    except OSError:
+        print("  SKIP  output-target symlink escape — this account cannot create symlinks")
+        return
+    try:
+        vr.resolve_output_target(images_root, "linked_dir")
+        check("a symlinked escape target is rejected", False, "it resolved")
+    except vr.VisualRoutesError:
+        check("a symlinked escape target is rejected", True)
+
+
 def main() -> int:
     try:
         run("1a. a complete READY MAP route validates", s1_ready_map_valid)
@@ -944,6 +1535,11 @@ def main() -> int:
         run("1d. unknown fields fail even under NEEDS_REVIEW",
             s1_unknown_field_rejected_even_under_needs_review)
         run("1e. NEEDS_REVIEW requires a reason", s1_needs_review_requires_a_reason)
+        run("1e2. READY forbids review_reasons/candidate_visual_types",
+            s1_ready_forbids_review_reasons_and_candidates)
+        run("1e3. READY requires non-empty source_ids", s1_ready_requires_nonempty_source_ids)
+        run("1e4. READY requires renderer_id and cost_category",
+            s1_ready_requires_renderer_id_and_cost_category)
         run("1f. strict route_args variants for all seven types",
             s1_strict_variants_for_all_seven_types)
         run("1g. host_present=false forbids host fields", s1_host_present_false_forbids_host_fields)
@@ -951,19 +1547,21 @@ def main() -> int:
             s1_ready_host_present_requires_host_method)
         run("1i. migrated NEEDS_REVIEW HOST validates; READY does not",
             s1_needs_review_host_may_leave_method_null)
-        run("1j. approved_pose_composite requires pose_id + scene_bound",
-            s1_approved_pose_composite_requires_pose_and_scene_bound)
+        run("1j. approved_pose_composite requires pose_id + scene_bound + host_renderer_id",
+            s1_approved_pose_composite_requires_pose_scene_bound_and_host_renderer)
         run("1k. approved_pose_composite forbids reference ids",
             s1_approved_pose_composite_forbids_reference_ids)
         run("1l. reference_anchored_generation requires non-empty reference ids",
             s1_reference_anchored_requires_nonempty_reference_ids)
-        run("1m. reference_anchored_generation forbids pose fields",
-            s1_reference_anchored_forbids_pose_fields)
+        run("1m. reference_anchored_generation forbids pose fields and host_renderer_id",
+            s1_reference_anchored_forbids_pose_fields_and_host_renderer_id)
         run("1n. READY DOCUMENT requires source_refs", s1_ready_document_requires_source_refs)
         run("1o. manual_override requires a reason", s1_manual_override_requires_reason)
         run("1p. routing_confidence=null is valid", s1_confidence_null_is_valid_never_required_to_be_a_number)
         run("1q. no independently mutable top-level summaries are storable",
             s1_no_top_level_summary_fields_stored)
+        run("1r. output_file rejects paths, separators and traversal",
+            s1_output_file_rejects_paths_and_traversal)
 
         run("2a. registry projection includes module/entry", s2_projection_includes_module_and_entry)
         run("2b. note excluded, module/reference-input included", s2_note_excluded_module_included)
@@ -976,29 +1574,58 @@ def main() -> int:
         run("3d. content hash ignores formatting/key order", s3_formatting_and_key_order_do_not_matter)
 
         run("4a. write_atomic produces a matching pair", s4_write_atomic_produces_a_matching_pair)
+        run("4a2. write_atomic refuses a stale content hash",
+            s4_write_atomic_refuses_a_stale_content_hash)
         run("4b. adapter drift detects a hand edit", s4_adapter_drift_detects_hand_edit)
-        run("4c. a simulated partial commit is detected, and the next build repairs it",
-            s4_simulated_partial_commit_is_detected)
+        run("4b2. adapter escapes table-breaking content and exposes review fields",
+            s4_adapter_escapes_table_breaking_content)
+        run("4c. an actual second-replacement failure cleans temp files and is detected",
+            s4_simulated_second_replacement_failure_cleans_temp_files_and_is_detected)
 
-        run("5a. manifest exact-equality on every identity field", s5_manifest_exact_equality_all_fields)
-        run("5b. channel binding mismatch is caught", s5_channel_binding_mismatch)
-        run("5c. renderer_id must match the current capability",
+        run("5a. a fully consistent READY route has no integrity problems", s5_ready_route_no_problems)
+        run("5a2. integrity-valid NEEDS_REVIEW is never executable",
+            s5_integrity_valid_but_needs_review_is_not_executable)
+        run("5b. a stale manifest hash is rejected by the main validator",
+            s5_stale_manifest_hash_rejected_by_main_validator)
+        run("5c. a stale content hash is rejected by the main validator",
+            s5_stale_content_hash_rejected_by_main_validator)
+        run("5d. a renderer redirect is rejected by the main validator",
+            s5_renderer_redirect_rejected_by_main_validator)
+        run("5e. channel binding mismatch is caught", s5_channel_binding_mismatch)
+        run("5f. renderer_id must match the current capability",
             s5_renderer_id_must_match_current_capability)
-        run("5d. an unimplemented renderer is refused", s5_unimplemented_renderer_refused)
-        run("5e. cost/paid disagreement is caught", s5_cost_and_paid_disagreement)
-        run("5f. host pose missing/cross-channel/state/hash rejection",
-            s5_host_pose_missing_cross_channel_state_hash)
-        run("5g. reference-anchored generation requires a supporting renderer and active reference",
+        run("5f2. a missing capability is an error even with a null renderer_id",
+            s5_ready_without_capability_rejected_even_with_null_renderer_id)
+        run("5g. an unimplemented renderer is refused", s5_unimplemented_renderer_refused)
+        run("5h. cost/paid disagreement is caught", s5_cost_and_paid_disagreement)
+        run("5i. manifest exact-equality on every identity field", s5_manifest_exact_equality_all_fields)
+        run("5j. manifest coverage: empty/missing/extra/duplicate rejected",
+            s5_manifest_coverage_empty_missing_extra_duplicates)
+        run("5k. real approved/approved_scene_bound pose vocabulary resolves correctly",
+            s5_host_pose_real_vocabulary_approved_and_approved_scene_bound)
+        run("5l. missing pose record / bad status / traversal / forbidden dir rejected",
+            s5_host_pose_missing_record_and_bad_status_and_traversal)
+        run("5m. missing file / missing hash evidence / hash mismatch rejected",
+            s5_host_pose_missing_file_missing_hash_evidence_and_hash_mismatch)
+        run("5n. reference-anchored generation requires a supporting renderer and active reference",
             s5_reference_anchored_requires_supporting_renderer_and_active_reference)
-        run("5h. reference-anchored generation never substitutes for deterministic types",
+        run("5o. reference-anchored generation never substitutes for any deterministic type",
             s5_reference_anchored_never_substitutes_for_deterministic_types)
-        run("5i. second-channel capability isolation", s5_second_channel_capability_isolation)
+        run("5p. second-channel capability isolation (a genuinely falsifiable assertion)",
+            s5_second_channel_capability_isolation)
 
         run("6a. full legacy markdown migration, end to end", s6_migration_end_to_end)
+        run("6a2. migration downgrades to NEEDS_REVIEW without a usable renderer",
+            s6_migration_downgrades_to_needs_review_without_a_usable_renderer)
+        run("6a3. migrated output passes integrity validation before writing",
+            s6_migrated_output_passes_integrity_validation_before_writing)
         run("6b. migrated HOST shape fails schema once marked READY",
             s6_migrated_host_shape_fails_if_marked_ready)
         run("6c. --dry-run writes nothing", s6_dry_run_writes_nothing)
         run("6d. a missing legacy file is refused", s6_refuses_missing_legacy_file)
+        run("6d2. an external legacy input is refused", s6_refuses_external_legacy_input)
+        run("6d3. an unmanifested legacy input is refused", s6_refuses_unmanifested_legacy_input)
+        run("6d4. a cross-channel legacy input is refused", s6_refuses_cross_channel_legacy_input)
         run("6e. migration never creates a missing project directory",
             s6_never_creates_a_missing_project_directory)
         run("6f. migration refuses an existing artifact; neither file changes",
@@ -1006,6 +1633,13 @@ def main() -> int:
         run("6g. migration refuses a project with no manifest", s6_refuses_missing_manifest)
         run("6h. the future provenance sidecar contract is structurally validated",
             s6_provenance_sidecar_structural_validation_only)
+
+        run("7a. resolve_output_target accepts a contained filename",
+            s7_resolve_output_target_accepts_a_contained_filename)
+        run("7b. resolve_output_target rejects traversal/separators",
+            s7_resolve_output_target_rejects_traversal_and_separators)
+        run("7c. resolve_output_target rejects a symlink escape",
+            s7_resolve_output_target_rejects_symlink_escape)
     finally:
         for td in _temps:
             shutil.rmtree(td, ignore_errors=True)
