@@ -217,6 +217,32 @@ PAID_ENTRY_POINTS = [
         "implemented": False,
         "note": "not written yet; reenactments currently route through images.flux_batch",
     },
+    {
+        "id": "images.canonical_adapters",
+        "module": "renderer_adapters.py",
+        "gates": [
+            {"kind": "canonical_visual_execution", "function": "adapt_map"},
+            {"kind": "canonical_visual_execution", "function": "adapt_chart"},
+            {"kind": "canonical_visual_execution", "function": "adapt_photo"},
+            {"kind": "canonical_visual_execution", "function": "adapt_flux"},
+            {"kind": "canonical_visual_execution", "function": "adapt_host_composite"},
+            {"kind": "canonical_visual_execution", "function": "adapt_flux_reference_anchor"},
+        ],
+        "provider": "delegated (local, pexels, xai, openai)",
+        "operation": "typed dispatch adapters for canonical visual_routes.json execution "
+                     "(Task 2B-B2a) — not wired into any live dispatcher yet",
+        "retry_paths": [],
+        "implemented": True,
+        "note": "every adapter, not only the two containing a provider-API marker, is "
+                "gated by require_canonical_visual_execution_ready() — a free/local "
+                "adapter (adapt_map, adapt_chart) can still write canonical episode "
+                "artwork, so it must be just as fail-closed as a paid one. This gate "
+                "is an intentional, temporary universal refusal (Task 2B-B2a); it does "
+                "not accept require_generation_ready()'s v2 approval semantics, which "
+                "do not bind canonical visual_routes execution and must never be able "
+                "to authorize it. A later, separately authorized B2b checkpoint "
+                "replaces this guard with the complete current-v3 binding validator.",
+    },
 ]
 
 # Paid, but genuinely pre-manifest. These run before scene identity exists, so
@@ -1015,6 +1041,47 @@ def require_generation_ready(project,
     if rep.blockers and raise_on_block:
         raise GateBlocked(operation, rep.blockers)
     return rep
+
+
+def require_canonical_visual_execution_ready(project=None,
+                                             operation: str = "canonical visual execution"
+                                             ) -> GateReport:
+    """Temporary, unconditional refusal (Task 2B-B2a).
+
+    Every adapter in renderer_adapters.py calls this, as its first executable
+    operation, before any credential read, client construction, reference
+    open, subprocess, download, directory creation, or write. It always
+    raises GateBlocked. There is no parameter, environment variable, or
+    branch anywhere in this function that can make it return successfully —
+    the only way past it is to replace it, in a later, separately authorized
+    B2b checkpoint, with the complete current-v3 approval/artifact binding
+    validator.
+
+    Deliberately does none of the following:
+      - accept an approval of any schema version (v2 or otherwise) — no
+        approval file is read at all;
+      - consult or reinterpret a legacy visual plan — none is read;
+      - consult visual_routes.json's validity at all — an artifact being
+        internally honest is not the same question as an execution being
+        approved to run, and this function does not conflate them even
+        provisionally;
+      - perform any I/O — no file is opened, no directory is created, no
+        client is constructed, no credential is read.
+
+    `project` is accepted only so a caller can label the blocked operation
+    with the project it was attempted against; it is never resolved,
+    inspected, or used to decide anything.
+    """
+    rep = GateReport(operation=operation,
+                     project=str(project) if project is not None else None,
+                     scope="canonical_visual_execution")
+    rep.add(
+        "canonical visual execution is enabled", False,
+        "canonical visual execution remains disabled until the Task 2B-B2b "
+        "approval-v3 cutover lands and replaces this guard — this is an "
+        "intentional, temporary, universal refusal, not a partial or "
+        "artifact-dependent check")
+    raise GateBlocked(operation, rep.blockers)
 
 
 # ── CLI ──────────────────────────────────────────────────────────────────────

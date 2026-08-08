@@ -129,6 +129,13 @@ check("every replayed record kept its hash",
 check("replay left the spec byte-for-byte unchanged",
       (ROOT / "character" / "character_spec.json").read_bytes() == spec_before)
 
+print("\nregistry() public accessor (Task 2B-B2a)")
+check("registry() returns the same data _registry() does",
+      pr.registry() == pr._registry())
+with with_spec(_pend):
+    check("registry() reflects a mutated spec the same way _registry() does",
+          pr.registry() == pr._registry())
+
 print("\n" + "=" * 58)
 print(f"FAILED ({len(failures)}): {failures}" if failures else "ALL PASS")
 sys.exit(1 if failures else 0)

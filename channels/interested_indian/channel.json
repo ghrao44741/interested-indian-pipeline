@@ -192,7 +192,8 @@
       "PHOTO": "pexels",
       "ILLUSTRATION": "flux_illustration",
       "REENACTMENT": "flux_reenactment",
-      "HOST_COMPOSITE": "approved_pose_compositor"
+      "HOST_COMPOSITE": "approved_pose_compositor",
+      "ILLUSTRATION_REFERENCE": "flux_reference_anchor"
     }
   },
   "evidence": {

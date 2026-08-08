@@ -53,6 +53,7 @@ import re
 import sys
 import uuid
 from collections import Counter
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path, PureWindowsPath
 
@@ -154,6 +155,23 @@ def renderer_registry_projection(renderer_ids, registry: dict) -> dict:
     redirects a renderer id to a different module/function is detected even
     though it changes neither cost_category nor implemented. Only
     descriptive fields (e.g. `note`) are excluded.
+
+    Widened in Task 2B-B2a (a new commit on top of the locked B1 baseline,
+    not an amendment to it) to cover every execution-affecting declaration a
+    real dispatch can vary on: which adapter callable answers for a
+    renderer_id, which provider and exact model it calls, its contract and
+    prompt-policy versions, its provider parameters, and its output-transform
+    version — not only module/entry/cost_category/implemented/
+    supports_reference_input. A registry entry that doesn't carry these newer
+    fields (every existing test fixture, and any future minimal fixture) is
+    read via `.get()` with `None`/`{}` defaults rather than raising — this
+    keeps every prior caller of this function working unchanged, while a
+    richer real registry (renderers.RENDERERS) now produces a richer,
+    execution-binding hash. This IS a deliberate, real widening of what
+    `renderer_registry_sha256` covers, and is fail-closed by construction: a
+    visual_routes.json built under the narrower pre-B2a projection has a
+    stale hash the moment this lands, and fails validate_contract()'s drift
+    check until rebuilt.
     """
     proj = {}
     for rid in sorted(set(renderer_ids)):
@@ -161,12 +179,21 @@ def renderer_registry_projection(renderer_ids, registry: dict) -> dict:
         if entry is None:
             raise VisualRoutesError(f"unregistered renderer {rid!r}; "
                                     f"registered: {sorted(registry)}")
+        adapter = entry.get("adapter")
         proj[rid] = {
             "module": entry["module"],
             "entry": entry["entry"],
             "cost_category": entry["cost_category"],
             "implemented": bool(entry["implemented"]),
             "supports_reference_input": bool(entry.get("supports_reference_input", False)),
+            "adapter_qualname": (f"{adapter.__module__}.{adapter.__qualname__}"
+                                 if adapter is not None else None),
+            "provider": entry.get("provider"),
+            "model_id": entry.get("model_id"),
+            "contract_version": entry.get("contract_version"),
+            "prompt_policy_version": entry.get("prompt_policy_version"),
+            "provider_parameters": dict(entry.get("provider_parameters") or {}),
+            "output_transform_version": entry.get("output_transform_version"),
         }
     return proj
 
@@ -766,18 +793,30 @@ def validate_contract(
         renderer_entry = renderer_registry.get(renderer_id) if renderer_id else None
 
         if route.get("status") == STATUS_READY and vt is not None:
-            expected_renderer = renderer_capabilities.get(vt)
+            # A reference-anchored route resolves against a capability key
+            # suffixed _REFERENCE (e.g. ILLUSTRATION_REFERENCE), not the
+            # plain visual-type key — mirroring the existing HOST_COMPOSITE
+            # capability-key precedent below. Every other route (including
+            # host_present routes using approved_pose_composite) resolves
+            # against the ordinary, unsuffixed key exactly as before — this
+            # branch changes nothing for them.
+            if (route.get("host_present")
+                    and route.get("host_method") == "reference_anchored_generation"):
+                capability_key = f"{vt}_REFERENCE"
+            else:
+                capability_key = vt
+            expected_renderer = renderer_capabilities.get(capability_key)
             if expected_renderer is None:
                 # A missing capability is an error even when renderer_id is
                 # null — a READY route naming a type the pack cannot render
                 # at all is not "unresolved," it is wrong.
                 problems.append(
                     f"{rid}: the governing Channel Pack declares no renderer "
-                    f"capability for {vt}, but the route is READY")
+                    f"capability for {capability_key}, but the route is READY")
             elif expected_renderer != renderer_id:
                 problems.append(
                     f"{rid}: renderer_id {renderer_id!r} != current capability "
-                    f"{expected_renderer!r} for {vt}")
+                    f"{expected_renderer!r} for {capability_key}")
 
             if renderer_id is None:
                 problems.append(f"{rid}: READY {vt} route has no renderer_id")
@@ -842,6 +881,17 @@ def validate_contract(
                 problems.append(
                     f"{rid}: reference_anchored_generation requires a resolvable "
                     f"renderer declaring supports_reference_input")
+
+            # The canonical route currently carries no reliable framing field
+            # for a host reference render, so every reference-anchored host
+            # route must name exactly both approved masters — never a single
+            # reference chosen ad hoc.
+            ref_id_set = set(route.get("host_reference_asset_ids") or [])
+            if ref_id_set != {"body_master", "face_master"}:
+                problems.append(
+                    f"{rid}: reference_anchored_generation requires exactly "
+                    f"host_reference_asset_ids == ['body_master', 'face_master'] "
+                    f"— got {sorted(ref_id_set)}")
 
             for ref_id in (route.get("host_reference_asset_ids") or []):
                 problems.extend(_verify_approved_reference(
@@ -952,6 +1002,216 @@ def _now() -> str:
 
 def new_routes_id() -> str:
     return uuid.uuid4().hex
+
+
+# ── prompt authority (Task 2B-B2a) ───────────────────────────────────────────
+
+_TYPE_ROUTE_ARGS_KEY = {"ILLUSTRATION": "illustration", "REENACTMENT": "reenactment"}
+
+
+def prompt_authority_problems(route: dict) -> list[str]:
+    """The schema carries both a top-level `route['prompt']` (required) and,
+    for ILLUSTRATION/REENACTMENT, a typed `route['route_args'][...]['prompt']`
+    (optional, nullable) — two places prompt text can live. The typed
+    route_args prompt is the execution authority (Task 2B-B2a amendment 2):
+    for a READY ILLUSTRATION/REENACTMENT route, it must be present (non-null)
+    and must equal the top-level prompt exactly. A mismatch, or a null typed
+    prompt on an otherwise-READY route, is a problem — never silently
+    resolved by picking one field over the other at generation time.
+
+    Layered on top of validate_contract() rather than folded into it: this
+    check doesn't touch anything validate_contract() (locked, B1) already
+    decides, so it can live entirely in new code."""
+    key = _TYPE_ROUTE_ARGS_KEY.get(route.get("visual_type"))
+    if key is None or route.get("status") != STATUS_READY:
+        return []
+    rid = route.get("visual_asset_id", "<unknown>")
+    args = (route.get("route_args") or {}).get(key)
+    typed = args.get("prompt") if isinstance(args, dict) else None
+    if typed is None:
+        return [f"{rid}: READY {route.get('visual_type')} route has no typed "
+                f"route_args.{key}.prompt — the typed prompt is the execution "
+                f"authority and must not be null"]
+    if typed != route.get("prompt"):
+        return [f"{rid}: top-level prompt does not equal route_args.{key}.prompt "
+                f"— {route.get('prompt')!r} != {typed!r}"]
+    return []
+
+
+def prompt_authority_problems_for_doc(doc: dict) -> list[str]:
+    problems: list[str] = []
+    for route in doc.get("routes", []):
+        problems.extend(prompt_authority_problems(route))
+    return problems
+
+
+# ── canonical project loader (Task 2B-B2a) ───────────────────────────────────
+#
+# Two tiers, deliberately: inspect_project_routes() never raises, so a caller
+# that needs to enumerate every problem by name (a GateReport, a diagnostic
+# --show) can. require_executable_routes() is the only one a direct
+# generator/reviewer/overlay-writer/approval-writer may call before doing
+# anything with side effects — it raises unless every bucket is empty, so
+# there is no way to hold a "loaded but broken" result without having already
+# raised. Nothing in the live pipeline calls either function yet (Task 2B-B2b
+# wires that in); both are exercised directly by tests in this task.
+
+@dataclass
+class ProjectRoutesLoad:
+    project_dir: Path
+    operation: str
+    doc: dict | None
+    context: object | None                     # channel_context.ChannelContext | None
+    manifest: dict | None
+    manifest_sha256: str | None
+    routes_path: Path
+    routes_md_path: Path
+    load_problems: list = field(default_factory=list)
+    schema_problems: list = field(default_factory=list)
+    integrity_problems: list = field(default_factory=list)
+    status_problems: list = field(default_factory=list)
+
+    @property
+    def execution_blockers(self) -> list:
+        return (list(self.load_problems) + list(self.schema_problems)
+                + list(self.integrity_problems) + list(self.status_problems))
+
+    @property
+    def is_executable(self) -> bool:
+        return not self.execution_blockers
+
+
+def file_sha256(path) -> str:
+    """SHA-256 of a file's exact bytes on disk — the same thing
+    generation_gate/approve_checkpoint already compute elsewhere, given one
+    shared name so every caller uses the identical function rather than
+    hand-rolling hashlib.sha256(path.read_bytes()) a second time."""
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
+def _resolve_project_dir(project) -> Path:
+    p = Path(project)
+    return p if p.is_absolute() else (PIPELINE_DIR / project).resolve()
+
+
+def inspect_project_routes(project, *, operation: str = "inspect") -> "ProjectRoutesLoad":
+    """Read-only. Never raises. Loads everything a project's
+    visual_routes.json needs to be judged against — the artifact itself, the
+    governing channel, the manifest and its hash, the approved pose and
+    reference registries — and returns a ProjectRoutesLoad whose four problem
+    buckets separate "could not even load the inputs" from "loaded but
+    schema-invalid" from "schema-valid but internally inconsistent" from
+    "internally honest but has routes needing review." No writes, no
+    directory creation, no reading of any legacy markdown artifact anywhere
+    in this function.
+    """
+    import pose_registry
+    import reference_registry
+    import renderers
+
+    project_dir = _resolve_project_dir(project)
+    routes_path = project_dir / ROUTES_NAME
+    routes_md_path = project_dir / ROUTES_MD_NAME
+    result = ProjectRoutesLoad(
+        project_dir=project_dir, operation=operation, doc=None, context=None,
+        manifest=None, manifest_sha256=None, routes_path=routes_path,
+        routes_md_path=routes_md_path)
+
+    if not project_dir.is_dir():
+        result.load_problems.append(f"no such project directory: {project_dir}")
+        return result
+
+    if not routes_path.is_file():
+        result.load_problems.append(
+            f"canonical routing artifact missing — {ROUTES_NAME} not found at "
+            f"{project_dir}; this project has not been migrated (no auto-migration "
+            f"— a human must run migrate_routes_from_markdown.py first)")
+        return result
+
+    try:
+        doc = json.loads(routes_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        result.load_problems.append(f"could not read/parse {ROUTES_NAME}: {e}")
+        return result
+    result.doc = doc
+
+    drift = adapter_drift(project_dir)
+    if drift:
+        result.load_problems.append(drift)
+
+    try:
+        context = channel_context.load_channel_for_project(project_dir)
+        result.context = context
+    except channel_context.ChannelError as e:
+        result.load_problems.append(f"could not resolve the governing channel: {e}")
+        context = None
+
+    manifest_path = project_dir / "manifest.json"
+    manifest = None
+    if not manifest_path.is_file():
+        result.load_problems.append(f"manifest.json missing at {project_dir}")
+    else:
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            result.manifest = manifest
+            result.manifest_sha256 = file_sha256(manifest_path)
+        except (OSError, json.JSONDecodeError) as e:
+            result.load_problems.append(f"could not read/parse manifest.json: {e}")
+
+    if result.load_problems:
+        return result
+
+    schema_probs = schema_errors(doc)
+    result.schema_problems.extend(schema_probs)
+    if schema_probs:
+        return result
+
+    approved_poses = {}
+    poses_asset_base = poses_root = None
+    approved_references = {}
+    references_asset_base = references_root = None
+    if context is not None and context.host_enabled:
+        approved_poses = dict(pose_registry.registry(context=context))
+        poses_asset_base = pose_registry._asset_base(context)
+        poses_root = pose_registry._poses_root(context)
+        approved_references = dict(reference_registry.registry(context=context))
+        references_asset_base = reference_registry.references_asset_base(context=context)
+        references_root = reference_registry.references_root(context=context)
+
+    integrity = list(validate_contract(
+        doc,
+        manifest=manifest, manifest_sha256=result.manifest_sha256,
+        governing_channel_binding=context.plan_binding() if context is not None else {},
+        expected_project_id=project_dir.name,
+        renderer_capabilities=dict(context.renderer_capabilities) if context is not None else {},
+        renderer_registry=renderers.RENDERERS,
+        approved_poses=approved_poses, poses_asset_base=poses_asset_base, poses_root=poses_root,
+        approved_references=approved_references,
+        references_asset_base=references_asset_base, references_root=references_root,
+    ))
+    integrity.extend(prompt_authority_problems_for_doc(doc))
+    result.integrity_problems = integrity
+    if integrity:
+        return result
+
+    result.status_problems = _status_only_blockers(doc)
+    return result
+
+
+def require_executable_routes(project, *, operation: str = "dispatch") -> "ProjectRoutesLoad":
+    """Calls inspect_project_routes() and raises VisualRoutesError, carrying
+    every blocker, unless the result is fully executable. This is the only
+    function a direct generator, reviewer, overlay writer, downloader, or
+    approval writer may call before doing anything with side effects — a
+    caller that gets a ProjectRoutesLoad back from this function has an
+    artifact already proven executable; there is no way to hold a broken one
+    without having already raised."""
+    result = inspect_project_routes(project, operation=operation)
+    if result.execution_blockers:
+        detail = "\n".join(f"  - {b}" for b in result.execution_blockers)
+        raise VisualRoutesError(
+            f"{operation}: the canonical routing artifact is not executable:\n{detail}")
+    return result
 
 
 # ── CLI ──────────────────────────────────────────────────────────────────────

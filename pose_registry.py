@@ -76,6 +76,16 @@ def _registry(context=None) -> dict:
     return spec.get("pose_library", {}).get("registry", {})
 
 
+def registry(*, context=None) -> dict:
+    """The full {pose_id: record} map, for a caller that must verify the
+    whole approved set against a routing artifact in one pass (Task 2B-B2a's
+    canonical loader) rather than resolving one id at a time the way every
+    other function in this module does. Returns the same data _registry()
+    already builds internally — this is a public name for it, not a new
+    read path."""
+    return _registry(context)
+
+
 def list_poses(generic_only: bool = False, *, context=None) -> list[str]:
     """Approved pose ids. With generic_only, excludes scene-bound tableaux."""
     out = []

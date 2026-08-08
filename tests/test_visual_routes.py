@@ -1639,10 +1639,18 @@ def s5_host_validation_never_silently_skipped_when_context_is_omitted():
 
 
 def s5_reference_anchored_requires_supporting_renderer_and_active_reference():
+    # Task 2B-B2a: reference-anchored routes now resolve against a
+    # capability key suffixed _REFERENCE (mirroring the existing
+    # HOST_COMPOSITE precedent) and must name exactly both approved
+    # masters — never a single arbitrary reference id — so this fixture's
+    # capability map and host_reference_asset_ids are updated to match the
+    # newly-approved contract; the behavior under test (missing reference,
+    # unsupported renderer, valid route accepted) is unchanged.
     root = temp_root()
     ref_base = root / "refs"
     refs_root = ref_base / "reference"
-    _, ref_hash = _write_asset(ref_base, "reference/ref1.png")
+    _, body_hash = _write_asset(ref_base, "reference/body_master.png")
+    _, face_hash = _write_asset(ref_base, "reference/face_master.png")
 
     route = _base_route(visual_type="ILLUSTRATION", renderer_id="flux_illustration",
                         cost_category="paid_api", paid=True,
@@ -1651,9 +1659,9 @@ def s5_reference_anchored_requires_supporting_renderer_and_active_reference():
                                     "illustration": {"prompt": "x", "style_tags": []},
                                     "reenactment": None},
                         host_present=True, host_method="reference_anchored_generation",
-                        host_reference_asset_ids=["ref1"])
+                        host_reference_asset_ids=["body_master", "face_master"])
     manifest = _manifest_for(route)
-    caps = {"ILLUSTRATION": "flux_illustration"}
+    caps = {"ILLUSTRATION_REFERENCE": "flux_illustration"}
     doc = _finalize(_doc([route]))
 
     problems = vr.validate_contract(
@@ -1666,8 +1674,10 @@ def s5_reference_anchored_requires_supporting_renderer_and_active_reference():
 
     no_ref_support = json.loads(json.dumps(REGISTRY))
     no_ref_support["flux_illustration"]["supports_reference_input"] = False
-    active_ref = {"ref1": {"status": "approved", "path": "reference/ref1.png",
-                          "sha256": ref_hash}}
+    active_ref = {"body_master": {"status": "approved", "path": "reference/body_master.png",
+                                  "sha256": body_hash},
+                 "face_master": {"status": "approved", "path": "reference/face_master.png",
+                                 "sha256": face_hash}}
     problems2 = vr.validate_contract(
         doc, manifest=manifest, manifest_sha256=MANIFEST_SHA,
         governing_channel_binding=_channel_binding(), expected_project_id="p", renderer_capabilities=caps,
@@ -2263,6 +2273,275 @@ def s7_resolve_output_target_rejects_symlink_escape():
         check("a symlinked escape target is rejected", True)
 
 
+# ── 8. Task 2B-B2a: capability-key precision, and the canonical loader ─────
+
+def s8_reference_anchored_requires_exactly_both_masters_not_a_single_id():
+    root = temp_root()
+    ref_base = root / "refs"
+    refs_root = ref_base / "reference"
+    _, body_hash = _write_asset(ref_base, "reference/body_master.png")
+
+    route = _base_route(visual_type="ILLUSTRATION", renderer_id="flux_illustration",
+                        cost_category="paid_api", paid=True,
+                        route_args={"map": None, "chart": None, "timeline": None,
+                                    "document": None, "photo": None,
+                                    "illustration": {"prompt": "x", "style_tags": []},
+                                    "reenactment": None},
+                        host_present=True, host_method="reference_anchored_generation",
+                        host_reference_asset_ids=["body_master"])
+    caps = {"ILLUSTRATION_REFERENCE": "flux_illustration"}
+    active_ref = {"body_master": {"status": "approved", "path": "reference/body_master.png",
+                                  "sha256": body_hash}}
+    problems = vr.validate_contract(
+        _doc([route]), manifest=_manifest_for(route), manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(), expected_project_id="p",
+        renderer_capabilities=caps, renderer_registry=REGISTRY,
+        approved_references=active_ref, references_asset_base=ref_base, references_root=refs_root)
+    check("a single reference id (missing face_master) is rejected — exactly both "
+          "approved masters are required",
+          any("requires exactly" in p for p in problems), str(problems))
+
+
+def s8_reenactment_reference_undeclared_stays_blocked():
+    root = temp_root()
+    ref_base = root / "refs"
+    refs_root = ref_base / "reference"
+    _, body_hash = _write_asset(ref_base, "reference/body_master.png")
+    _, face_hash = _write_asset(ref_base, "reference/face_master.png")
+
+    route = _base_route(visual_type="REENACTMENT", renderer_id="flux_illustration",
+                        cost_category="paid_api", paid=True,
+                        route_args={"map": None, "chart": None, "timeline": None,
+                                    "document": None, "photo": None, "illustration": None,
+                                    "reenactment": {"prompt": "x", "reference_asset_ids": []}},
+                        host_present=True, host_method="reference_anchored_generation",
+                        host_reference_asset_ids=["body_master", "face_master"])
+    # REENACTMENT_REFERENCE deliberately not declared (amendment 4, option B) —
+    # only ILLUSTRATION_REFERENCE is registered.
+    caps = {"ILLUSTRATION_REFERENCE": "flux_illustration"}
+    active_ref = {"body_master": {"status": "approved", "path": "reference/body_master.png",
+                                  "sha256": body_hash},
+                 "face_master": {"status": "approved", "path": "reference/face_master.png",
+                                 "sha256": face_hash}}
+    problems = vr.validate_contract(
+        _doc([route]), manifest=_manifest_for(route), manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(), expected_project_id="p",
+        renderer_capabilities=caps, renderer_registry=REGISTRY,
+        approved_references=active_ref, references_asset_base=ref_base, references_root=refs_root)
+    check("a REENACTMENT reference-anchored route is blocked when "
+          "REENACTMENT_REFERENCE is not declared",
+          any("declares no renderer capability for REENACTMENT_REFERENCE" in p
+              for p in problems), str(problems))
+
+
+def s8_ordinary_capability_resolution_is_unaffected():
+    """Regression guard: the new _REFERENCE-suffixed branch only applies to
+    reference_anchored_generation routes — an ordinary ILLUSTRATION route
+    (no host) still resolves against the plain, unsuffixed key exactly as
+    before."""
+    route = _base_route(visual_type="ILLUSTRATION", renderer_id="flux_illustration",
+                        cost_category="paid_api", paid=True,
+                        route_args={"map": None, "chart": None, "timeline": None,
+                                    "document": None, "photo": None,
+                                    "illustration": {"prompt": "x", "style_tags": []},
+                                    "reenactment": None})
+    caps = {"ILLUSTRATION": "flux_illustration"}
+    problems = vr.validate_contract(
+        _finalize(_doc([route])), manifest=_manifest_for(route), manifest_sha256=MANIFEST_SHA,
+        governing_channel_binding=_channel_binding(), expected_project_id="p",
+        renderer_capabilities=caps, renderer_registry=REGISTRY)
+    check("an ordinary (non-reference-anchored) ILLUSTRATION route is unaffected "
+          "by the new capability-key branch", problems == [], str(problems))
+
+    also_composite = _base_route(host_present=True, host_method="approved_pose_composite",
+                                 host_pose_id="neutral", host_scene_bound=False,
+                                 host_renderer_id="approved_pose_compositor")
+    caps2 = {"MAP": "india_geojson", "HOST_COMPOSITE": "approved_pose_compositor"}
+    problems2 = vr.validate_contract(
+        _finalize(_doc([also_composite])), manifest=_manifest_for(also_composite),
+        manifest_sha256=MANIFEST_SHA, governing_channel_binding=_channel_binding(),
+        expected_project_id="p", renderer_capabilities=caps2, renderer_registry=REGISTRY,
+        approved_poses={"neutral": {"status": "approved", "generic_compositing_allowed": True,
+                                    "includes_geometry": [], "path": "poses/neutral.png",
+                                    "sha256": "a" * 64}})
+    check("an approved_pose_composite route (a different host_method) is also "
+          "unaffected by the new capability-key branch — MAP still resolves "
+          "against the plain key",
+          not any("MAP_REFERENCE" in p for p in problems2), str(problems2))
+
+
+# ── canonical loader: real on-disk projects ─────────────────────────────────
+
+def _loader_project(root: Path, *, channel_id="loaderchan"):
+    """A minimal, real, on-disk project: one MAP route, host-disabled pack —
+    no character tree involved, keeping these tests focused on the loader's
+    own load/schema/integrity/status bucketing rather than host verification
+    (already covered exhaustively in section 5)."""
+    make_pack(root / "channels", channel_id)
+    proj = root / "proj"
+    proj.mkdir(parents=True, exist_ok=True)
+    manifest = {"episode": "proj", "identity_state": "ok", "identity_reasons": [],
+               "scenes": [{"id": "SCENE-001", "image": "shot-01.png",
+                          "visual_asset_id": "VIS-001-A", "source_ids": ["SRC-001"],
+                          "shot_instance_id": "SRC-001-I01"}],
+               "channel_id": channel_id, "channel_dna_version": 1}
+    (proj / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    manifest_sha256 = sha(proj / "manifest.json")
+
+    # inspect_project_routes() resolves the channel and the REAL
+    # renderers.RENDERERS itself — this fixture must bind against those same
+    # live sources, not the test-local REGISTRY fixture (narrower than the
+    # real registry) or a hand-guessed voice_profile_sha256, or every
+    # "fully clean" case would spuriously show drift.
+    import renderers as real_renderers
+    context = cc.load_channel(channel_id)
+
+    route = _base_route(output_file="shot-01.png")
+    doc = {
+        "schema_version": 1, "project_id": "proj", "routes_id": "r1",
+        "generated_at": "2026-01-01T00:00:00+00:00",
+        "inputs": {"manifest_sha256": manifest_sha256},
+        "channel": context.plan_binding(),
+        "renderer_registry_sha256": vr.compute_renderer_registry_sha256(
+            {"india_geojson"}, real_renderers.RENDERERS),
+        "routes_content_sha256": "placeholder",
+        "routes": [route],
+    }
+    doc["routes_content_sha256"] = vr.compute_routes_content_sha256(doc)
+    vr.write_atomic(doc, proj)
+    return proj, doc, manifest_sha256
+
+
+def s8_inspect_missing_artifact_never_raises():
+    root = temp_root()
+    proj = root / "unmigrated"
+    proj.mkdir(parents=True, exist_ok=True)
+    result = vr.inspect_project_routes(proj, operation="test")
+    check("inspect_project_routes never raises for a missing artifact",
+          isinstance(result, vr.ProjectRoutesLoad))
+    check("the literal 'canonical routing artifact missing' message is present",
+          any("canonical routing artifact missing" in p for p in result.load_problems),
+          str(result.load_problems))
+    check("is_executable is False", result.is_executable is False)
+    check("doc stayed None — nothing partially loaded", result.doc is None)
+
+
+def s8_require_executable_raises_for_the_same_missing_case():
+    root = temp_root()
+    proj = root / "unmigrated2"
+    proj.mkdir(parents=True, exist_ok=True)
+    try:
+        vr.require_executable_routes(proj, operation="test")
+        check("require_executable_routes raises for a missing artifact", False, "no raise")
+    except vr.VisualRoutesError as e:
+        check("require_executable_routes raises for a missing artifact", True)
+        check("the raised message carries the same blocker text",
+              "canonical routing artifact missing" in str(e), str(e))
+
+
+def s8_inspect_malformed_json_is_a_load_problem():
+    root = temp_root()
+    proj = root / "malformed"
+    proj.mkdir(parents=True, exist_ok=True)
+    (proj / vr.ROUTES_NAME).write_text("{not valid json", encoding="utf-8")
+    (proj / vr.ROUTES_MD_NAME).write_text("whatever", encoding="utf-8")
+    result = vr.inspect_project_routes(proj, operation="test")
+    check("malformed JSON is a load_problem, not a raise",
+          any("could not read/parse" in p for p in result.load_problems),
+          str(result.load_problems))
+    check("is_executable is False", result.is_executable is False)
+
+
+def s8_inspect_adapter_drift_is_a_load_problem():
+    root = temp_root()
+    with World(root):
+        proj, doc, _ = _loader_project(root)
+        # Hand-edit the .md so it no longer matches a fresh render — exactly
+        # what adapter_drift() exists to catch.
+        (proj / vr.ROUTES_MD_NAME).write_text("hand-edited, no longer generated\n",
+                                              encoding="utf-8")
+        result = vr.inspect_project_routes(proj, operation="test")
+        check("a drifted visual_routes.md is a load_problem",
+              any("does not match a fresh render" in p for p in result.load_problems),
+              str(result.load_problems))
+
+
+def s8_inspect_schema_invalid_doc_is_a_schema_problem_not_integrity():
+    root = temp_root()
+    with World(root):
+        proj, doc, _ = _loader_project(root)
+        broken = json.loads(json.dumps(doc))
+        broken["schema_version"] = 99
+        # Keep the .md/.json pair matching (schema_version alone doesn't
+        # change render_routes_md()'s output) so adapter_drift() doesn't
+        # mask the schema problem this test actually targets.
+        vr._write_atomic_text(proj / vr.ROUTES_MD_NAME, vr.render_routes_md(broken))
+        vr._write_atomic_text(proj / vr.ROUTES_NAME,
+                              json.dumps(broken, indent=2, ensure_ascii=False))
+        result = vr.inspect_project_routes(proj, operation="test")
+        check("a schema-invalid doc lands in schema_problems, not integrity_problems",
+              bool(result.schema_problems) and not result.integrity_problems, str(result))
+        check("is_executable is False", result.is_executable is False)
+
+
+def s8_inspect_stale_manifest_hash_is_an_integrity_problem():
+    root = temp_root()
+    with World(root):
+        proj, doc, _ = _loader_project(root)
+        (proj / "manifest.json").write_text(
+            json.dumps({"episode": "proj", "identity_state": "ok", "identity_reasons": [],
+                       "scenes": [{"id": "SCENE-001", "image": "shot-01.png",
+                                  "visual_asset_id": "VIS-001-A", "source_ids": ["SRC-001"],
+                                  "shot_instance_id": "SRC-001-I01"}, {"extra": "scene"}],
+                       "channel_id": "loaderchan", "channel_dna_version": 1}, indent=2),
+            encoding="utf-8")
+        result = vr.inspect_project_routes(proj, operation="test")
+        check("changing the manifest after the routes were built shows up in "
+              "integrity_problems", bool(result.integrity_problems)
+              and not result.schema_problems, str(result))
+
+
+def s8_inspect_needs_review_route_is_a_status_problem_only():
+    root = temp_root()
+    with World(root):
+        proj, doc, manifest_sha256 = _loader_project(root)
+        needs_review_doc = json.loads(json.dumps(doc))
+        needs_review_doc["routes"][0]["status"] = "NEEDS_REVIEW"
+        needs_review_doc["routes"][0]["review_reasons"] = [{"code": "OTHER", "detail": "x"}]
+        needs_review_doc["routes_content_sha256"] = vr.compute_routes_content_sha256(
+            needs_review_doc)
+        vr.write_atomic(needs_review_doc, proj)
+        result = vr.inspect_project_routes(proj, operation="test")
+        check("a NEEDS_REVIEW route surfaces only in status_problems",
+              bool(result.status_problems) and not result.load_problems
+              and not result.schema_problems and not result.integrity_problems,
+              str(result))
+        check("is_executable is False", result.is_executable is False)
+
+
+def s8_inspect_fully_clean_project_is_executable():
+    root = temp_root()
+    with World(root):
+        proj, doc, _ = _loader_project(root)
+        result = vr.inspect_project_routes(proj, operation="test")
+        check("a fully clean project has no problems in any bucket",
+              result.execution_blockers == [], str(result.execution_blockers))
+        check("is_executable is True", result.is_executable is True)
+        check("doc is populated", result.doc is not None
+              and result.doc["project_id"] == "proj")
+        require = vr.require_executable_routes(proj, operation="test")
+        check("require_executable_routes returns the same, non-raising result",
+              require.doc["routes_id"] == "r1")
+
+
+def s8_file_sha256_matches_plain_hashlib():
+    root = temp_root()
+    p = root / "x.txt"
+    p.write_bytes(b"some bytes")
+    check("file_sha256() matches hashlib.sha256(path.read_bytes())",
+          vr.file_sha256(p) == hashlib.sha256(p.read_bytes()).hexdigest())
+
+
 def main() -> int:
     try:
         run("1a. a complete READY MAP route validates", s1_ready_map_valid)
@@ -2416,6 +2695,30 @@ def main() -> int:
             s7_resolve_output_target_rejects_traversal_and_separators)
         run("7c. resolve_output_target rejects a symlink escape",
             s7_resolve_output_target_rejects_symlink_escape)
+
+        run("8a. reference_anchored_generation requires exactly both masters, not a "
+            "single id", s8_reference_anchored_requires_exactly_both_masters_not_a_single_id)
+        run("8b. REENACTMENT_REFERENCE undeclared stays blocked",
+            s8_reenactment_reference_undeclared_stays_blocked)
+        run("8c. ordinary capability resolution is unaffected by the new branch",
+            s8_ordinary_capability_resolution_is_unaffected)
+        run("8d. inspect_project_routes never raises for a missing artifact",
+            s8_inspect_missing_artifact_never_raises)
+        run("8e. require_executable_routes raises for the same missing case",
+            s8_require_executable_raises_for_the_same_missing_case)
+        run("8f. malformed JSON is a load_problem, not a raise",
+            s8_inspect_malformed_json_is_a_load_problem)
+        run("8g. a drifted visual_routes.md is a load_problem",
+            s8_inspect_adapter_drift_is_a_load_problem)
+        run("8h. a schema-invalid doc lands in schema_problems, not integrity_problems",
+            s8_inspect_schema_invalid_doc_is_a_schema_problem_not_integrity)
+        run("8i. a stale manifest hash is an integrity_problem",
+            s8_inspect_stale_manifest_hash_is_an_integrity_problem)
+        run("8j. a NEEDS_REVIEW route is a status_problem only",
+            s8_inspect_needs_review_route_is_a_status_problem_only)
+        run("8k. a fully clean project is executable",
+            s8_inspect_fully_clean_project_is_executable)
+        run("8l. file_sha256 matches plain hashlib", s8_file_sha256_matches_plain_hashlib)
     finally:
         for td in _temps:
             shutil.rmtree(td, ignore_errors=True)

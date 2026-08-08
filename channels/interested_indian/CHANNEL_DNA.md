@@ -96,6 +96,7 @@ Letterbox padding: `#1A2B4C`
 | DOCUMENT | `deterministic_document` |
 | HOST_COMPOSITE | `approved_pose_compositor` |
 | ILLUSTRATION | `flux_illustration` |
+| ILLUSTRATION_REFERENCE | `flux_reference_anchor` |
 | MAP | `india_geojson` |
 | PHOTO | `pexels` |
 | REENACTMENT | `flux_reenactment` |
