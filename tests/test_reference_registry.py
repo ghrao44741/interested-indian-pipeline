@@ -146,6 +146,129 @@ check("references_root() equals the character spec's own directory",
 check("references_asset_base() equals the existing _asset_base()",
       rr.references_asset_base() == rr._asset_base())
 
+print("\nread_verified_bytes() returns the exact, re-verified bytes "
+      "(final boundary micro-fix, item 2)")
+def _good_body_face():
+    """A self-contained, isolated fixture with its own real master files —
+    correctly laid out as asset_base/character/character_spec.json with
+    assets at asset_base/character/canonical/*, mirroring
+    tests/test_renderer_adapters.py's _fixture_reference_context() exactly
+    (that layout is what _asset_base()/_character_root() actually expect —
+    reusing REAL's data with the wrong directory depth, as an earlier draft
+    of this fixture did, produces a false "resolved path escapes" failure,
+    not a real one)."""
+    td = Path(tempfile.mkdtemp())
+    body_bytes, face_bytes = b"body-master-fixture-bytes", b"face-master-fixture-bytes"
+    body_path = td / "character" / "canonical" / "body-master.png"
+    face_path = td / "character" / "canonical" / "face-master.png"
+    body_path.parent.mkdir(parents=True, exist_ok=True)
+    body_path.write_bytes(body_bytes)
+    face_path.write_bytes(face_bytes)
+    spec = {
+        "masters": {
+            "body_master": {"path": "character/canonical/body-master.png", "status": "approved",
+                            "sha256": __import__("hashlib").sha256(body_bytes).hexdigest()},
+            "face_master": {"path": "character/canonical/face-master.png", "status": "approved",
+                            "sha256": __import__("hashlib").sha256(face_bytes).hexdigest()},
+        },
+        "references": {"body_master": "character/canonical/body-master.png",
+                       "face_master": "character/canonical/face-master.png"},
+    }
+    spec_path = td / "character" / "character_spec.json"
+    spec_path.write_text(json.dumps(spec), encoding="utf-8")
+
+    class _Ctx:
+        character_spec_path = str(spec_path)
+    return _Ctx()
+
+
+ctx_ok = _good_body_face()
+body_bytes = rr.read_verified_bytes("body_master", context=ctx_ok)
+check("read_verified_bytes returns real, non-empty bytes",
+      isinstance(body_bytes, bytes) and len(body_bytes) > 0)
+live_path = rr.resolve("body_master", context=ctx_ok)
+check("the returned bytes match the file's current on-disk content exactly",
+      body_bytes == live_path.read_bytes())
+
+print("\nTOCTOU regression: a file changed after resolve() validated it is "
+      "still caught on the final read")
+ctx_toctou = _good_body_face()
+valid_path = rr.resolve("body_master", context=ctx_toctou)   # validates original bytes
+tampered_bytes = b"TAMPERED-AFTER-RESOLVE-VALIDATED-THE-ORIGINAL"
+valid_path.write_bytes(tampered_bytes)
+# Simulate a caller that already has a validated path/record from an
+# earlier resolve() call (as if it were cached) — read_verified_bytes()
+# must not simply trust that; its own internal resolve()+read+hash must
+# be against CURRENT disk state, so even a resolve() that (in a real race)
+# validated stale bytes a moment ago cannot let tampered bytes through.
+with mock.patch.object(rr, "resolve", return_value=valid_path):
+    try:
+        rr.read_verified_bytes("body_master", context=ctx_toctou)
+        check("tampered bytes are refused, never returned to a caller", False,
+              "no error raised — read_verified_bytes returned the tampered bytes")
+    except rr.ReferenceError as e:
+        check("tampered bytes are refused, never returned to a caller", True, str(e)[:100])
+        check("the refusal names a hash mismatch, not some other failure",
+              "hash mismatch" in str(e).lower(), str(e))
+
+print("\nunreadable file is a controlled ReferenceError, not an uncaught OSError")
+ctx_unreadable = _good_body_face()
+unreadable_path = rr.resolve("body_master", context=ctx_unreadable)
+real_read_bytes = Path.read_bytes
+
+
+def _boom_read_bytes(self, *a, **kw):
+    if self == unreadable_path:
+        raise OSError("simulated permission denied")
+    return real_read_bytes(self, *a, **kw)
+
+
+with mock.patch.object(Path, "read_bytes", _boom_read_bytes):
+    expect_error("an unreadable (but otherwise valid) reference file is refused, "
+                 "not an uncaught OSError",
+                 lambda: rr.read_verified_bytes("body_master", context=ctx_unreadable),
+                 "could not read")
+
+print("\nmalformed/unreadable character_spec.json is a controlled empty registry, "
+      "never an uncaught exception")
+malformed_td = Path(tempfile.mkdtemp())
+malformed_spec_path = malformed_td / "character_spec.json"
+malformed_spec_path.write_text("{not valid json at all", encoding="utf-8")
+
+
+class _MalformedCtx:
+    character_spec_path = str(malformed_spec_path)
+
+
+check("registry() never raises against malformed JSON — returns empty",
+      rr.registry(context=_MalformedCtx()) == {})
+a_malformed = rr.audit(context=_MalformedCtx())
+check("audit() never raises against malformed JSON either",
+      a_malformed["ok"] == [] and set(k.split(" ")[0] for k in a_malformed["unapproved"])
+      == {"body_master", "face_master"}, str(a_malformed))
+expect_error("resolve() against malformed JSON is a controlled ReferenceError "
+             "(the registry is empty, so the id is 'unknown'), not an uncaught "
+             "JSONDecodeError",
+             lambda: rr.resolve("body_master", context=_MalformedCtx()),
+             "unknown or unapproved")
+expect_error("read_verified_bytes() against malformed JSON is likewise a "
+             "controlled refusal, before any credential/client concern could "
+             "even arise",
+             lambda: rr.read_verified_bytes("body_master", context=_MalformedCtx()),
+             "unknown or unapproved")
+
+missing_spec_td = Path(tempfile.mkdtemp())
+
+
+class _MissingSpecCtx:
+    character_spec_path = str(missing_spec_td / "does_not_exist.json")
+
+
+check("registry() never raises when character_spec.json is entirely missing",
+      rr.registry(context=_MissingSpecCtx()) == {})
+expect_error("resolve() against a missing character_spec.json refuses cleanly",
+             lambda: rr.resolve("body_master", context=_MissingSpecCtx()))
+
 print("\n" + "=" * 58)
 print(f"FAILED ({len(failures)}): {failures}" if failures else "ALL PASS")
 sys.exit(1 if failures else 0)

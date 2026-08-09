@@ -22,6 +22,7 @@ Mirrors pose_registry.py's shape (`registry()`, `resolve()`, `audit()`,
 context-optional legacy path) so the two modules read the same way.
 """
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -68,6 +69,19 @@ def _load_spec(context=None) -> dict:
     return json.loads(_spec_path(context).read_text(encoding="utf-8"))
 
 
+def _load_spec_safe(context=None) -> dict:
+    """Same as _load_spec(), but a missing/unreadable/malformed
+    character_spec.json is a controlled empty result, not an uncaught
+    exception — registry()/audit() both document "never raises," and a
+    corrupted spec means no references are available, which IS the safe
+    answer (never a crash, and never a fabricated approval)."""
+    try:
+        spec = _load_spec(context)
+    except (OSError, ValueError):
+        return {}
+    return spec if isinstance(spec, dict) else {}
+
+
 def registry(*, context=None) -> dict:
     """{"body_master"|"face_master": {"path", "sha256", "status"}}, populated
     only for masters that are exactly status=="approved" and whose top-level
@@ -76,10 +90,11 @@ def registry(*, context=None) -> dict:
     result, which is exactly what a caller building `approved_references`
     for visual_routes.validate_contract() needs: an absent id is refused by
     the existing `_verify_approved_reference()` the same way an unknown pose
-    id is refused today."""
-    spec = _load_spec(context)
-    masters = spec.get("masters", {})
-    refs = spec.get("references", {})
+    id is refused today. A missing/unreadable/malformed character_spec.json
+    itself is likewise never a crash — it simply yields an empty registry."""
+    spec = _load_spec_safe(context)
+    masters = spec.get("masters") if isinstance(spec.get("masters"), dict) else {}
+    refs = spec.get("references") if isinstance(spec.get("references"), dict) else {}
     out: dict = {}
     for key in REFERENCE_IDS:
         m = masters.get(key)
@@ -135,14 +150,51 @@ def resolve(reference_id: str, *, context=None) -> Path:
     return (Path(references_asset_base(context=context)) / record["path"]).resolve()
 
 
+def read_verified_bytes(reference_id: str, *, context=None) -> bytes:
+    """Resolves, reads, and re-verifies a reference asset's bytes in one
+    call, returning the EXACT bytes a caller must use — never a path a
+    caller reopens itself later. `resolve()` above already validates path
+    safety and hashes the file as of its own read; between that read
+    returning and any later, separate `path.read_bytes()` call a caller
+    might perform, the file could change (a TOCTOU gap). This function
+    closes it by reading the bytes itself, immediately, and hashing THOSE
+    exact bytes against the approved value one more time — so what is
+    returned is provably what was just verified, not merely "was verified
+    a moment ago at some other read." Raises ReferenceError on any
+    failure: everything resolve() already raises for, plus an unreadable
+    file or a hash mismatch discovered on this final, authoritative read."""
+    resolved = resolve(reference_id, context=context)   # raises ReferenceError on first-pass failure
+    record = registry(context=context).get(reference_id)
+    if record is None:
+        # resolve() succeeding guarantees this shouldn't happen, but a
+        # concurrent change to the spec between the two calls is exactly
+        # the class of race this function exists to refuse against, not
+        # silently paper over.
+        raise ReferenceError(
+            f"reference {reference_id!r} was verified but is no longer in the "
+            f"approved registry — refusing rather than trusting a stale result")
+    try:
+        data = resolved.read_bytes()
+    except OSError as e:
+        raise ReferenceError(f"reference {reference_id!r}: could not read {resolved}: {e}") from e
+    live_hash = hashlib.sha256(data).hexdigest()
+    expected_hash = record.get("sha256")
+    if live_hash != expected_hash:
+        raise ReferenceError(
+            f"reference {reference_id!r}: hash mismatch on final read — the file "
+            f"changed after verification (expected {str(expected_hash)[:12]}..., "
+            f"found {live_hash[:12]}...)")
+    return data
+
+
 def audit(*, context=None) -> dict:
     """Mirrors pose_registry.audit()'s {"ok", "problems", "unapproved"}
     three-way split. A master awaiting approval, or one whose top-level
     references.<key> pointer has drifted, is reported as `unapproved`/
     `problems` respectively — never silently treated as available."""
-    spec = _load_spec(context)
-    masters = spec.get("masters", {})
-    refs = spec.get("references", {})
+    spec = _load_spec_safe(context)
+    masters = spec.get("masters") if isinstance(spec.get("masters"), dict) else {}
+    refs = spec.get("references") if isinstance(spec.get("references"), dict) else {}
     ok, problems, unapproved = [], [], []
     for key in REFERENCE_IDS:
         m = masters.get(key)

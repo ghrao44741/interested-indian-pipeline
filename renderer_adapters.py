@@ -43,12 +43,114 @@ import io
 import os
 import subprocess
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import MappingProxyType
 
 import prompt_policy
 import route_failures
+
+
+def _verify_dispatch_entry(route: dict, ctx: "DispatchContext", expected_adapter) -> None:
+    """Every adapter calls this immediately after the universal refusal
+    guard, before any other meaningful operation (final boundary micro-fix,
+    item 1). Proves `ctx.renderer_entry` IS — by object identity, not
+    equal-looking content — the exact, canonical, deeply-frozen entry
+    `renderers.get(route['renderer_id'])` returns for THIS route, and that
+    its registered `adapter` is the function currently executing.
+
+    A caller-constructed dict, a fresh MappingProxyType built to look
+    identical, a copy of the real entry, or another renderer's real entry
+    all fail the `is` check below — copying or re-freezing an entry would
+    only prove the *values* match at one instant, never that dispatch is
+    still reading the one canonical object every other reader (the hash
+    projection, a future dispatcher) also reads. Raises RuntimeError — this
+    is a dispatch-integrity violation, not an ordinary per-route failure,
+    so it is never converted into a route_failures record and a `False`
+    return; there is no route content that could excuse it.
+
+    `renderers` is imported locally: renderers.py imports this module for
+    its adapter callables, so a module-level `import renderers` here would
+    close the same import cycle documented for `generation_gate` above."""
+    import renderers
+
+    renderer_id = route.get("renderer_id")
+    if not isinstance(renderer_id, str) or not renderer_id.strip():
+        raise RuntimeError(f"route has no usable renderer_id: {renderer_id!r}")
+    try:
+        canonical_entry = renderers.get(renderer_id)
+    except renderers.RendererError as e:
+        raise RuntimeError(f"route names an unregistered renderer_id: {e}") from e
+    if ctx.renderer_entry is not canonical_entry:
+        raise RuntimeError(
+            f"ctx.renderer_entry is not the canonical registry entry for "
+            f"renderer_id {renderer_id!r} (identity check failed) — a "
+            f"caller-substituted, copied, re-frozen, or mismatched-renderer "
+            f"entry is refused, never trusted")
+    if canonical_entry.get("adapter") is not expected_adapter:
+        raise RuntimeError(
+            f"renderer_id {renderer_id!r}'s registered adapter does not match "
+            f"the adapter currently being invoked")
+
+
+def _require_execution_settings(entry) -> dict:
+    """Every execution-affecting setting must be explicitly, validly
+    declared on the canonical entry — no `or <default>` fallback anywhere
+    (final boundary micro-fix, item 3). Missing, null, wrong-type, or
+    otherwise malformed settings refuse (raise RuntimeError) before any
+    credential lookup or client construction. Returns a plain dict of the
+    validated values so callers never re-read `entry.get(...)` themselves
+    and risk reintroducing a silent default."""
+    credential_env_var = entry.get("credential_env_var")
+    if not isinstance(credential_env_var, str) or not credential_env_var.strip():
+        raise RuntimeError("registry entry declares no valid credential_env_var")
+
+    model_id = entry.get("model_id")
+    if not isinstance(model_id, str) or not model_id.strip():
+        raise RuntimeError("registry entry declares no valid model_id")
+
+    response_format_policy = entry.get("response_format_policy")
+    if response_format_policy not in _KNOWN_RESPONSE_FORMAT_POLICIES:
+        raise RuntimeError(
+            f"registry entry declares an unknown response_format_policy "
+            f"{response_format_policy!r}; known: {_KNOWN_RESPONSE_FORMAT_POLICIES}")
+
+    timeout = entry.get("download_timeout_seconds")
+    if (not isinstance(timeout, (int, float)) or isinstance(timeout, bool)
+            or timeout <= 0):
+        raise RuntimeError(
+            f"registry entry declares an invalid download_timeout_seconds "
+            f"{timeout!r} — must be a positive number")
+
+    provider_parameters = entry.get("provider_parameters")
+    if not isinstance(provider_parameters, Mapping):
+        raise RuntimeError("registry entry's provider_parameters is not a mapping")
+
+    transform = entry.get("output_transform")
+    if not callable(transform):
+        raise RuntimeError("registry entry declares no callable output_transform")
+
+    transform_version = entry.get("output_transform_version")
+    if (not isinstance(transform_version, int) or isinstance(transform_version, bool)
+            or transform_version <= 0):
+        raise RuntimeError(
+            f"registry entry declares an invalid output_transform_version "
+            f"{transform_version!r} — must be a positive int")
+
+    base_url = entry.get("base_url")
+    if base_url is not None and (not isinstance(base_url, str) or not base_url.strip()):
+        raise RuntimeError(f"registry entry declares an invalid base_url {base_url!r}")
+
+    return {
+        "credential_env_var": credential_env_var,
+        "model_id": model_id,
+        "response_format_policy": response_format_policy,
+        "timeout": timeout,
+        "provider_parameters": dict(provider_parameters),
+        "transform": transform,
+        "base_url": base_url,
+    }
 
 
 def _deep_freeze(obj):
@@ -105,6 +207,7 @@ def adapt_map(route: dict, target: Path, ctx: DispatchContext) -> bool:
     import generation_gate
     generation_gate.require_canonical_visual_execution_ready(
         ctx.project_dir, operation="adapt_map (canonical visual execution)")
+    _verify_dispatch_entry(route, ctx, adapt_map)
     args = (route.get("route_args") or {}).get("map") or {}
     cmd = [sys.executable, str(Path(__file__).parent / "generate_india_map.py"),
            "--out", str(target)]
@@ -128,6 +231,7 @@ def adapt_chart(route: dict, target: Path, ctx: DispatchContext) -> bool:
     import generation_gate
     generation_gate.require_canonical_visual_execution_ready(
         ctx.project_dir, operation="adapt_chart (canonical visual execution)")
+    _verify_dispatch_entry(route, ctx, adapt_chart)
     import json as _json
     args = (route.get("route_args") or {}).get("chart") or {}
     cmd = [sys.executable, str(Path(__file__).parent / "generate_chart.py"),
@@ -149,6 +253,7 @@ def adapt_host_composite(route: dict, target: Path, ctx: DispatchContext) -> boo
     import generation_gate
     generation_gate.require_canonical_visual_execution_ready(
         ctx.project_dir, operation="adapt_host_composite (canonical visual execution)")
+    _verify_dispatch_entry(route, ctx, adapt_host_composite)
     import composite_character
     try:
         result = composite_character.render_production(
@@ -169,6 +274,7 @@ def adapt_photo(route: dict, target: Path, ctx: DispatchContext) -> bool:
     import generation_gate
     generation_gate.require_canonical_visual_execution_ready(
         ctx.project_dir, operation="adapt_photo (canonical visual execution)")
+    _verify_dispatch_entry(route, ctx, adapt_photo)
     import search_pexels
     args = (route.get("route_args") or {}).get("photo") or {}
     query = args.get("query")
@@ -186,19 +292,21 @@ def adapt_photo(route: dict, target: Path, ctx: DispatchContext) -> bool:
 
 # ── shared: credentials, response extraction, output transform ─────────────
 
-def _read_credential(env_var_name: str | None) -> str:
+def _read_credential(env_var_name: str) -> str:
     """Reads a credential by the EXACT env-var name the registry declares
-    for this renderer (`ctx.renderer_entry["credential_env_var"]`) — never a
-    name hardcoded in this file, and never borrowed from another module's
-    own hardcoded default (generate_images_flux.XAI_BASE_URL,
+    for this renderer (`ctx.renderer_entry["credential_env_var"]`, already
+    validated non-blank by `_require_execution_settings`) — never a name
+    hardcoded in this file, and never borrowed from another module's own
+    hardcoded default (generate_images_flux.XAI_BASE_URL,
     generate_images_aibmm._get_api_key(), or a literal "XAI_API_KEY" are all
     exactly the kind of un-registry-traceable authority this closes off).
     Checks the environment first, then a `.env` file alongside this module,
     matching the existing convention elsewhere in this codebase — but keyed
-    on the registry-declared name, not a name this function assumes."""
-    if not env_var_name:
-        raise RuntimeError(
-            "this renderer's registry entry declares no credential_env_var")
+    on the registry-declared name, not a name this function assumes.
+
+    Raises RuntimeError when the credential is unavailable — final boundary
+    micro-fix, item 3: a caller must never construct a client with an
+    empty key. There is no empty-string return path left in this function."""
     value = os.environ.get(env_var_name)
     if value:
         return value
@@ -207,17 +315,22 @@ def _read_credential(env_var_name: str | None) -> str:
         for line in env_file.read_text(encoding="utf-8").splitlines():
             line = line.strip()
             if line.startswith(f"{env_var_name}="):
-                return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return ""
+                found = line.split("=", 1)[1].strip().strip('"').strip("'")
+                if found:
+                    return found
+    raise RuntimeError(
+        f"credential {env_var_name!r} is not set (checked the environment and "
+        f"a .env file) — refusing to construct a client with an empty key")
 
 
-def _client_kwargs(entry) -> dict:
-    """api_key + (optionally) base_url, built only from what the registry
-    declares — never a module-level default imported from elsewhere."""
-    kwargs = {"api_key": _read_credential(entry.get("credential_env_var"))}
-    base_url = entry.get("base_url")
-    if base_url:
-        kwargs["base_url"] = base_url
+def _client_kwargs(settings: dict) -> dict:
+    """api_key + (optionally) base_url, built only from an already-validated
+    settings dict (`_require_execution_settings()`'s return) — never a
+    module-level default imported from elsewhere, and never a raw,
+    unvalidated `entry.get(...)` read."""
+    kwargs = {"api_key": _read_credential(settings["credential_env_var"])}
+    if settings["base_url"]:
+        kwargs["base_url"] = settings["base_url"]
     return kwargs
 
 
@@ -300,17 +413,20 @@ def adapt_flux(route: dict, target: Path, ctx: DispatchContext) -> bool:
     """xAI/Grok illustration or reenactment. Every execution-affecting
     setting — provider, model, credential slot, base URL, request
     parameters, response-format policy, download timeout, output transform
-    — comes from ctx.renderer_entry, never from a CLI flag, an environment
-    variable chosen at call time, another module's hardcoded default, or a
-    route field. No adapter parameter exists for a caller to override any
-    of it."""
+    — comes from ctx.renderer_entry via `_require_execution_settings()`,
+    never from a CLI flag, an environment variable chosen at call time,
+    another module's hardcoded default, a route field, or an `or <default>`
+    fallback. No adapter parameter exists for a caller to override any of
+    it."""
     import generation_gate
     generation_gate.require_canonical_visual_execution_ready(
         ctx.project_dir, operation="adapt_flux (canonical visual execution)")
+    _verify_dispatch_entry(route, ctx, adapt_flux)
     entry = ctx.renderer_entry
     if entry.get("provider") != "xai":
         raise RuntimeError(f"adapt_flux only supports provider 'xai', got "
                            f"{entry.get('provider')!r}")
+    settings = _require_execution_settings(entry)
 
     try:
         prompt = prompt_policy.build_effective_prompt(route)
@@ -326,14 +442,18 @@ def adapt_flux(route: dict, target: Path, ctx: DispatchContext) -> bool:
                                        reason="openai package not installed")
         return False
 
-    client = OpenAI(**_client_kwargs(entry))
+    try:
+        client = OpenAI(**_client_kwargs(settings))
+    except RuntimeError as e:
+        route_failures.record_failure(ctx.project_dir, route,
+                                       reason=f"credential unavailable: {e}")
+        return False
     try:
         response = client.images.generate(
-            model=entry["model_id"], prompt=prompt,
-            **dict(entry.get("provider_parameters") or {}))
+            model=settings["model_id"], prompt=prompt, **settings["provider_parameters"])
         img_bytes = _extract_image_bytes(
-            response, response_format_policy=entry.get("response_format_policy"),
-            timeout=entry.get("download_timeout_seconds") or 60)
+            response, response_format_policy=settings["response_format_policy"],
+            timeout=settings["timeout"])
     except Exception as e:
         route_failures.record_failure(ctx.project_dir, route,
                                        reason=f"flux/grok generation failed: {e}")
@@ -343,9 +463,8 @@ def adapt_flux(route: dict, target: Path, ctx: DispatchContext) -> bool:
                                        reason="flux/grok response carried no usable image data")
         return False
 
-    transform = entry.get("output_transform") or apply_output_transform
     try:
-        final_bytes = transform(img_bytes)
+        final_bytes = settings["transform"](img_bytes)
     except Exception as e:
         # Never leave a successful-looking final file behind on a transform
         # failure — nothing has been written to `target` at all yet.
@@ -365,6 +484,19 @@ def adapt_flux(route: dict, target: Path, ctx: DispatchContext) -> bool:
 REFERENCE_ORDER = ("body_master", "face_master")
 
 
+def _exactly_body_then_face(ref_ids) -> bool:
+    """True only for a list of exactly two strings that are, in some order,
+    body_master and face_master once each — never for a wrong count, a
+    duplicate (["body_master", "body_master"] has length 2 but is not this),
+    a non-list, or a non-string element. `set()` equality alone cannot tell
+    ["body_master", "face_master", "body_master"] apart from the correct
+    pair (both produce the same 2-element set) — this checks length AND
+    element identity, not set membership alone."""
+    return (isinstance(ref_ids, list) and len(ref_ids) == 2
+            and all(isinstance(r, str) for r in ref_ids)
+            and sorted(ref_ids) == sorted(REFERENCE_ORDER))
+
+
 def adapt_flux_reference_anchor(route: dict, target: Path, ctx: DispatchContext) -> bool:
     """Reference-anchored generation via OpenAI's image-edit endpoint,
     anchored on both approved character masters. No path in this function
@@ -373,53 +505,45 @@ def adapt_flux_reference_anchor(route: dict, target: Path, ctx: DispatchContext)
     silent fallback to unanchored generation.
 
     Reference bytes are revalidated here, not trusted from
-    ctx.approved_references alone: each reference id is resolved through
-    reference_registry.resolve(), which re-verifies status, top-level/master
-    agreement, path containment, forbidden (archive/candidate/raw/pending)
-    components, symlink escapes, and hash freshness against the CURRENT
-    channel — the same shared verifier visual_routes.validate_contract()
-    itself uses — before any credential is read or client constructed.
-    ctx.approved_references (deep-frozen, but still just a prior snapshot)
-    is not consulted for this decision at all."""
+    ctx.approved_references alone: each reference id is read through
+    reference_registry.read_verified_bytes(), which resolves, verifies
+    (status, top-level/master agreement, path containment, forbidden
+    archive/candidate/raw/pending components, symlink escapes), reads, and
+    re-hashes the exact bytes returned — closing the gap where a separate
+    later `path.read_bytes()` call could read a file that changed after an
+    earlier check. ctx.approved_references (deep-frozen, but still just a
+    prior snapshot) is not consulted for this decision at all."""
     import generation_gate
     generation_gate.require_canonical_visual_execution_ready(
         ctx.project_dir,
         operation="adapt_flux_reference_anchor (canonical visual execution)")
+    _verify_dispatch_entry(route, ctx, adapt_flux_reference_anchor)
     entry = ctx.renderer_entry
     if entry.get("provider") != "openai":
         raise RuntimeError(f"adapt_flux_reference_anchor only supports provider "
                            f"'openai', got {entry.get('provider')!r}")
+    settings = _require_execution_settings(entry)
 
-    ref_ids = route.get("host_reference_asset_ids") or []
-    if set(ref_ids) != set(REFERENCE_ORDER):
+    ref_ids = route.get("host_reference_asset_ids")
+    if not _exactly_body_then_face(ref_ids):
         route_failures.record_failure(
             ctx.project_dir, route,
-            reason=f"reference_anchored_generation requires exactly "
-                   f"{sorted(REFERENCE_ORDER)}, got {sorted(ref_ids)}")
+            reason=f"reference_anchored_generation requires a list of exactly "
+                   f"{sorted(REFERENCE_ORDER)} (each exactly once), got {ref_ids!r}")
         return False
 
     import reference_registry
 
-    resolved_paths = []
+    reference_bytes = []
     for rid in REFERENCE_ORDER:               # deterministic: body, then face
         try:
-            p = reference_registry.resolve(rid, context=ctx.channel)
+            reference_bytes.append(
+                reference_registry.read_verified_bytes(rid, context=ctx.channel))
         except reference_registry.ReferenceError as e:
             route_failures.record_failure(
                 ctx.project_dir, route,
                 reason=f"reference {rid!r} failed verification: {e}")
             return False
-        resolved_paths.append(p)
-
-    # Read and verify the exact bytes now, before any credential lookup or
-    # client construction — resolve() already hash-checked the file; this
-    # is the bytes that will actually be sent, read once, right before use.
-    try:
-        reference_bytes = [p.read_bytes() for p in resolved_paths]
-    except OSError as e:
-        route_failures.record_failure(
-            ctx.project_dir, route, reason=f"could not read a verified reference: {e}")
-        return False
 
     try:
         prompt = prompt_policy.build_effective_prompt(route)
@@ -435,12 +559,17 @@ def adapt_flux_reference_anchor(route: dict, target: Path, ctx: DispatchContext)
                                        reason="openai package not installed")
         return False
 
-    client = OpenAI(**_client_kwargs(entry))
+    try:
+        client = OpenAI(**_client_kwargs(settings))
+    except RuntimeError as e:
+        route_failures.record_failure(ctx.project_dir, route,
+                                       reason=f"credential unavailable: {e}")
+        return False
     file_objs = [io.BytesIO(b) for b in reference_bytes]
     try:
         response = client.images.edit(
-            model=entry["model_id"], image=file_objs, prompt=prompt,
-            **dict(entry.get("provider_parameters") or {}))
+            model=settings["model_id"], image=file_objs, prompt=prompt,
+            **settings["provider_parameters"])
     except Exception as e:
         # Refusal, never a fallback to images.generate() without the
         # reference — that would silently turn an anchored request into
@@ -452,17 +581,16 @@ def adapt_flux_reference_anchor(route: dict, target: Path, ctx: DispatchContext)
         return False
 
     img_bytes = _extract_image_bytes(
-        response, response_format_policy=entry.get("response_format_policy"),
-        timeout=entry.get("download_timeout_seconds") or 60)
+        response, response_format_policy=settings["response_format_policy"],
+        timeout=settings["timeout"])
     if not img_bytes:
         route_failures.record_failure(
             ctx.project_dir, route,
             reason="reference-anchored edit returned no usable image data; refused")
         return False
 
-    transform = entry.get("output_transform") or apply_output_transform
     try:
-        final_bytes = transform(img_bytes)
+        final_bytes = settings["transform"](img_bytes)
     except Exception as e:
         route_failures.record_failure(ctx.project_dir, route,
                                        reason=f"output transform failed: {e}")

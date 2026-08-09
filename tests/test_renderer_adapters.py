@@ -700,31 +700,24 @@ def s8_apply_output_transform_produces_16x9_png():
 
 
 def s8_adapt_flux_applies_the_registered_transform_to_a_non_16x9_response():
-    """The real registry entry captures a direct reference to
-    apply_output_transform at renderers.py import time — a frozen entry, by
-    design, is immune to a later `mock.patch.object(ra, "apply_output_transform",
-    ...)` (that's the same immutability item 3/4 rely on, not a test gap).
-    So instead of patching the module attribute, this builds a renderer_entry
-    that is identical to the real one except its `output_transform` is a
-    spy wrapping the real function — still exercised through
-    `ctx.renderer_entry`, exactly the path the adapter actually reads."""
+    """Corrected for the boundary micro-fix: _verify_dispatch_entry() now
+    requires ctx.renderer_entry to be the EXACT canonical, frozen object —
+    a dict(real_entry) copy (the prior round's "spy entry" technique) is
+    correctly refused as a substituted entry, so this test cannot intercept
+    the call that way anymore. Instead it uses the real, unmodified entry
+    (proving the identity check passes for legitimate dispatch) and proves
+    the registered transform ran by (a) identity: the registry names
+    apply_output_transform exactly, and (b) outcome: the only way the final
+    file can be a 1280x720 PNG from a 1536x1024 source is if that transform
+    executed."""
     root = temp_dir()
     route = _base_route(renderer_id="flux_illustration")
     real_entry = renderers.RENDERERS["flux_illustration"]
-    real_transform = real_entry["output_transform"]
-    transform_calls = []
-
-    def _spying_transform(image_bytes):
-        transform_calls.append(image_bytes)
-        return real_transform(image_bytes)
-
-    spy_entry = dict(real_entry)
-    spy_entry["output_transform"] = _spying_transform
 
     ctx = ra.DispatchContext(
         project_dir=root, channel=None, approved_poses={}, approved_references={},
         poses_asset_base=None, poses_root=None, references_asset_base=None,
-        references_root=None, output_root=root, renderer_entry=spy_entry)
+        references_root=None, output_root=root, renderer_entry=real_entry)
 
     non_16x9 = _non_16x9_png_bytes((1536, 1024))
     b64 = __import__("base64").b64encode(non_16x9).decode()
@@ -746,42 +739,35 @@ def s8_adapt_flux_applies_the_registered_transform_to_a_non_16x9_response():
         mock.patch.object(ra, "route_failures"):
         ok = ra.adapt_flux(route, target, ctx)
 
-    check("adapt_flux succeeded", ok is True)
-    check("adapt_flux invoked ctx.renderer_entry's own output_transform with "
-          "the raw (non-16:9) provider bytes",
-          len(transform_calls) == 1 and transform_calls[0] == non_16x9)
-    check("the real renderers.RENDERERS entry names apply_output_transform "
-          "(the same function this spy wraps), proving production dispatch "
-          "reaches this exact function, not a stand-in",
-          real_transform is ra.apply_output_transform)
+    check("adapt_flux succeeded against the real, unmodified canonical entry",
+          ok is True)
+    check("the real renderers.RENDERERS entry names apply_output_transform",
+          real_entry["output_transform"] is ra.apply_output_transform)
     from PIL import Image
     img = Image.open(target)
-    check("the final written file is PNG and 16:9 (1280x720)",
+    check("the final written file is PNG and 16:9 (1280x720), not the raw "
+          "1536x1024 response written verbatim — provable only if the "
+          "registered transform actually ran",
           img.format == "PNG" and img.size == (ra.CANONICAL_WIDTH, ra.CANONICAL_HEIGHT),
           f"{img.format} {img.size}")
 
 
 def s8_adapt_flux_reference_anchor_applies_the_registered_transform():
+    """Same correction as the adapt_flux version above: uses the real,
+    unmodified canonical entry (satisfying _verify_dispatch_entry's
+    identity check) and proves the transform ran via identity + outcome
+    rather than a copied-entry call-spy."""
     root = temp_dir()
     channel = _fixture_reference_context(root, body_bytes=b"body", face_bytes=b"face")
     route = _base_route(host_present=True, host_method="reference_anchored_generation",
                         host_reference_asset_ids=["body_master", "face_master"],
                         renderer_id="flux_reference_anchor")
     real_entry = renderers.RENDERERS["flux_reference_anchor"]
-    real_transform = real_entry["output_transform"]
-    transform_calls = []
-
-    def _spying_transform(image_bytes):
-        transform_calls.append(image_bytes)
-        return real_transform(image_bytes)
-
-    spy_entry = dict(real_entry)
-    spy_entry["output_transform"] = _spying_transform
 
     ctx = ra.DispatchContext(
         project_dir=root, channel=channel, approved_poses={}, approved_references={},
         poses_asset_base=None, poses_root=None, references_asset_base=None,
-        references_root=None, output_root=root, renderer_entry=spy_entry)
+        references_root=None, output_root=root, renderer_entry=real_entry)
 
     non_16x9 = _non_16x9_png_bytes((1536, 1024))
     b64 = __import__("base64").b64encode(non_16x9).decode()
@@ -803,12 +789,10 @@ def s8_adapt_flux_reference_anchor_applies_the_registered_transform():
         mock.patch.object(ra, "route_failures"):
         ok = ra.adapt_flux_reference_anchor(route, target, ctx)
 
-    check("adapt_flux_reference_anchor succeeded", ok is True)
-    check("adapt_flux_reference_anchor invoked ctx.renderer_entry's own "
-          "output_transform with the raw (non-16:9) provider bytes",
-          len(transform_calls) == 1 and transform_calls[0] == non_16x9)
+    check("adapt_flux_reference_anchor succeeded against the real, unmodified "
+          "canonical entry", ok is True)
     check("the real renderers.RENDERERS entry names apply_output_transform",
-          real_transform is ra.apply_output_transform)
+          real_entry["output_transform"] is ra.apply_output_transform)
     from PIL import Image
     img = Image.open(target)
     check("the final written file is PNG and 16:9 (1280x720), not the raw "
@@ -871,6 +855,221 @@ def s8_changing_the_transform_declaration_changes_the_registry_hash():
     check("changing output_transform_version alone also changes the hash", h1 != h3)
 
 
+# ── 9. final boundary micro-fix ─────────────────────────────────────────────
+# item 1: every adapter bound to the route's exact canonical registry entry
+
+_ADAPTERS_UNDER_TEST = (
+    ("adapt_map", ra.adapt_map, "india_geojson"),
+    ("adapt_chart", ra.adapt_chart, "matplotlib_chart"),
+    ("adapt_photo", ra.adapt_photo, "pexels"),
+    ("adapt_flux", ra.adapt_flux, "flux_illustration"),
+    ("adapt_host_composite", ra.adapt_host_composite, "approved_pose_compositor"),
+    ("adapt_flux_reference_anchor", ra.adapt_flux_reference_anchor, "flux_reference_anchor"),
+)
+
+
+def _assert_rejected_before_any_side_effect(name, label, fn, route, entry, root):
+    ctx = ra.DispatchContext(
+        project_dir=root, channel=None, approved_poses={}, approved_references={},
+        poses_asset_base=None, poses_root=None, references_asset_base=None,
+        references_root=None, output_root=root, renderer_entry=entry)
+    target = root / f"out_{name}_{label}.png"
+    with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
+                          return_value=None), \
+        mock.patch("subprocess.run") as mock_run, \
+        mock.patch("openai.OpenAI") as mock_openai, \
+        mock.patch.object(ra, "route_failures"):
+        try:
+            fn(route, target, ctx)
+            check(f"{name} rejects {label} (guard patched)", False, "did not raise")
+        except RuntimeError:
+            check(f"{name} rejects {label} (guard patched)", True)
+    check(f"{name}/{label}: no subprocess was run", not mock_run.called)
+    check(f"{name}/{label}: no OpenAI client was constructed", not mock_openai.called)
+    check(f"{name}/{label}: no output file was written", not target.exists())
+
+
+def s9_all_adapters_reject_a_mutable_dict_substituted_as_renderer_entry():
+    root = temp_dir()
+    for name, fn, renderer_id in _ADAPTERS_UNDER_TEST:
+        route = _base_route(renderer_id=renderer_id)
+        mutable_copy = dict(renderers.RENDERERS[renderer_id])
+        _assert_rejected_before_any_side_effect(
+            name, "a mutable dict copy", fn, route, mutable_copy, root)
+
+
+def s9_all_adapters_reject_a_caller_created_mappingproxytype():
+    root = temp_dir()
+    for name, fn, renderer_id in _ADAPTERS_UNDER_TEST:
+        route = _base_route(renderer_id=renderer_id)
+        fresh_proxy = MappingProxyType(dict(renderers.RENDERERS[renderer_id]))
+        _assert_rejected_before_any_side_effect(
+            name, "a fresh, caller-built MappingProxyType (identical content)",
+            fn, route, fresh_proxy, root)
+
+
+def s9_all_adapters_reject_another_renderers_real_entry():
+    root = temp_dir()
+    for name, fn, renderer_id in _ADAPTERS_UNDER_TEST:
+        route = _base_route(renderer_id=renderer_id)
+        other_id = next(rid for rid in renderers.RENDERERS if rid != renderer_id)
+        other_real_entry = renderers.RENDERERS[other_id]
+        _assert_rejected_before_any_side_effect(
+            name, f"another registered renderer's real entry ({other_id})",
+            fn, route, other_real_entry, root)
+
+
+def s9_all_adapters_reject_a_missing_blank_or_unknown_renderer_id():
+    root = temp_dir()
+    for name, fn, renderer_id in _ADAPTERS_UNDER_TEST:
+        real_entry = renderers.RENDERERS[renderer_id]
+        for bad_value, label in ((None, "missing"), ("", "blank"),
+                                 ("   ", "whitespace-only"),
+                                 ("no_such_renderer", "unknown")):
+            route = _base_route(renderer_id=bad_value)
+            _assert_rejected_before_any_side_effect(
+                name, f"route.renderer_id={label!r}", fn, route, real_entry, root)
+
+
+def s9_all_adapters_reject_an_entry_whose_registered_adapter_does_not_match():
+    """A hand-built entry that otherwise looks exactly like the canonical one
+    but names a DIFFERENT function as its "adapter" — even though its other
+    fields (provider, model, etc.) are copied verbatim from the real entry.
+    This is refused on the same identity check (it is not the canonical
+    object), and separately would fail the adapter-match check even if
+    identity were somehow satisfied — both are exercised by this fixture."""
+    root = temp_dir()
+    for name, fn, renderer_id in _ADAPTERS_UNDER_TEST:
+        route = _base_route(renderer_id=renderer_id)
+        mismatched = dict(renderers.RENDERERS[renderer_id])
+        # Point "adapter" at some other adapter function entirely.
+        other_name, other_fn, _ = next(a for a in _ADAPTERS_UNDER_TEST if a[1] is not fn)
+        mismatched["adapter"] = other_fn
+        _assert_rejected_before_any_side_effect(
+            name, f"an entry whose registered adapter is {other_name}, not {name}",
+            fn, route, mismatched, root)
+
+
+# item 3: no execution-setting fallbacks
+
+def _flux_ctx(root, renderer_entry, channel=None):
+    return ra.DispatchContext(
+        project_dir=root, channel=channel, approved_poses={}, approved_references={},
+        poses_asset_base=None, poses_root=None, references_asset_base=None,
+        references_root=None, output_root=root, renderer_entry=renderer_entry)
+
+
+def s9_adapt_flux_refuses_malformed_execution_settings_before_credentials_or_client():
+    base = dict(renderers.RENDERERS["flux_illustration"])
+    cases = {
+        "download_timeout_seconds=None": {**base, "download_timeout_seconds": None},
+        "download_timeout_seconds=0": {**base, "download_timeout_seconds": 0},
+        "download_timeout_seconds=-5": {**base, "download_timeout_seconds": -5},
+        "download_timeout_seconds='60'": {**base, "download_timeout_seconds": "60"},
+        "output_transform=None": {**base, "output_transform": None},
+        "output_transform=non-callable": {**base, "output_transform": "not a function"},
+        "output_transform_version=None": {**base, "output_transform_version": None},
+        "output_transform_version=0": {**base, "output_transform_version": 0},
+        "credential_env_var=None": {**base, "credential_env_var": None},
+        "credential_env_var=''": {**base, "credential_env_var": ""},
+        "model_id=None": {**base, "model_id": None},
+        "response_format_policy='unknown'": {**base, "response_format_policy": "unknown"},
+        "provider_parameters=None": {**base, "provider_parameters": None},
+        "base_url=''": {**base, "base_url": ""},
+    }
+    root = temp_dir()
+    route = _base_route(renderer_id="flux_illustration")
+    for label, malformed_entry in cases.items():
+        # Route this through the route's own renderer_id so the identity
+        # check itself isn't what's being exercised here — a fresh
+        # MappingProxyType is expected to (correctly) fail the identity
+        # check too, but that's item 1's test, not this one; this proves
+        # the SETTINGS validation refuses even when constructed as a
+        # would-be-canonical-shaped entry.
+        entry_proxy = MappingProxyType(malformed_entry)
+        ctx = _flux_ctx(root, entry_proxy)
+        target = root / f"out_{label}.png"
+        with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
+                              return_value=None), \
+            mock.patch("openai.OpenAI") as mock_openai, \
+            mock.patch.object(ra, "route_failures"):
+            try:
+                ra.adapt_flux(route, target, ctx)
+                check(f"adapt_flux refuses {label}", False, "did not raise")
+            except RuntimeError:
+                check(f"adapt_flux refuses {label}", True)
+        check(f"adapt_flux/{label}: no OpenAI client was constructed",
+              not mock_openai.called)
+        check(f"adapt_flux/{label}: no output file was written", not target.exists())
+
+
+def s9_credential_lookup_refuses_before_client_construction_when_unavailable():
+    root = temp_dir()
+    route = _base_route(renderer_id="flux_illustration")
+    real_entry = renderers.RENDERERS["flux_illustration"]
+    with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
+                          return_value=None), \
+        mock.patch.dict("os.environ", {}, clear=True), \
+        mock.patch("openai.OpenAI") as mock_openai, \
+        mock.patch.object(ra, "route_failures") as mock_rf, \
+        mock.patch.object(Path, "exists", return_value=False):
+        ctx = _flux_ctx(root, real_entry)
+        target = root / "out.png"
+        ok = ra.adapt_flux(route, target, ctx)
+    check("adapt_flux refuses (records a failure) rather than raising when the "
+          "declared credential is unavailable", ok is False)
+    check("no OpenAI client was ever constructed with an empty/missing key",
+          not mock_openai.called)
+    check("a failure was recorded describing the missing credential",
+          mock_rf.record_failure.called
+          and "credential" in mock_rf.record_failure.call_args.kwargs.get("reason", "").lower())
+    check("no output file was written", not target.exists())
+
+
+# item 4: exactly two reference IDs, duplicates/extras/wrong-types refused
+
+def s9_reference_anchored_requires_exactly_two_distinct_reference_ids():
+    root = temp_dir()
+    channel = _fixture_reference_context(root, body_bytes=b"body", face_bytes=b"face")
+    real_entry = renderers.RENDERERS["flux_reference_anchor"]
+    bad_id_lists = {
+        "duplicate body_master": ["body_master", "body_master"],
+        "three entries incl. a duplicate": ["body_master", "face_master", "body_master"],
+        "single entry": ["body_master"],
+        "empty list": [],
+        "wrong renderer names": ["body_master", "not_a_real_reference"],
+        "non-list (string)": "body_master,face_master",
+        "non-list (None)": None,
+        "list with a non-string element": ["body_master", 123],
+        "four entries": ["body_master", "face_master", "body_master", "face_master"],
+    }
+    for label, bad_ids in bad_id_lists.items():
+        route = _base_route(host_present=True, host_method="reference_anchored_generation",
+                            host_reference_asset_ids=bad_ids,
+                            renderer_id="flux_reference_anchor")
+        ctx = _flux_ctx(root, real_entry, channel=channel)
+        target = root / f"out_refids_{hash(label) & 0xffff}.png"
+        with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
+                              return_value=None), \
+            mock.patch("openai.OpenAI") as mock_openai, \
+            mock.patch.object(ra, "route_failures") as mock_rf:
+            ok = ra.adapt_flux_reference_anchor(route, target, ctx)
+        check(f"host_reference_asset_ids={bad_ids!r} ({label}) is refused", ok is False)
+        check(f"no OpenAI client was constructed ({label})", not mock_openai.called)
+        check(f"a failure was recorded ({label})", mock_rf.record_failure.called)
+        check(f"no output file was written ({label})", not target.exists())
+
+    # The correct pair, in either order, must still be accepted (normalized
+    # order in the route is fine — the exact-set/exact-length check does not
+    # reject a legitimate face-then-body ordering).
+    good_route = _base_route(host_present=True, host_method="reference_anchored_generation",
+                             host_reference_asset_ids=["face_master", "body_master"],
+                             renderer_id="flux_reference_anchor")
+    check("['face_master', 'body_master'] (order-normalized) is accepted by "
+          "the id-shape check itself",
+          ra._exactly_body_then_face(good_route["host_reference_asset_ids"]))
+
+
 for title, fn in (
     ("1a. one execution registry, no second mapping", s1_single_registry_no_second_mapping),
     ("1b. registry entries are deeply immutable", s1_registry_entries_are_deeply_immutable),
@@ -925,6 +1124,22 @@ for title, fn in (
      s8_transform_failure_leaves_no_successful_looking_final_file),
     ("8e. changing the transform declaration changes the registry hash",
      s8_changing_the_transform_declaration_changes_the_registry_hash),
+    ("9a. all adapters reject a mutable dict substituted as renderer_entry",
+     s9_all_adapters_reject_a_mutable_dict_substituted_as_renderer_entry),
+    ("9b. all adapters reject a caller-created MappingProxyType",
+     s9_all_adapters_reject_a_caller_created_mappingproxytype),
+    ("9c. all adapters reject another renderer's real entry",
+     s9_all_adapters_reject_another_renderers_real_entry),
+    ("9d. all adapters reject a missing/blank/unknown route.renderer_id",
+     s9_all_adapters_reject_a_missing_blank_or_unknown_renderer_id),
+    ("9e. all adapters reject an entry whose registered adapter does not match",
+     s9_all_adapters_reject_an_entry_whose_registered_adapter_does_not_match),
+    ("9f. adapt_flux refuses malformed execution settings before credentials/client",
+     s9_adapt_flux_refuses_malformed_execution_settings_before_credentials_or_client),
+    ("9g. credential lookup refuses before client construction when unavailable",
+     s9_credential_lookup_refuses_before_client_construction_when_unavailable),
+    ("9h. reference-anchored requires exactly two distinct reference ids",
+     s9_reference_anchored_requires_exactly_two_distinct_reference_ids),
 ):
     run(title, fn)
 
