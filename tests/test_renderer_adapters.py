@@ -11,6 +11,7 @@ exercise the adapters directly, against mocked boundaries only.
 
 import hashlib
 import inspect
+import io
 import sys
 import tempfile
 from pathlib import Path
@@ -276,33 +277,75 @@ def s4_prompt_authority_agreement_required_for_ready_illustration_reenactment():
 
 
 # ── 5. reference-anchored adapter: real bytes, deterministic order, no fallback
+#
+# Corrective follow-up item 4: the adapter no longer trusts
+# ctx.approved_references at all — it revalidates through
+# reference_registry.resolve(rid, context=ctx.channel), which reads live
+# masters/references off ctx.channel.character_spec_path. Every fixture
+# below therefore builds a REAL temp character_spec.json + real temp master
+# files and a minimal fake ChannelContext pointing at them — never the real
+# production character/ tree, and never a bare `channel=None` (which would
+# resolve against the real repository's own approved masters instead of the
+# fixture).
+
+import hashlib as _hashlib
+import json as _json_mod
+
 
 def _write(p: Path, content: bytes):
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_bytes(content)
 
 
-def s5_reference_anchored_passes_both_exact_master_bytes_body_then_face():
-    root = temp_dir()
-    body_bytes = b"BODY-MASTER-BYTES-0001"
-    face_bytes = b"FACE-MASTER-BYTES-0002"
+class _FakeChannelContext:
+    def __init__(self, character_spec_path: Path):
+        self.character_spec_path = str(character_spec_path)
+
+
+def _fixture_reference_context(root: Path, *, body_bytes: bytes, face_bytes: bytes,
+                               body_status="approved", face_status="approved",
+                               agree=True) -> _FakeChannelContext:
+    """Builds a real, isolated character_spec.json + real master files under
+    `root`, and returns a minimal fake ChannelContext pointing at them —
+    exactly the shape reference_registry.resolve()/registry() need
+    (`.character_spec_path`), with none of the rest of a real ChannelContext
+    required."""
     body_path = root / "character" / "canonical" / "body-master.png"
     face_path = root / "character" / "canonical" / "face-master.png"
     _write(body_path, body_bytes)
     _write(face_path, face_bytes)
+    spec_path = root / "character" / "character_spec.json"
+    refs = {
+        "body_master": "character/canonical/body-master.png" if agree else "character/canonical/other.png",
+        "face_master": "character/canonical/face-master.png",
+    }
+    spec = {
+        "masters": {
+            "body_master": {"path": "character/canonical/body-master.png", "status": body_status,
+                            "sha256": _hashlib.sha256(body_bytes).hexdigest()},
+            "face_master": {"path": "character/canonical/face-master.png", "status": face_status,
+                            "sha256": _hashlib.sha256(face_bytes).hexdigest()},
+        },
+        "references": refs,
+    }
+    spec_path.parent.mkdir(parents=True, exist_ok=True)
+    spec_path.write_text(_json_mod.dumps(spec), encoding="utf-8")
+    return _FakeChannelContext(spec_path)
+
+
+def s5_reference_anchored_passes_both_exact_master_bytes_body_then_face():
+    root = temp_dir()
+    body_bytes = b"BODY-MASTER-BYTES-0001"
+    face_bytes = b"FACE-MASTER-BYTES-0002"
+    channel = _fixture_reference_context(root, body_bytes=body_bytes, face_bytes=face_bytes)
 
     route = _base_route(host_present=True, host_method="reference_anchored_generation",
                         host_reference_asset_ids=["body_master", "face_master"],
                         renderer_id="flux_reference_anchor")
     ctx = ra.DispatchContext(
-        project_dir=root, channel=None,
-        approved_poses={},
-        approved_references={
-            "body_master": {"path": "character/canonical/body-master.png"},
-            "face_master": {"path": "character/canonical/face-master.png"},
-        },
+        project_dir=root, channel=channel, approved_poses={}, approved_references={},
         poses_asset_base=None, poses_root=None,
-        references_asset_base=root, references_root=root / "character",
+        references_asset_base=None, references_root=None,
         output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"])
 
     captured = {}
@@ -324,13 +367,11 @@ def s5_reference_anchored_passes_both_exact_master_bytes_body_then_face():
                           return_value=None), \
         mock.patch("openai.OpenAI", return_value=_FakeClient()), \
         mock.patch.object(ra, "route_failures") as mock_rf:
-        with mock.patch("generate_images_aibmm._get_api_key", return_value="fake-key"), \
-            mock.patch("generate_images_aibmm._extract_image", return_value=None):
-            ok = ra.adapt_flux_reference_anchor(route, root / "out.png", ctx)
+        ok = ra.adapt_flux_reference_anchor(route, root / "out.png", ctx)
 
     check("the adapter reported failure (no usable image data from the mock)", ok is False)
     check("exactly two images were passed to images.edit()",
-          len(captured.get("image_bytes", [])) == 2, str(captured.get("image_bytes")))
+          len(captured.get("image_bytes", [])) == 2, str(len(captured.get("image_bytes", []))))
     check("body_master bytes were passed FIRST, face_master bytes SECOND",
           captured.get("image_bytes") == [body_bytes, face_bytes],
           str(captured.get("image_bytes")))
@@ -338,26 +379,21 @@ def s5_reference_anchored_passes_both_exact_master_bytes_body_then_face():
           captured.get("model") == renderers.RENDERERS["flux_reference_anchor"]["model_id"])
     check("a failure was recorded when no usable image data came back",
           mock_rf.record_failure.called)
+    check("no output file was written on a no-usable-image-data refusal",
+          not (root / "out.png").exists())
 
 
 def s5_reference_anchored_edit_failure_never_calls_images_generate():
     root = temp_dir()
-    body_path = root / "character" / "canonical" / "body-master.png"
-    face_path = root / "character" / "canonical" / "face-master.png"
-    _write(body_path, b"body")
-    _write(face_path, b"face")
+    channel = _fixture_reference_context(root, body_bytes=b"body", face_bytes=b"face")
 
     route = _base_route(host_present=True, host_method="reference_anchored_generation",
                         host_reference_asset_ids=["body_master", "face_master"],
                         renderer_id="flux_reference_anchor")
     ctx = ra.DispatchContext(
-        project_dir=root, channel=None, approved_poses={},
-        approved_references={
-            "body_master": {"path": "character/canonical/body-master.png"},
-            "face_master": {"path": "character/canonical/face-master.png"},
-        },
+        project_dir=root, channel=channel, approved_poses={}, approved_references={},
         poses_asset_base=None, poses_root=None,
-        references_asset_base=root, references_root=root / "character",
+        references_asset_base=None, references_root=None,
         output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"])
 
     class _FakeImages:
@@ -382,8 +418,7 @@ def s5_reference_anchored_edit_failure_never_calls_images_generate():
                           return_value=None), \
         mock.patch("openai.OpenAI", return_value=_FakeClient()), \
         mock.patch.object(ra, "route_failures") as mock_rf:
-        with mock.patch("generate_images_aibmm._get_api_key", return_value="fake-key"):
-            ok = ra.adapt_flux_reference_anchor(route, root / "out.png", ctx)
+        ok = ra.adapt_flux_reference_anchor(route, root / "out.png", ctx)
 
     check("the adapter returned False (refused) on an edit failure", ok is False)
     check("images.edit() was called exactly once", len(_FakeImages.edit_calls) == 1)
@@ -392,18 +427,25 @@ def s5_reference_anchored_edit_failure_never_calls_images_generate():
     check("a failure was recorded describing the refusal, not a silent fallback",
           mock_rf.record_failure.called
           and "falling back" in mock_rf.record_failure.call_args.kwargs.get("reason", ""))
+    check("no output file was written on an edit failure", not (root / "out.png").exists())
 
 
 def s5_reference_anchored_refuses_before_provider_call_when_a_reference_is_missing():
     root = temp_dir()
+    # No character_spec.json / masters exist under this root at all — every
+    # reference id is "missing" from reference_registry's point of view.
+    (root / "character").mkdir(parents=True, exist_ok=True)
+    (root / "character" / "character_spec.json").write_text(
+        _json_mod.dumps({"masters": {}, "references": {}}), encoding="utf-8")
+    channel = _FakeChannelContext(root / "character" / "character_spec.json")
+
     route = _base_route(host_present=True, host_method="reference_anchored_generation",
                         host_reference_asset_ids=["body_master", "face_master"],
                         renderer_id="flux_reference_anchor")
     ctx = ra.DispatchContext(
-        project_dir=root, channel=None, approved_poses={},
-        approved_references={},  # neither reference is approved
+        project_dir=root, channel=channel, approved_poses={}, approved_references={},
         poses_asset_base=None, poses_root=None,
-        references_asset_base=root, references_root=root / "character",
+        references_asset_base=None, references_root=None,
         output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"])
 
     with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
@@ -415,6 +457,129 @@ def s5_reference_anchored_refuses_before_provider_call_when_a_reference_is_missi
     check("the adapter refused (missing-reference logic, guard patched)", ok is False)
     check("no OpenAI client was ever constructed", not mock_openai.called)
     check("a failure was recorded", mock_rf.record_failure.called)
+    check("no output file was written", not (root / "out.png").exists())
+
+
+def s5_reference_anchored_rejects_a_stale_hash_before_any_provider_call():
+    root = temp_dir()
+    channel = _fixture_reference_context(root, body_bytes=b"body-v1", face_bytes=b"face-v1")
+    # Mutate the body master's bytes on disk after the spec recorded its
+    # hash -- exactly a "the file changed since approval" drift.
+    (root / "character" / "canonical" / "body-master.png").write_bytes(b"body-v2-tampered")
+
+    route = _base_route(host_present=True, host_method="reference_anchored_generation",
+                        host_reference_asset_ids=["body_master", "face_master"],
+                        renderer_id="flux_reference_anchor")
+    ctx = ra.DispatchContext(
+        project_dir=root, channel=channel, approved_poses={}, approved_references={},
+        poses_asset_base=None, poses_root=None,
+        references_asset_base=None, references_root=None,
+        output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"])
+
+    with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
+                          return_value=None), \
+        mock.patch("openai.OpenAI") as mock_openai, \
+        mock.patch.object(ra, "route_failures") as mock_rf:
+        ok = ra.adapt_flux_reference_anchor(route, root / "out.png", ctx)
+
+    check("a stale hash is refused before any provider call", ok is False)
+    check("no OpenAI client was constructed for a stale-hash reference",
+          not mock_openai.called)
+    check("a failure was recorded", mock_rf.record_failure.called)
+
+
+def s5_reference_anchored_rejects_a_non_approved_status_before_any_provider_call():
+    root = temp_dir()
+    channel = _fixture_reference_context(root, body_bytes=b"body", face_bytes=b"face",
+                                         body_status="pending-approval")
+
+    route = _base_route(host_present=True, host_method="reference_anchored_generation",
+                        host_reference_asset_ids=["body_master", "face_master"],
+                        renderer_id="flux_reference_anchor")
+    ctx = ra.DispatchContext(
+        project_dir=root, channel=channel, approved_poses={}, approved_references={},
+        poses_asset_base=None, poses_root=None,
+        references_asset_base=None, references_root=None,
+        output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"])
+
+    with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
+                          return_value=None), \
+        mock.patch("openai.OpenAI") as mock_openai, \
+        mock.patch.object(ra, "route_failures") as mock_rf:
+        ok = ra.adapt_flux_reference_anchor(route, root / "out.png", ctx)
+
+    check("a non-approved master status is refused before any provider call", ok is False)
+    check("no OpenAI client was constructed", not mock_openai.called)
+    check("a failure was recorded", mock_rf.record_failure.called)
+
+
+def s5_reference_anchored_rejects_top_level_master_disagreement_before_any_provider_call():
+    root = temp_dir()
+    channel = _fixture_reference_context(root, body_bytes=b"body", face_bytes=b"face",
+                                         agree=False)
+
+    route = _base_route(host_present=True, host_method="reference_anchored_generation",
+                        host_reference_asset_ids=["body_master", "face_master"],
+                        renderer_id="flux_reference_anchor")
+    ctx = ra.DispatchContext(
+        project_dir=root, channel=channel, approved_poses={}, approved_references={},
+        poses_asset_base=None, poses_root=None,
+        references_asset_base=None, references_root=None,
+        output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"])
+
+    with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
+                          return_value=None), \
+        mock.patch("openai.OpenAI") as mock_openai, \
+        mock.patch.object(ra, "route_failures") as mock_rf:
+        ok = ra.adapt_flux_reference_anchor(route, root / "out.png", ctx)
+
+    check("top-level/master disagreement is refused before any provider call", ok is False)
+    check("no OpenAI client was constructed", not mock_openai.called)
+    check("a failure was recorded", mock_rf.record_failure.called)
+
+
+def s5_reference_anchored_rejects_traversal_and_archive_paths_before_any_provider_call():
+    for label, bad_path in (
+        ("traversal", "../../etc/passwd"),
+        ("archive component", "character/archive/body_master_v1_superseded/x.png"),
+    ):
+        root = temp_dir()
+        body_bytes, face_bytes = b"body", b"face"
+        face_path = root / "character" / "canonical" / "face-master.png"
+        _write(face_path, face_bytes)
+        spec_path = root / "character" / "character_spec.json"
+        spec = {
+            "masters": {
+                "body_master": {"path": bad_path, "status": "approved",
+                                "sha256": _hashlib.sha256(body_bytes).hexdigest()},
+                "face_master": {"path": "character/canonical/face-master.png",
+                                "status": "approved",
+                                "sha256": _hashlib.sha256(face_bytes).hexdigest()},
+            },
+            "references": {"body_master": bad_path,
+                           "face_master": "character/canonical/face-master.png"},
+        }
+        spec_path.write_text(_json_mod.dumps(spec), encoding="utf-8")
+        channel = _FakeChannelContext(spec_path)
+
+        route = _base_route(host_present=True, host_method="reference_anchored_generation",
+                            host_reference_asset_ids=["body_master", "face_master"],
+                            renderer_id="flux_reference_anchor")
+        ctx = ra.DispatchContext(
+            project_dir=root, channel=channel, approved_poses={}, approved_references={},
+            poses_asset_base=None, poses_root=None,
+            references_asset_base=None, references_root=None,
+            output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"])
+
+        with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
+                              return_value=None), \
+            mock.patch("openai.OpenAI") as mock_openai, \
+            mock.patch.object(ra, "route_failures") as mock_rf:
+            ok = ra.adapt_flux_reference_anchor(route, root / "out.png", ctx)
+
+        check(f"a {label} registered path is refused before any provider call", ok is False)
+        check(f"no OpenAI client was constructed ({label})", not mock_openai.called)
+        check(f"a failure was recorded ({label})", mock_rf.record_failure.called)
 
 
 # ── 6. regenerated Channel Pack passes drift validation ─────────────────────
@@ -510,6 +675,202 @@ def s7_all_six_functions_are_registered_in_paid_entry_points():
               registered_kinds == {"canonical_visual_execution"}, str(registered_kinds))
 
 
+# ── 8. output-transform truthfulness (corrective follow-up item 3) ─────────
+
+def _non_16x9_png_bytes(size=(1536, 1024)) -> bytes:
+    """A real, decodable PNG that is deliberately NOT 16:9 — matching a
+    gpt-image-2 edit response's common 1536x1024 shape — so a test can
+    prove the canonical transform is actually applied, not merely declared."""
+    from PIL import Image
+    img = Image.new("RGB", size, color=(120, 60, 200))
+    out = io.BytesIO()
+    img.save(out, format="PNG")
+    return out.getvalue()
+
+
+def s8_apply_output_transform_produces_16x9_png():
+    src = _non_16x9_png_bytes((1536, 1024))
+    out_bytes = ra.apply_output_transform(src)
+    from PIL import Image
+    img = Image.open(io.BytesIO(out_bytes))
+    check("the transform's output is a real, decodable image", img is not None)
+    check("the transform's output format is PNG", img.format == "PNG", str(img.format))
+    check("the transform's output is exactly the canonical 1280x720 (16:9)",
+          img.size == (ra.CANONICAL_WIDTH, ra.CANONICAL_HEIGHT), str(img.size))
+
+
+def s8_adapt_flux_applies_the_registered_transform_to_a_non_16x9_response():
+    """The real registry entry captures a direct reference to
+    apply_output_transform at renderers.py import time — a frozen entry, by
+    design, is immune to a later `mock.patch.object(ra, "apply_output_transform",
+    ...)` (that's the same immutability item 3/4 rely on, not a test gap).
+    So instead of patching the module attribute, this builds a renderer_entry
+    that is identical to the real one except its `output_transform` is a
+    spy wrapping the real function — still exercised through
+    `ctx.renderer_entry`, exactly the path the adapter actually reads."""
+    root = temp_dir()
+    route = _base_route(renderer_id="flux_illustration")
+    real_entry = renderers.RENDERERS["flux_illustration"]
+    real_transform = real_entry["output_transform"]
+    transform_calls = []
+
+    def _spying_transform(image_bytes):
+        transform_calls.append(image_bytes)
+        return real_transform(image_bytes)
+
+    spy_entry = dict(real_entry)
+    spy_entry["output_transform"] = _spying_transform
+
+    ctx = ra.DispatchContext(
+        project_dir=root, channel=None, approved_poses={}, approved_references={},
+        poses_asset_base=None, poses_root=None, references_asset_base=None,
+        references_root=None, output_root=root, renderer_entry=spy_entry)
+
+    non_16x9 = _non_16x9_png_bytes((1536, 1024))
+    b64 = __import__("base64").b64encode(non_16x9).decode()
+
+    class _FakeImages:
+        @staticmethod
+        def generate(**kw):
+            class _Resp:
+                data = [type("D", (), {"b64_json": b64, "url": None})()]
+            return _Resp()
+
+    class _FakeClient:
+        images = _FakeImages()
+
+    target = root / "out.png"
+    with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
+                          return_value=None), \
+        mock.patch("openai.OpenAI", return_value=_FakeClient()), \
+        mock.patch.object(ra, "route_failures"):
+        ok = ra.adapt_flux(route, target, ctx)
+
+    check("adapt_flux succeeded", ok is True)
+    check("adapt_flux invoked ctx.renderer_entry's own output_transform with "
+          "the raw (non-16:9) provider bytes",
+          len(transform_calls) == 1 and transform_calls[0] == non_16x9)
+    check("the real renderers.RENDERERS entry names apply_output_transform "
+          "(the same function this spy wraps), proving production dispatch "
+          "reaches this exact function, not a stand-in",
+          real_transform is ra.apply_output_transform)
+    from PIL import Image
+    img = Image.open(target)
+    check("the final written file is PNG and 16:9 (1280x720)",
+          img.format == "PNG" and img.size == (ra.CANONICAL_WIDTH, ra.CANONICAL_HEIGHT),
+          f"{img.format} {img.size}")
+
+
+def s8_adapt_flux_reference_anchor_applies_the_registered_transform():
+    root = temp_dir()
+    channel = _fixture_reference_context(root, body_bytes=b"body", face_bytes=b"face")
+    route = _base_route(host_present=True, host_method="reference_anchored_generation",
+                        host_reference_asset_ids=["body_master", "face_master"],
+                        renderer_id="flux_reference_anchor")
+    real_entry = renderers.RENDERERS["flux_reference_anchor"]
+    real_transform = real_entry["output_transform"]
+    transform_calls = []
+
+    def _spying_transform(image_bytes):
+        transform_calls.append(image_bytes)
+        return real_transform(image_bytes)
+
+    spy_entry = dict(real_entry)
+    spy_entry["output_transform"] = _spying_transform
+
+    ctx = ra.DispatchContext(
+        project_dir=root, channel=channel, approved_poses={}, approved_references={},
+        poses_asset_base=None, poses_root=None, references_asset_base=None,
+        references_root=None, output_root=root, renderer_entry=spy_entry)
+
+    non_16x9 = _non_16x9_png_bytes((1536, 1024))
+    b64 = __import__("base64").b64encode(non_16x9).decode()
+
+    class _FakeImages:
+        @staticmethod
+        def edit(**kw):
+            class _Resp:
+                data = [type("D", (), {"b64_json": b64, "url": None})()]
+            return _Resp()
+
+    class _FakeClient:
+        images = _FakeImages()
+
+    target = root / "out.png"
+    with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
+                          return_value=None), \
+        mock.patch("openai.OpenAI", return_value=_FakeClient()), \
+        mock.patch.object(ra, "route_failures"):
+        ok = ra.adapt_flux_reference_anchor(route, target, ctx)
+
+    check("adapt_flux_reference_anchor succeeded", ok is True)
+    check("adapt_flux_reference_anchor invoked ctx.renderer_entry's own "
+          "output_transform with the raw (non-16:9) provider bytes",
+          len(transform_calls) == 1 and transform_calls[0] == non_16x9)
+    check("the real renderers.RENDERERS entry names apply_output_transform",
+          real_transform is ra.apply_output_transform)
+    from PIL import Image
+    img = Image.open(target)
+    check("the final written file is PNG and 16:9 (1280x720), not the raw "
+          "1536x1024 edit response written verbatim",
+          img.format == "PNG" and img.size == (ra.CANONICAL_WIDTH, ra.CANONICAL_HEIGHT),
+          f"{img.format} {img.size}")
+
+
+def s8_transform_failure_leaves_no_successful_looking_final_file():
+    root = temp_dir()
+    route = _base_route(renderer_id="flux_illustration")
+    ctx = ra.DispatchContext(
+        project_dir=root, channel=None, approved_poses={}, approved_references={},
+        poses_asset_base=None, poses_root=None, references_asset_base=None,
+        references_root=None, output_root=root,
+        renderer_entry=renderers.RENDERERS["flux_illustration"])
+
+    b64 = __import__("base64").b64encode(b"not-a-real-image").decode()
+
+    class _FakeImages:
+        @staticmethod
+        def generate(**kw):
+            class _Resp:
+                data = [type("D", (), {"b64_json": b64, "url": None})()]
+            return _Resp()
+
+    class _FakeClient:
+        images = _FakeImages()
+
+    target = root / "out.png"
+    with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
+                          return_value=None), \
+        mock.patch("openai.OpenAI", return_value=_FakeClient()), \
+        mock.patch.object(ra, "route_failures") as mock_rf:
+        ok = ra.adapt_flux(route, target, ctx)
+
+    check("adapt_flux refuses when the transform cannot decode the provider bytes",
+          ok is False)
+    check("no output file was left behind by a failed transform", not target.exists())
+    check("a failure was recorded describing the transform failure",
+          mock_rf.record_failure.called
+          and "transform" in mock_rf.record_failure.call_args.kwargs.get("reason", ""))
+
+
+def s8_changing_the_transform_declaration_changes_the_registry_hash():
+    import visual_routes as vr
+    base = {"module": "m.py", "entry": "main", "adapter": None,
+           "output_transform": ra.apply_output_transform, "output_transform_version": 1,
+           "implemented": True, "cost_category": "paid_api"}
+    other = dict(base)
+    other["output_transform"] = ra.adapt_map  # a different callable identity
+    h1 = vr.compute_renderer_registry_sha256({"r"}, {"r": base})
+    h2 = vr.compute_renderer_registry_sha256({"r"}, {"r": other})
+    check("changing which function a renderer's output_transform points at "
+          "changes renderer_registry_sha256", h1 != h2)
+
+    other_version = dict(base)
+    other_version["output_transform_version"] = 2
+    h3 = vr.compute_renderer_registry_sha256({"r"}, {"r": other_version})
+    check("changing output_transform_version alone also changes the hash", h1 != h3)
+
+
 for title, fn in (
     ("1a. one execution registry, no second mapping", s1_single_registry_no_second_mapping),
     ("1b. registry entries are deeply immutable", s1_registry_entries_are_deeply_immutable),
@@ -538,6 +899,14 @@ for title, fn in (
      s5_reference_anchored_edit_failure_never_calls_images_generate),
     ("5c. reference-anchored: missing reference refuses before any provider call",
      s5_reference_anchored_refuses_before_provider_call_when_a_reference_is_missing),
+    ("5d. reference-anchored: stale hash refuses before any provider call",
+     s5_reference_anchored_rejects_a_stale_hash_before_any_provider_call),
+    ("5e. reference-anchored: non-approved status refuses before any provider call",
+     s5_reference_anchored_rejects_a_non_approved_status_before_any_provider_call),
+    ("5f. reference-anchored: top-level/master disagreement refuses before any "
+     "provider call", s5_reference_anchored_rejects_top_level_master_disagreement_before_any_provider_call),
+    ("5g. reference-anchored: traversal/archive paths refuse before any provider call",
+     s5_reference_anchored_rejects_traversal_and_archive_paths_before_any_provider_call),
     ("6. regenerated Channel Pack: ILLUSTRATION_REFERENCE reachable, drift-clean",
      s6_illustration_reference_capability_is_reachable_in_the_real_channel),
     ("7a. all six adapters refuse normally, before any side effect",
@@ -547,6 +916,15 @@ for title, fn in (
     ("7c. all six functions are registered in PAID_ENTRY_POINTS under the "
      "canonical_visual_execution kind",
      s7_all_six_functions_are_registered_in_paid_entry_points),
+    ("8a. apply_output_transform produces a 16:9 PNG", s8_apply_output_transform_produces_16x9_png),
+    ("8b. adapt_flux applies the registered transform to a non-16:9 response",
+     s8_adapt_flux_applies_the_registered_transform_to_a_non_16x9_response),
+    ("8c. adapt_flux_reference_anchor applies the registered transform",
+     s8_adapt_flux_reference_anchor_applies_the_registered_transform),
+    ("8d. transform failure leaves no successful-looking final file",
+     s8_transform_failure_leaves_no_successful_looking_final_file),
+    ("8e. changing the transform declaration changes the registry hash",
+     s8_changing_the_transform_declaration_changes_the_registry_hash),
 ):
     run(title, fn)
 

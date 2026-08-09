@@ -151,51 +151,31 @@ def validate_schema(doc: dict, *, source: str) -> None:
 def renderer_registry_projection(renderer_ids, registry: dict) -> dict:
     """The execution-affecting subset of every referenced renderer's entry.
 
-    module and entry are included specifically so a code change that
-    redirects a renderer id to a different module/function is detected even
-    though it changes neither cost_category nor implemented. Only
-    descriptive fields (e.g. `note`) are excluded.
+    Corrective follow-up to Task 2B-B2a: this used to independently
+    reconstruct the same field list `renderers.projection_for_hash()` also
+    built — two implementations of one fact, free to drift apart. There is
+    now exactly one implementation, `renderers.projection_for_hash()`; this
+    function is a thin delegator that exists only to keep this module's own
+    public name and `VisualRoutesError`-raising contract stable for every
+    existing caller (this module never raises `renderers.RendererError`
+    directly — that would be a second exception type this module's own
+    callers were never contracted to catch).
 
-    Widened in Task 2B-B2a (a new commit on top of the locked B1 baseline,
-    not an amendment to it) to cover every execution-affecting declaration a
-    real dispatch can vary on: which adapter callable answers for a
-    renderer_id, which provider and exact model it calls, its contract and
-    prompt-policy versions, its provider parameters, and its output-transform
-    version — not only module/entry/cost_category/implemented/
-    supports_reference_input. A registry entry that doesn't carry these newer
-    fields (every existing test fixture, and any future minimal fixture) is
-    read via `.get()` with `None`/`{}` defaults rather than raising — this
-    keeps every prior caller of this function working unchanged, while a
-    richer real registry (renderers.RENDERERS) now produces a richer,
-    execution-binding hash. This IS a deliberate, real widening of what
-    `renderer_registry_sha256` covers, and is fail-closed by construction: a
-    visual_routes.json built under the narrower pre-B2a projection has a
-    stale hash the moment this lands, and fails validate_contract()'s drift
-    check until rebuilt.
+    `renderers` is imported locally, not at module scope: `renderers.py`
+    imports `renderer_adapters.py`, which (for its universal-refusal guard)
+    imports `generation_gate.py`, which imports `channel_context.py` — and
+    `channel_context.py` itself imports `renderers.py`. A module-level
+    `import renderers` here would risk the same import-cycle class Task
+    2B-B2a already had to route around once; a local import inside this
+    function has no such risk, since by the time any caller actually
+    invokes this function, all of those modules have already finished
+    importing.
     """
-    proj = {}
-    for rid in sorted(set(renderer_ids)):
-        entry = registry.get(rid)
-        if entry is None:
-            raise VisualRoutesError(f"unregistered renderer {rid!r}; "
-                                    f"registered: {sorted(registry)}")
-        adapter = entry.get("adapter")
-        proj[rid] = {
-            "module": entry["module"],
-            "entry": entry["entry"],
-            "cost_category": entry["cost_category"],
-            "implemented": bool(entry["implemented"]),
-            "supports_reference_input": bool(entry.get("supports_reference_input", False)),
-            "adapter_qualname": (f"{adapter.__module__}.{adapter.__qualname__}"
-                                 if adapter is not None else None),
-            "provider": entry.get("provider"),
-            "model_id": entry.get("model_id"),
-            "contract_version": entry.get("contract_version"),
-            "prompt_policy_version": entry.get("prompt_policy_version"),
-            "provider_parameters": dict(entry.get("provider_parameters") or {}),
-            "output_transform_version": entry.get("output_transform_version"),
-        }
-    return proj
+    import renderers
+    try:
+        return renderers.projection_for_hash(renderer_ids, registry)
+    except renderers.RendererError as e:
+        raise VisualRoutesError(str(e)) from e
 
 
 def compute_renderer_registry_sha256(renderer_ids, registry: dict) -> str:
@@ -1095,21 +1075,42 @@ def _resolve_project_dir(project) -> Path:
 
 
 def inspect_project_routes(project, *, operation: str = "inspect") -> "ProjectRoutesLoad":
-    """Read-only. Never raises. Loads everything a project's
-    visual_routes.json needs to be judged against — the artifact itself, the
-    governing channel, the manifest and its hash, the approved pose and
-    reference registries — and returns a ProjectRoutesLoad whose four problem
-    buckets separate "could not even load the inputs" from "loaded but
-    schema-invalid" from "schema-valid but internally inconsistent" from
-    "internally honest but has routes needing review." No writes, no
-    directory creation, no reading of any legacy markdown artifact anywhere
-    in this function.
+    """Read-only. Never raises for ordinary malformed input or an expected
+    operational failure — that is the whole point of returning a
+    ProjectRoutesLoad rather than letting a caller catch an exception.
+    Loads everything a project's visual_routes.json needs to be judged
+    against — the artifact itself, the governing channel, the manifest and
+    its hash, the approved pose and reference registries — and returns a
+    ProjectRoutesLoad whose four problem buckets separate "could not even
+    load the inputs" from "loaded but schema-invalid" from "schema-valid but
+    internally inconsistent" from "internally honest but has routes needing
+    review." No writes, no directory creation, no reading of any legacy
+    markdown artifact anywhere in this function.
+
+    Corrective follow-up (item 6): every phase below — path resolution,
+    directory/file existence checks, adapter-drift inspection, the routes/
+    manifest reads, channel loading, schema loading/validation, pose/
+    reference registry loading, and contract validation itself — is wrapped
+    so an unexpected failure inside it becomes a blocker in the appropriate
+    bucket instead of an uncaught exception. Every `except` below names
+    `Exception`, never a bare `except:` and never `BaseException` — so
+    KeyboardInterrupt and SystemExit are never swallowed; only genuine
+    operational failures are converted into diagnostics.
     """
     import pose_registry
     import reference_registry
     import renderers
 
-    project_dir = _resolve_project_dir(project)
+    try:
+        project_dir = _resolve_project_dir(project)
+    except Exception as e:
+        result = ProjectRoutesLoad(
+            project_dir=Path("."), operation=operation, doc=None, context=None,
+            manifest=None, manifest_sha256=None, routes_path=Path("."),
+            routes_md_path=Path("."))
+        result.load_problems.append(f"could not resolve project path {project!r}: {e}")
+        return result
+
     routes_path = project_dir / ROUTES_NAME
     routes_md_path = project_dir / ROUTES_MD_NAME
     result = ProjectRoutesLoad(
@@ -1117,51 +1118,74 @@ def inspect_project_routes(project, *, operation: str = "inspect") -> "ProjectRo
         manifest=None, manifest_sha256=None, routes_path=routes_path,
         routes_md_path=routes_md_path)
 
-    if not project_dir.is_dir():
+    try:
+        project_is_dir = project_dir.is_dir()
+    except Exception as e:
+        result.load_problems.append(f"could not check project directory {project_dir}: {e}")
+        return result
+    if not project_is_dir:
         result.load_problems.append(f"no such project directory: {project_dir}")
         return result
 
-    if not routes_path.is_file():
+    try:
+        routes_exists = routes_path.is_file()
+    except Exception as e:
+        result.load_problems.append(f"could not check for {ROUTES_NAME}: {e}")
+        return result
+    if not routes_exists:
         result.load_problems.append(
-            f"canonical routing artifact missing — {ROUTES_NAME} not found at "
-            f"{project_dir}; this project has not been migrated (no auto-migration "
-            f"— a human must run migrate_routes_from_markdown.py first)")
+            f"canonical routing is unavailable — {ROUTES_NAME} not found at "
+            f"{project_dir}. A future canonical rebuild and a fresh approval "
+            f"are required before this project can be dispatched.")
         return result
 
     try:
         doc = json.loads(routes_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as e:
+    except Exception as e:
         result.load_problems.append(f"could not read/parse {ROUTES_NAME}: {e}")
         return result
     result.doc = doc
 
-    drift = adapter_drift(project_dir)
+    try:
+        drift = adapter_drift(project_dir)
+    except Exception as e:
+        result.load_problems.append(f"could not check {ROUTES_MD_NAME} for drift: {e}")
+        drift = None
     if drift:
         result.load_problems.append(drift)
 
+    context = None
     try:
         context = channel_context.load_channel_for_project(project_dir)
         result.context = context
-    except channel_context.ChannelError as e:
+    except Exception as e:
         result.load_problems.append(f"could not resolve the governing channel: {e}")
-        context = None
 
     manifest_path = project_dir / "manifest.json"
     manifest = None
-    if not manifest_path.is_file():
+    try:
+        manifest_exists = manifest_path.is_file()
+    except Exception as e:
+        result.load_problems.append(f"could not check for manifest.json: {e}")
+        manifest_exists = False
+    if not manifest_exists:
         result.load_problems.append(f"manifest.json missing at {project_dir}")
     else:
         try:
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             result.manifest = manifest
             result.manifest_sha256 = file_sha256(manifest_path)
-        except (OSError, json.JSONDecodeError) as e:
+        except Exception as e:
             result.load_problems.append(f"could not read/parse manifest.json: {e}")
 
     if result.load_problems:
         return result
 
-    schema_probs = schema_errors(doc)
+    try:
+        schema_probs = schema_errors(doc)
+    except Exception as e:
+        result.schema_problems.append(f"schema validation itself failed: {e}")
+        return result
     result.schema_problems.extend(schema_probs)
     if schema_probs:
         return result
@@ -1170,31 +1194,49 @@ def inspect_project_routes(project, *, operation: str = "inspect") -> "ProjectRo
     poses_asset_base = poses_root = None
     approved_references = {}
     references_asset_base = references_root = None
-    if context is not None and context.host_enabled:
-        approved_poses = dict(pose_registry.registry(context=context))
-        poses_asset_base = pose_registry._asset_base(context)
-        poses_root = pose_registry._poses_root(context)
-        approved_references = dict(reference_registry.registry(context=context))
-        references_asset_base = reference_registry.references_asset_base(context=context)
-        references_root = reference_registry.references_root(context=context)
+    try:
+        if context is not None and context.host_enabled:
+            approved_poses = dict(pose_registry.registry(context=context))
+            poses_asset_base = pose_registry._asset_base(context)
+            poses_root = pose_registry._poses_root(context)
+            approved_references = dict(reference_registry.registry(context=context))
+            references_asset_base = reference_registry.references_asset_base(context=context)
+            references_root = reference_registry.references_root(context=context)
+    except Exception as e:
+        result.integrity_problems.append(
+            f"could not load the approved pose/reference registry: {e}")
+        return result
 
-    integrity = list(validate_contract(
-        doc,
-        manifest=manifest, manifest_sha256=result.manifest_sha256,
-        governing_channel_binding=context.plan_binding() if context is not None else {},
-        expected_project_id=project_dir.name,
-        renderer_capabilities=dict(context.renderer_capabilities) if context is not None else {},
-        renderer_registry=renderers.RENDERERS,
-        approved_poses=approved_poses, poses_asset_base=poses_asset_base, poses_root=poses_root,
-        approved_references=approved_references,
-        references_asset_base=references_asset_base, references_root=references_root,
-    ))
-    integrity.extend(prompt_authority_problems_for_doc(doc))
+    try:
+        integrity = list(validate_contract(
+            doc,
+            manifest=manifest, manifest_sha256=result.manifest_sha256,
+            governing_channel_binding=context.plan_binding() if context is not None else {},
+            expected_project_id=project_dir.name,
+            renderer_capabilities=(dict(context.renderer_capabilities)
+                                   if context is not None else {}),
+            renderer_registry=renderers.RENDERERS,
+            approved_poses=approved_poses, poses_asset_base=poses_asset_base,
+            poses_root=poses_root,
+            approved_references=approved_references,
+            references_asset_base=references_asset_base, references_root=references_root,
+        ))
+    except Exception as e:
+        result.integrity_problems.append(f"contract validation itself failed: {e}")
+        return result
+
+    try:
+        integrity.extend(prompt_authority_problems_for_doc(doc))
+    except Exception as e:
+        integrity.append(f"prompt-authority validation itself failed: {e}")
     result.integrity_problems = integrity
     if integrity:
         return result
 
-    result.status_problems = _status_only_blockers(doc)
+    try:
+        result.status_problems = _status_only_blockers(doc)
+    except Exception as e:
+        result.integrity_problems.append(f"status evaluation itself failed: {e}")
     return result
 
 

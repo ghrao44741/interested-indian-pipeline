@@ -2419,8 +2419,11 @@ def s8_inspect_missing_artifact_never_raises():
     result = vr.inspect_project_routes(proj, operation="test")
     check("inspect_project_routes never raises for a missing artifact",
           isinstance(result, vr.ProjectRoutesLoad))
-    check("the literal 'canonical routing artifact missing' message is present",
-          any("canonical routing artifact missing" in p for p in result.load_problems),
+    check("canonical routing is reported unavailable, with no instruction to "
+          "run migrate_routes_from_markdown.py (corrective follow-up item 6)",
+          any("canonical routing is unavailable" in p and "future canonical rebuild" in p
+              and "fresh approval" in p and "migrate_routes_from_markdown" not in p
+              for p in result.load_problems),
           str(result.load_problems))
     check("is_executable is False", result.is_executable is False)
     check("doc stayed None — nothing partially loaded", result.doc is None)
@@ -2436,7 +2439,7 @@ def s8_require_executable_raises_for_the_same_missing_case():
     except vr.VisualRoutesError as e:
         check("require_executable_routes raises for a missing artifact", True)
         check("the raised message carries the same blocker text",
-              "canonical routing artifact missing" in str(e), str(e))
+              "canonical routing is unavailable" in str(e), str(e))
 
 
 def s8_inspect_malformed_json_is_a_load_problem():
@@ -2540,6 +2543,74 @@ def s8_file_sha256_matches_plain_hashlib():
     p.write_bytes(b"some bytes")
     check("file_sha256() matches hashlib.sha256(path.read_bytes())",
           vr.file_sha256(p) == hashlib.sha256(p.read_bytes()).hexdigest())
+
+
+# ── 9. corrective follow-up: one canonical registry projection ─────────────
+
+_MINIMAL_EXEC_ENTRY = {
+    "module": "m.py", "entry": "main", "adapter": None,
+    "provider": "xai", "model_id": "grok-imagine-image",
+    "credential_env_var": "XAI_API_KEY", "base_url": "https://api.x.ai/v1",
+    "contract_version": 1, "prompt_policy_version": "abc",
+    "provider_parameters": {"n": 1}, "response_format_policy": "url_or_b64json",
+    "download_timeout_seconds": 60, "supports_reference_input": False,
+    "output_transform": None, "output_transform_version": 1,
+    "implemented": True, "cost_category": "paid_api",
+}
+
+
+def s9_visual_routes_hashing_invokes_the_canonical_renderers_projection():
+    import renderers as real_renderers
+    sentinel = {"r": {"sentinel": True}}
+    with mock.patch.object(real_renderers, "projection_for_hash",
+                          return_value=sentinel) as mock_proj:
+        h = vr.compute_renderer_registry_sha256({"r"}, {"r": _MINIMAL_EXEC_ENTRY})
+    check("visual_routes.compute_renderer_registry_sha256 calls "
+          "renderers.projection_for_hash exactly once", mock_proj.call_count == 1,
+          str(mock_proj.call_count))
+    check("the hash it returns is the canonical_sha256 of what the canonical "
+          "projection produced, not an independently-reconstructed value",
+          h == cc.canonical_sha256(sentinel), h)
+
+
+def s9_only_one_field_projection_implementation_exists():
+    import inspect as _inspect
+    src = _inspect.getsource(vr.renderer_registry_projection)
+    check("visual_routes.renderer_registry_projection() delegates to "
+          "renderers.projection_for_hash rather than reconstructing the field "
+          "list itself", "renderers.projection_for_hash(" in src, src)
+    check("it does not re-declare the execution-affecting field names "
+          "itself (no independent second implementation)",
+          '"credential_env_var"' not in src and '"base_url"' not in src
+          and '"response_format_policy"' not in src, src)
+
+
+def s9_dispatch_and_hashing_read_the_same_renderers_object():
+    import renderers as real_renderers
+    proj = vr.renderer_registry_projection({"flux_illustration"}, real_renderers.RENDERERS)
+    dispatched = real_renderers.dispatch_adapter("flux_illustration")
+    check("the projection's adapter_qualname names exactly the function "
+          "dispatch_adapter() returns for the same renderer_id",
+          proj["flux_illustration"]["adapter_qualname"]
+          == f"{dispatched.__module__}.{dispatched.__qualname__}")
+
+
+def s9_every_execution_field_changes_the_visual_routes_hash():
+    base_registry = {"r": dict(_MINIMAL_EXEC_ENTRY)}
+    base_hash = vr.compute_renderer_registry_sha256({"r"}, base_registry)
+    for field, new_value in (
+        ("provider", "openai"), ("model_id", "other-model"),
+        ("credential_env_var", "OTHER_KEY"), ("base_url", "https://example.invalid"),
+        ("contract_version", 2), ("prompt_policy_version", "different"),
+        ("provider_parameters", {"n": 2}), ("response_format_policy", "other"),
+        ("download_timeout_seconds", 30), ("output_transform_version", 2),
+        ("implemented", False), ("cost_category", "free_local"),
+    ):
+        mutated = {"r": dict(_MINIMAL_EXEC_ENTRY)}
+        mutated["r"][field] = new_value
+        h = vr.compute_renderer_registry_sha256({"r"}, mutated)
+        check(f"changing {field!r} changes the visual_routes renderer_registry_sha256",
+              h != base_hash, f"{field}: {new_value!r} did not change the hash")
 
 
 def main() -> int:
@@ -2719,6 +2790,15 @@ def main() -> int:
         run("8k. a fully clean project is executable",
             s8_inspect_fully_clean_project_is_executable)
         run("8l. file_sha256 matches plain hashlib", s8_file_sha256_matches_plain_hashlib)
+
+        run("9a. visual_routes hashing invokes the canonical renderers projection",
+            s9_visual_routes_hashing_invokes_the_canonical_renderers_projection)
+        run("9b. only one field-projection implementation exists",
+            s9_only_one_field_projection_implementation_exists)
+        run("9c. dispatch and hashing read the same RENDERERS object",
+            s9_dispatch_and_hashing_read_the_same_renderers_object)
+        run("9d. every execution field changes the visual_routes renderer hash",
+            s9_every_execution_field_changes_the_visual_routes_hash)
     finally:
         for td in _temps:
             shutil.rmtree(td, ignore_errors=True)

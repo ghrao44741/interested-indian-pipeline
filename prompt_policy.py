@@ -84,31 +84,50 @@ STYLE_SUFFIX = (
 _TYPE_ROUTE_ARGS_KEY = {"ILLUSTRATION": "illustration", "REENACTMENT": "reenactment"}
 
 
-def typed_prompt(route: dict) -> str | None:
-    """The typed route_args prompt for an ILLUSTRATION/REENACTMENT route, or
-    None if the route's visual_type has no typed-prompt slot, or the slot is
-    itself null. This is the execution authority (Task 2B-B2a amendment 2) —
-    build_effective_prompt() below reads this, not route['prompt'], whenever
-    it is present."""
-    key = _TYPE_ROUTE_ARGS_KEY.get(route.get("visual_type"))
+class PromptPolicyError(RuntimeError):
+    """Raised when a route's typed prompt cannot be trusted as the
+    execution authority — missing, null, non-string, blank, or the route
+    has no typed-prompt slot at all for its visual_type."""
+
+
+def typed_prompt(route: dict) -> str:
+    """The typed route_args prompt — the SOLE execution authority for
+    ILLUSTRATION/REENACTMENT (Task 2B-B2a amendment, corrective follow-up
+    item 5). Raises PromptPolicyError for anything other than a genuine,
+    non-blank string: a visual_type with no typed-prompt slot, a missing
+    route_args block, a missing/null typed sub-object, or a missing/null/
+    non-string/blank prompt value. Never falls back to route['prompt'] —
+    that field is validated for EXACT EQUALITY against this one elsewhere
+    (visual_routes.prompt_authority_problems, still required by canonical
+    contract validation), it is never itself trusted as content here. A
+    silent fallback here would mean a route could execute against text no
+    typed-prompt check ever verified."""
+    vt = route.get("visual_type")
+    key = _TYPE_ROUTE_ARGS_KEY.get(vt)
     if key is None:
-        return None
-    args = (route.get("route_args") or {}).get(key)
+        raise PromptPolicyError(f"visual_type {vt!r} has no typed prompt slot")
+    route_args = route.get("route_args")
+    if not isinstance(route_args, dict):
+        raise PromptPolicyError("route has no route_args object at all")
+    args = route_args.get(key)
     if not isinstance(args, dict):
-        return None
-    return args.get("prompt")
+        raise PromptPolicyError(f"route_args.{key} is missing or not an object")
+    value = args.get("prompt")
+    if not isinstance(value, str) or not value.strip():
+        raise PromptPolicyError(
+            f"route_args.{key}.prompt must be a non-blank string, got {value!r}")
+    return value
 
 
 def build_effective_prompt(route: dict) -> str:
-    """The exact string a provider call must use. Derives content from the
-    typed route_args prompt (the execution authority) whenever the route's
-    visual_type carries one, falling back to route['prompt'] only when no
-    typed slot applies (e.g. this function is also exercised directly in
-    tests against fixtures that predate a full contract check) — a schema-
-    and contract-valid READY ILLUSTRATION/REENACTMENT route always has the
-    two in agreement by the time dispatch would ever call this."""
-    tp = typed_prompt(route)
-    base_prompt = tp if tp is not None else (route.get("prompt") or "")
+    """The exact string a provider call must use. Derives content
+    exclusively from the typed route_args prompt (the execution authority)
+    — raises PromptPolicyError (via typed_prompt()) rather than falling back
+    to route['prompt'] for a missing, null, non-string, or blank typed
+    prompt. A caller (an adapter) must let this exception propagate before
+    any credential lookup or client construction — it is exactly the kind
+    of malformed-input case that must fail before any side effect."""
+    base_prompt = typed_prompt(route)
 
     parts = [STYLE_POLICY, base_prompt]
 

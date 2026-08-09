@@ -62,11 +62,16 @@ _RAW_RENDERERS = {
         "adapter": _ra.adapt_map,
         "provider": "local",
         "model_id": None,
+        "credential_env_var": None,
+        "base_url": None,
         "contract_version": 1,
         "prompt_policy_version": None,
         "provider_parameters": {},
+        "response_format_policy": None,
+        "download_timeout_seconds": None,
         "supports_reference_input": False,
-        "output_transform_version": 1,
+        "output_transform": None,
+        "output_transform_version": None,
         "implemented": True,
         "cost_category": "free_local",
         "note": "Geography is rendered from GeoJSON, never drawn by a model. "
@@ -79,11 +84,16 @@ _RAW_RENDERERS = {
         "adapter": _ra.adapt_chart,
         "provider": "local",
         "model_id": None,
+        "credential_env_var": None,
+        "base_url": None,
         "contract_version": 1,
         "prompt_policy_version": None,
         "provider_parameters": {},
+        "response_format_policy": None,
+        "download_timeout_seconds": None,
         "supports_reference_input": False,
-        "output_transform_version": 1,
+        "output_transform": None,
+        "output_transform_version": None,
         "implemented": True,
         "cost_category": "free_local",
     },
@@ -93,10 +103,15 @@ _RAW_RENDERERS = {
         "adapter": None,
         "provider": None,
         "model_id": None,
+        "credential_env_var": None,
+        "base_url": None,
         "contract_version": 1,
         "prompt_policy_version": None,
         "provider_parameters": {},
+        "response_format_policy": None,
+        "download_timeout_seconds": None,
         "supports_reference_input": False,
+        "output_transform": None,
         "output_transform_version": None,
         "implemented": False,
         "cost_category": "free_local",
@@ -108,10 +123,15 @@ _RAW_RENDERERS = {
         "adapter": None,
         "provider": None,
         "model_id": None,
+        "credential_env_var": None,
+        "base_url": None,
         "contract_version": 1,
         "prompt_policy_version": None,
         "provider_parameters": {},
+        "response_format_policy": None,
+        "download_timeout_seconds": None,
         "supports_reference_input": False,
+        "output_transform": None,
         "output_transform_version": None,
         "implemented": False,
         "cost_category": "free_local",
@@ -124,15 +144,23 @@ _RAW_RENDERERS = {
         "adapter": _ra.adapt_photo,
         "provider": "pexels",
         "model_id": None,
+        "credential_env_var": "PEXELS_API_KEY",
+        "base_url": None,
         "contract_version": 1,
         "prompt_policy_version": None,
         "provider_parameters": {},
+        "response_format_policy": None,
+        "download_timeout_seconds": None,
         "supports_reference_input": False,
-        "output_transform_version": 1,
+        "output_transform": None,
+        "output_transform_version": None,
         "implemented": True,
         "cost_category": "free_api",
         "note": "Free of charge but writes approved episode artwork, so it is "
-                "approval-gated like any paid route.",
+                "approval-gated like any paid route. credential_env_var is "
+                "declarative here — adapt_photo still reads the key through "
+                "search_pexels._get_api_key() (that module is out of this task's "
+                "authorized scope), which happens to check the same env var name.",
     },
     "flux_illustration": {
         "module": "generate_images_flux.py",
@@ -140,11 +168,16 @@ _RAW_RENDERERS = {
         "adapter": _ra.adapt_flux,
         "provider": "xai",
         "model_id": "grok-imagine-image",
+        "credential_env_var": "XAI_API_KEY",
+        "base_url": "https://api.x.ai/v1",
         "contract_version": 1,
         "prompt_policy_version": prompt_policy.PROMPT_POLICY_VERSION,
         "provider_parameters": {"n": 1},
+        "response_format_policy": "url_or_b64json",
+        "download_timeout_seconds": 60,
         "supports_reference_input": False,
-        "output_transform_version": 1,
+        "output_transform": _ra.apply_output_transform,
+        "output_transform_version": _ra.OUTPUT_TRANSFORM_VERSION,
         "implemented": True,
         "cost_category": "paid_api",
     },
@@ -154,11 +187,16 @@ _RAW_RENDERERS = {
         "adapter": _ra.adapt_flux,
         "provider": "xai",
         "model_id": "grok-imagine-image",
+        "credential_env_var": "XAI_API_KEY",
+        "base_url": "https://api.x.ai/v1",
         "contract_version": 1,
         "prompt_policy_version": prompt_policy.PROMPT_POLICY_VERSION,
         "provider_parameters": {"n": 1},
+        "response_format_policy": "url_or_b64json",
+        "download_timeout_seconds": 60,
         "supports_reference_input": False,
-        "output_transform_version": 1,
+        "output_transform": _ra.apply_output_transform,
+        "output_transform_version": _ra.OUTPUT_TRANSFORM_VERSION,
         "implemented": True,
         "cost_category": "paid_api",
         "note": "Shares the illustration backend today; a dedicated reenactment "
@@ -171,11 +209,16 @@ _RAW_RENDERERS = {
         "adapter": _ra.adapt_host_composite,
         "provider": "local",
         "model_id": None,
+        "credential_env_var": None,
+        "base_url": None,
         "contract_version": 1,
         "prompt_policy_version": None,
         "provider_parameters": {},
+        "response_format_policy": None,
+        "download_timeout_seconds": None,
         "supports_reference_input": False,
-        "output_transform_version": 1,
+        "output_transform": None,
+        "output_transform_version": None,
         "implemented": True,
         "cost_category": "derived",
         "note": "Composites an already-approved pose asset; spends nothing, but "
@@ -187,11 +230,16 @@ _RAW_RENDERERS = {
         "adapter": _ra.adapt_flux_reference_anchor,
         "provider": "openai",
         "model_id": "gpt-image-2",
+        "credential_env_var": "OPENAI_API_KEY",
+        "base_url": None,
         "contract_version": 1,
         "prompt_policy_version": prompt_policy.PROMPT_POLICY_VERSION,
         "provider_parameters": {"size": "1536x1024", "n": 1},
+        "response_format_policy": "url_or_b64json",
+        "download_timeout_seconds": 60,
         "supports_reference_input": True,
-        "output_transform_version": 1,
+        "output_transform": _ra.apply_output_transform,
+        "output_transform_version": _ra.OUTPUT_TRANSFORM_VERSION,
         "implemented": True,
         "cost_category": "paid_api",
         "note": "Reference-anchored generation via OpenAI's image-edit endpoint, "
@@ -223,16 +271,39 @@ def dispatch_adapter(renderer_id: str):
     return get(renderer_id)["adapter"]
 
 
-def projection_for_hash(renderer_ids) -> dict:
-    """The execution-affecting projection of every referenced renderer's
-    entry, keyed by renderer_id, sorted. `adapter` (a live callable, not
-    JSON-stable on its own) is represented by its qualified name instead —
-    changing which function a renderer_id points at still changes this
-    projection, and therefore the hash visual_routes.py computes over it."""
+def projection_for_hash(renderer_ids, registry: dict | None = None) -> dict:
+    """THE canonical execution-affecting projection of every referenced
+    renderer's entry, keyed by renderer_id, sorted. This is the ONLY field-
+    projection implementation in the codebase — visual_routes.py delegates
+    to this function rather than reconstructing the same field list a
+    second time (corrective follow-up to Task 2B-B2a).
+
+    Defaults to this module's own `RENDERERS` — the canonical case, every
+    real caller. `registry` may be supplied explicitly so a test can exercise
+    this exact function (not a hand-rolled equivalent) against a minimal
+    fixture registry that doesn't carry every newer field; every field below
+    is read via `.get()` with a `None`/`{}` default for that reason.
+
+    `adapter` and `output_transform` are live callables, not JSON-stable on
+    their own — each is represented by its qualified name instead, so
+    changing which function a renderer_id points at (dispatch OR the output
+    transform it applies) still changes this projection, and therefore the
+    hash visual_routes.py computes over it. Every other execution-affecting
+    declaration a real provider call can vary on is included too: provider,
+    model, which named credential slot supplies the secret (never the secret
+    itself), the base URL / endpoint policy, exact request parameters, the
+    response-format policy, the download timeout, and the output-transform
+    version — not only module/entry/cost_category/implemented/
+    supports_reference_input.
+    """
+    reg = RENDERERS if registry is None else registry
     out = {}
     for rid in sorted(set(renderer_ids)):
-        entry = get(rid)
+        entry = reg.get(rid)
+        if entry is None:
+            raise RendererError(f"unregistered renderer {rid!r}; registered: {sorted(reg)}")
         adapter = entry.get("adapter")
+        output_transform = entry.get("output_transform")
         out[rid] = {
             "module": entry["module"],
             "entry": entry["entry"],
@@ -240,10 +311,17 @@ def projection_for_hash(renderer_ids) -> dict:
                                  if adapter is not None else None),
             "provider": entry.get("provider"),
             "model_id": entry.get("model_id"),
+            "credential_env_var": entry.get("credential_env_var"),
+            "base_url": entry.get("base_url"),
             "contract_version": entry.get("contract_version"),
             "prompt_policy_version": entry.get("prompt_policy_version"),
             "provider_parameters": dict(entry.get("provider_parameters") or {}),
+            "response_format_policy": entry.get("response_format_policy"),
+            "download_timeout_seconds": entry.get("download_timeout_seconds"),
             "supports_reference_input": bool(entry.get("supports_reference_input", False)),
+            "output_transform_qualname": (
+                f"{output_transform.__module__}.{output_transform.__qualname__}"
+                if output_transform is not None else None),
             "output_transform_version": entry.get("output_transform_version"),
             "implemented": bool(entry["implemented"]),
             "cost_category": entry["cost_category"],
