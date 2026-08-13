@@ -31,7 +31,11 @@ sys.path.insert(0, str(ROOT))
 import composite_character  # noqa: E402
 import generation_gate as gate  # noqa: E402
 import pose_registry  # noqa: E402
+import render_channel_dna as rd  # noqa: E402
+import renderers  # noqa: E402
+import route_failures  # noqa: E402
 import route_images  # noqa: E402
+import visual_routes as vr  # noqa: E402
 import channel_context as cc  # noqa: E402
 import channel_fixture  # noqa: E402
 
@@ -198,6 +202,140 @@ def edit_manifest(proj: Path, fn):
 
 def blocked_on(rep, fragment):
     return any(fragment in b for b in rep.blockers)
+
+
+# ── canonical (v3) fixture — Task 2B-B2b-1 ──────────────────────────────────
+#
+# A second, additive fixture layer on top of build_fixture(): the same
+# identity-clean project, a channel pack extended with an ILLUSTRATION
+# capability, a schema-valid two-route visual_routes.json/.md pair (one free
+# PHOTO route, one paid ILLUSTRATION route — so canonical_paid_generation_
+# summary() has something real to report), and a matching v3 approval. None
+# of this is wired into any live gate; it exists solely to exercise
+# _check_approval_v3() and _canonical_execution_problems() directly.
+
+def install_canonical_channel(root: Path, channel_id: str = channel_fixture.CHANNEL_ID) -> None:
+    """Extends the fixture channel pack with an ILLUSTRATION capability, so a
+    canonical routes fixture can carry one paid route alongside a free one.
+    Must run after channel_fixture.install() (which build_fixture() already
+    calls) so this overwrite is the final word on the pack's content."""
+    doc = channel_fixture.pack_document(channel_id)
+    doc["renderers"]["capabilities"]["ILLUSTRATION"] = "flux_illustration"
+    d = root / "channels" / channel_id
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "channel.json").write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n",
+                                    encoding="utf-8")
+    (d / cc.DNA_NAME).write_text(rd.render_dna(doc), encoding="utf-8")
+
+
+def _canonical_route(scene, visual_type, renderer_id, cost_category, paid, route_args,
+                     narration, prompt=None) -> dict:
+    return {
+        "visual_asset_id": scene["visual_asset_id"], "source_ids": scene["source_ids"],
+        "shot_instance_id": scene["shot_instance_id"], "scene_id": scene["id"],
+        "output_file": scene["image"], "status": "READY", "review_reasons": [],
+        "candidate_visual_types": [], "routing_confidence": 0.9, "manual_override": None,
+        "visual_type": visual_type, "route_args": route_args, "narration": narration,
+        "prompt": prompt, "visual_cue": None, "overlay_text": None,
+        "renderer_id": renderer_id, "host_renderer_id": None,
+        "cost_category": cost_category, "paid": paid,
+        "host_present": False, "host_method": None, "host_pose_id": None,
+        "host_scene_bound": None, "host_reference_asset_ids": None, "host_placement": None,
+    }
+
+
+def install_canonical_routes(proj: Path, ctx) -> dict:
+    """Writes a schema-valid, fully executable visual_routes.json/.md pair
+    covering every scene build_fixture()'s manifest carries: the first scene
+    as a free PHOTO route, every remaining scene as a paid ILLUSTRATION route.
+    Returns the written document. Uses visual_routes.write_atomic(), so a
+    stale routes_content_sha256 or a schema violation raises here — a broken
+    fixture fails loudly at build time, not as a mysterious later blocker."""
+    manifest = json.loads((proj / "manifest.json").read_text(encoding="utf-8"))
+    scenes = manifest["scenes"]
+    routes = [
+        _canonical_route(scenes[0], "PHOTO", "pexels", "free_api", False,
+                         {"map": None, "chart": None, "timeline": None, "document": None,
+                          "photo": {"query": "a government building", "constraints": None},
+                          "illustration": None, "reenactment": None}, "n1"),
+    ] + [
+        _canonical_route(sc, "ILLUSTRATION", "flux_illustration", "paid_api", True,
+                         {"map": None, "chart": None, "timeline": None, "document": None,
+                          "photo": None,
+                          "illustration": {"prompt": "a mascot scene", "style_tags": []},
+                          "reenactment": None}, f"n{i}", prompt="a mascot scene")
+        for i, sc in enumerate(scenes[1:], start=2)
+    ]
+    doc = {
+        "schema_version": vr.SCHEMA_VERSION, "project_id": proj.name,
+        "routes_id": vr.new_routes_id(), "generated_at": "2026-01-01T00:00:00+00:00",
+        "inputs": {"manifest_sha256": vr.file_sha256(proj / "manifest.json")},
+        "channel": ctx.plan_binding(), "routes": routes,
+        "renderer_registry_sha256": "0" * 64, "routes_content_sha256": "0" * 64,
+    }
+    rids = vr.referenced_renderer_ids(routes)
+    doc["renderer_registry_sha256"] = vr.compute_renderer_registry_sha256(rids, renderers.RENDERERS)
+    doc["routes_content_sha256"] = vr.compute_routes_content_sha256(doc)
+    errs = vr.schema_errors(doc)
+    if errs:
+        raise AssertionError(f"canonical fixture is not schema-valid: {errs}")
+    vr.write_atomic(doc, proj)
+    return doc
+
+
+def build_v3_approval(proj: Path, doc: dict, ctx, *, approved_by="Giri",
+                      approved_at="2026-01-01T00:00:00+00:00", tamper=None) -> dict:
+    """A self-consistent v3 approval for `doc`'s routes document, written to
+    disk. `tamper(rec)` mutates the in-memory record before it is written —
+    used by the binding-completeness regressions below."""
+    rec = {
+        "schema_version": gate.APPROVAL_V3_SCHEMA_VERSION,
+        "project": proj.name,
+        "routes_id": doc["routes_id"],
+        "routes_file_sha256": vr.file_sha256(proj / vr.ROUTES_NAME),
+        "routes_md_sha256": vr.file_sha256(proj / vr.ROUTES_MD_NAME),
+        "routes_content_sha256": vr.compute_routes_content_sha256(doc),
+        "renderer_registry_sha256": doc["renderer_registry_sha256"],
+        "manifest_sha256": vr.file_sha256(proj / "manifest.json"),
+        "channel": ctx.plan_binding(),
+        "failure_revision": route_failures.revision(proj),
+        "approved_at": approved_at, "approved_by": approved_by,
+        "confirmation": gate.canonical_confirmation_phrase(proj.name, doc["routes_id"]),
+        "paid_generation": gate.canonical_paid_generation_summary(doc),
+    }
+    if tamper is not None:
+        tamper(rec)
+    (proj / gate.APPROVAL_NAME).write_text(json.dumps(rec, indent=2), encoding="utf-8")
+    return rec
+
+
+def build_canonical_baseline(*, approval_tamper=None):
+    """(root, proj, ctx, doc) — build_fixture() plus a complete, passing
+    canonical world: an extended channel, an executable routes document and a
+    matching v3 approval."""
+    root, proj = build_fixture()
+    install_canonical_channel(root)
+    a, b, c, d = patched(root)
+    with a, b, c, d:
+        ctx = cc.load_channel_for_project(proj)
+        doc = install_canonical_routes(proj, ctx)
+        build_v3_approval(proj, doc, ctx, tamper=approval_tamper)
+    return root, proj, ctx, doc
+
+
+def run_canonical(root, proj, **kw):
+    """The unwired canonical validator, called directly — never through
+    require_canonical_visual_execution_ready(), which still always raises."""
+    a, b, c, d = patched(root)
+    with a, b, c, d:
+        return gate._canonical_execution_problems(proj, "test", **kw)
+
+
+def rewrite_approval(proj: Path, fn) -> None:
+    p = proj / gate.APPROVAL_NAME
+    rec = json.loads(p.read_text(encoding="utf-8"))
+    fn(rec)
+    p.write_text(json.dumps(rec, indent=2), encoding="utf-8")
 
 
 REPO_BEFORE = census(ROOT)
@@ -541,6 +679,237 @@ try:
         blocked_images, detail = "Checkpoint 3 approval" in str(e), str(e)
     check("the orchestrated images stage refuses without approval",
           blocked_images, detail[:200])
+
+    # ── 19. canonical (v3) foundation — Task 2B-B2b-1 ─────────────────────────
+    print("\n19. the canonical baseline passes _canonical_execution_problems()")
+    root, proj, ctx, doc = build_canonical_baseline()
+    rep = run_canonical(root, proj)
+    check("canonical baseline passes", not rep.blockers, str(rep.blockers))
+
+    print("\n19a. v2 and v3 approval validators are isolated")
+    V2_SHAPED = {
+        "schema_version": 2, "project": "demo_project", "plan_id": "aaaaaaaa",
+        "manifest_sha256": "a" * 64, "visual_plan_sha256": "a" * 64,
+        "visual_plan_md_sha256": "a" * 64, "prompts_sha256": "a" * 64,
+        "failure_revision": 0, "approved_at": "2026-01-01T00:00:00+00:00",
+        "approved_by": "Giri", "confirmation": "x", "paid_generation": {"shots": 1},
+        "channel": {"channel_id": "fixture_channel", "channel_dna_version": 1,
+                   "channel_json_sha256": "a" * 64, "character_spec_sha256": "a" * 64,
+                   "voice_profile_sha256": "a" * 64},
+    }
+
+    root, proj, ctx, doc = build_canonical_baseline()
+    v3_rec = json.loads((proj / gate.APPROVAL_NAME).read_text(encoding="utf-8"))
+    check("a valid v3 approval carries schema_version 3", v3_rec.get("schema_version") == 3)
+
+    rep_v2_on_v3 = gate.GateReport(operation="x", project=proj.name, scope="test")
+    gate._check_approval_v2(rep_v2_on_v3, proj, None, ctx)
+    check("_check_approval_v2 rejects a v3-shaped approval",
+          blocked_on(rep_v2_on_v3, "approval schema is supported"),
+          str(rep_v2_on_v3.blockers))
+
+    rep_v3_on_v3 = gate.GateReport(operation="x", project=proj.name, scope="test")
+    a, b, c, d = patched(root)
+    with a, b, c, d:
+        routes_load = vr.inspect_project_routes(proj, operation="test")
+        gate._check_approval_v3(rep_v3_on_v3, proj, routes_load, ctx)
+    check("_check_approval_v3 accepts the valid v3 approval",
+          not rep_v3_on_v3.blockers, str(rep_v3_on_v3.blockers))
+
+    (proj / gate.APPROVAL_NAME).write_text(json.dumps(V2_SHAPED, indent=2), encoding="utf-8")
+    rep_v2_on_v2 = gate.GateReport(operation="x", project=proj.name, scope="test")
+    gate._check_approval_v2(rep_v2_on_v2, proj, None, ctx)
+    check("_check_approval_v2 accepts the schema_version of a v2-shaped approval",
+          "approval schema is supported" not in
+          [n for n, ok, _ in rep_v2_on_v2.checks if not ok],
+          str(rep_v2_on_v2.blockers))
+
+    rep_v3_on_v2 = gate.GateReport(operation="x", project=proj.name, scope="test")
+    a, b, c, d = patched(root)
+    with a, b, c, d:
+        routes_load2 = vr.inspect_project_routes(proj, operation="test")
+        gate._check_approval_v3(rep_v3_on_v2, proj, routes_load2, ctx)
+    check("_check_approval_v3 rejects a v2-shaped approval",
+          blocked_on(rep_v3_on_v2, "v3 approval schema_version is exactly 3"),
+          str(rep_v3_on_v2.blockers))
+    check("...and refuses structurally, before reading a single v3-specific field",
+          len(rep_v3_on_v2.blockers) == 1, str(rep_v3_on_v2.blockers))
+
+    print("\n19b. static isolation: no cross-calls between the v2 and v3 paths")
+    gg_src = ast.parse((ROOT / "generation_gate.py").read_text(encoding="utf-8"))
+
+    def _calls_and_names(func_name):
+        for node in ast.walk(gg_src):
+            if (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                    and node.name == func_name):
+                calls = {ast.unparse(n.func) for n in ast.walk(node)
+                        if isinstance(n, ast.Call)}
+                names = {ast.unparse(n) for n in ast.walk(node)
+                        if isinstance(n, (ast.Name, ast.Attribute))}
+                return calls, names
+        raise AssertionError(f"{func_name} not found in generation_gate.py")
+
+    rg_calls, _ = _calls_and_names("require_generation_ready")
+    check("require_generation_ready does not call _check_approval_v3",
+          not any(c.endswith("_check_approval_v3") for c in rg_calls), str(rg_calls))
+
+    cep_calls, cep_names = _calls_and_names("_canonical_execution_problems")
+    check("canonical validation does not call _check_approval_v2",
+          not any(c.endswith("_check_approval_v2") for c in cep_calls), str(cep_calls))
+    check("canonical validation does not call _check_visual_plan",
+          not any(c.endswith("_check_visual_plan") for c in cep_calls), str(cep_calls))
+    check("canonical validation never references VISUAL_PLAN_NAME",
+          "VISUAL_PLAN_NAME" not in cep_names)
+
+    # ── 20. v3 binding completeness ───────────────────────────────────────────
+    print("\n20. each bound v3 field, tampered alone, blocks by name")
+
+    def check_tamper(label, key, bad_value, expect_fragment):
+        root, proj, ctx, doc = build_canonical_baseline()
+        rewrite_approval(proj, lambda rec: rec.__setitem__(key, bad_value))
+        rep = run_canonical(root, proj)
+        check(label, blocked_on(rep, expect_fragment), str(rep.blockers))
+
+    check_tamper("tampered project blocks", "project", "some_other_project",
+                "v3 approval names this project")
+    check_tamper("tampered routes_id blocks", "routes_id", "not-the-real-routes-id",
+                "v3 approval names the current routes_id")
+    check_tamper("tampered routes_file_sha256 blocks", "routes_file_sha256", "f" * 64,
+                "visual_routes.json is unchanged since approval")
+    check_tamper("tampered routes_md_sha256 blocks", "routes_md_sha256", "f" * 64,
+                "visual_routes.md is unchanged since approval")
+    check_tamper("tampered routes_content_sha256 blocks", "routes_content_sha256", "f" * 64,
+                "routes_content_sha256 is freshly recomputed and matches")
+    check_tamper("tampered renderer_registry_sha256 blocks", "renderer_registry_sha256",
+                "f" * 64, "renderer_registry_sha256 is freshly recomputed and matches")
+    check_tamper("tampered manifest_sha256 blocks", "manifest_sha256", "f" * 64,
+                "manifest is unchanged since approval")
+    check_tamper("tampered channel binding blocks", "channel", {"channel_id": "other"},
+                "v3 approval channel binding matches the current channel")
+    check_tamper("tampered failure_revision blocks", "failure_revision", 999,
+                "v3 approval is current with the failure record")
+    check_tamper("blank approved_by blocks", "approved_by", "   ",
+                "v3 approval names a human approver")
+    check_tamper("timezone-naive approved_at blocks", "approved_at", "2026-01-01T00:00:00",
+                "v3 approval timestamp is timezone-aware")
+    check_tamper("wrong confirmation phrase blocks", "confirmation",
+                "I approve something else",
+                "v3 approval confirmation names this project and routes_id")
+    check_tamper("wrong paid-generation summary blocks", "paid_generation",
+                {"shots": 999, "paid_route_ids": [], "paid_count": 0},
+                "v3 approval paid-generation summary matches the approved routes")
+
+    print("\n20a. routes JSON/Markdown bytes tampered on disk block, not just the record")
+    root, proj, ctx, doc = build_canonical_baseline()
+    (proj / vr.ROUTES_NAME).write_text(
+        (proj / vr.ROUTES_NAME).read_text(encoding="utf-8") + " ", encoding="utf-8")
+    rep = run_canonical(root, proj)
+    check("a hand-edited visual_routes.json is refused",
+          blocked_on(rep, "visual_routes.json is unchanged since approval"),
+          str(rep.blockers))
+
+    root, proj, ctx, doc = build_canonical_baseline()
+    (proj / vr.ROUTES_MD_NAME).write_text(
+        (proj / vr.ROUTES_MD_NAME).read_text(encoding="utf-8") + "\n<!-- tampered -->\n",
+        encoding="utf-8")
+    rep = run_canonical(root, proj)
+    check("a hand-edited visual_routes.md is refused",
+          blocked_on(rep, "visual_routes.md is unchanged since approval")
+          or any("does not match a fresh render" in b for b in rep.blockers),
+          str(rep.blockers))
+
+    print("\n20b. a copied project tree with matching hashes still refuses on project binding")
+    root, proj, ctx, doc = build_canonical_baseline()
+    copy_root = Path(tempfile.mkdtemp())
+    _fixtures.append(copy_root)
+    shutil.copytree(root, copy_root, dirs_exist_ok=True)
+    copied_proj = copy_root / "renamed_project"
+    shutil.move(str(copy_root / proj.name), str(copied_proj))
+    rep = run_canonical(copy_root, copied_proj)
+    check("a project renamed after copying is refused on project binding",
+          blocked_on(rep, "v3 approval names this project"), str(rep.blockers))
+
+    # ── 21. narration enforcement ─────────────────────────────────────────────
+    print("\n21. narration enforcement reaches the unwired canonical validator directly")
+
+    def check_narration_break(label, root, proj):
+        rep = run_canonical(root, proj)
+        check(label, blocked_on(rep, "narration binding is verified"), str(rep.blockers))
+
+    root, proj, ctx, doc = build_canonical_baseline()
+    edit_manifest(proj, lambda m: m.update(narration_audio_sha256="0" * 64))
+    check_narration_break("a changed narration audio hash is refused", root, proj)
+
+    root, proj, ctx, doc = build_canonical_baseline()
+    audio_path = proj / "source_audio" / "narration.mp3"
+    audio_path.write_bytes(audio_path.read_bytes() + b"tampered")
+    check_narration_break("tampered narration audio bytes are refused", root, proj)
+
+    root, proj, ctx, doc = build_canonical_baseline()
+    edit_manifest(proj, lambda m: m.update(narration_voice_profile_sha256="0" * 64))
+    check_narration_break("a recorded voice-profile hash mismatch is refused", root, proj)
+
+    root, proj, ctx, doc = build_canonical_baseline()
+    edit_manifest(proj, lambda m: m.update(narration_effective_profile={
+        **m["narration_effective_profile"], "provider": "elevenlabs"}))
+    check_narration_break(
+        "an effective profile that no longer matches the channel is refused", root, proj)
+
+    root, proj, ctx, doc = build_canonical_baseline()
+    edit_manifest(proj, lambda m: m.pop("narration_audio_file"))
+    check_narration_break("a missing required narration field is refused", root, proj)
+
+    root, proj, ctx, doc = build_canonical_baseline()
+    ch_path = root / "channels" / channel_fixture.CHANNEL_ID / "channel.json"
+    chdoc = json.loads(ch_path.read_text(encoding="utf-8"))
+    chdoc["voice"]["approved_profile"]["settings"]["voice"] = "a-different-voice"
+    ch_path.write_text(json.dumps(chdoc, indent=2, ensure_ascii=False) + "\n",
+                       encoding="utf-8")
+    (root / "channels" / channel_fixture.CHANNEL_ID / cc.DNA_NAME).write_text(
+        rd.render_dna(chdoc), encoding="utf-8")
+    check_narration_break(
+        "the channel's current approved voice differing from what was narrated is refused",
+        root, proj)
+
+    # ── 22. the universal refusal remains ─────────────────────────────────────
+    print("\n22. the universal canonical refusal is untouched by any of the above")
+    root, proj, ctx, doc = build_canonical_baseline()
+    direct = run_canonical(root, proj)
+    check("the direct canonical validator passes this fixture", not direct.blockers,
+          str(direct.blockers))
+    a, b, c, d = patched(root)
+    with a, b, c, d:
+        try:
+            gate.require_canonical_visual_execution_ready(proj)
+            refused, err = False, ""
+        except gate.GateBlocked as e:
+            refused, err = True, str(e)
+    check("require_canonical_visual_execution_ready still refuses even when every "
+          "direct canonical check passes", refused, err[:200])
+    check("the refusal is the intentional temporary-disable message, not a real check "
+          "failing", "remains disabled" in err)
+
+    print("\n22a. all six canonical adapters remain universally blocked")
+    canonical_entry = gate.entry_point("images.canonical_adapters")
+    registered_fns = {g["function"] for g in canonical_entry["gates"]}
+    check("exactly the six documented adapters are gated",
+          registered_fns == {"adapt_map", "adapt_chart", "adapt_photo", "adapt_flux",
+                             "adapt_host_composite", "adapt_flux_reference_anchor"},
+          str(registered_fns))
+    for g in canonical_entry["gates"]:
+        check(f"{g['function']} still calls require_canonical_visual_execution_ready as "
+             f"its declared gate", g["kind"] == "canonical_visual_execution")
+
+    # ── 23. legacy (v2) regression ────────────────────────────────────────────
+    print("\n23. require_generation_ready() ignores a v3 approval entirely")
+    root, proj, ctx, doc = build_canonical_baseline()
+    a, b, c, d = patched(root)
+    with a, b, c, d:
+        rep = gate.require_generation_ready(proj, "test", raise_on_block=False)
+    check("a v3 approval does not satisfy require_generation_ready()",
+          blocked_on(rep, "approval schema is supported"), str(rep.blockers))
+    check("require_generation_ready still reports the generation scope",
+          rep.scope == "generation")
 
 finally:
     for td in _fixtures:

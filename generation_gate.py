@@ -42,8 +42,10 @@ from pathlib import Path
 
 import channel_context
 import pose_registry
+import renderers
 import route_failures
 import source_ids
+import visual_routes
 
 PIPELINE_DIR = Path(__file__).parent
 SPEC_PATH = PIPELINE_DIR / "character" / "character_spec.json"
@@ -65,6 +67,23 @@ APPROVAL_REQUIRED_FIELDS = ("schema_version", "project", "plan_id",
                             "visual_plan_md_sha256", "prompts_sha256",
                             "failure_revision", "approved_at", "approved_by",
                             "confirmation", "paid_generation", "channel")
+
+# The v3 approval binds canonical visual_routes.json execution. Deliberately a
+# separate schema version, checked first and in isolation from
+# APPROVAL_SCHEMA_VERSIONS/APPROVAL_REQUIRED_FIELDS above: a v2 record and a v3
+# record describe different artifacts (a legacy visual_plan.json vs. the
+# canonical routes document), so accepting one where the other is expected
+# would silently reinterpret what was actually approved. There is exactly one
+# supported v3 schema_version, not a set, for the same reason APPROVAL_SCHEMA_
+# VERSIONS is not {1, 2}: no v3 record predates this task, so there is nothing
+# to stay compatible with.
+APPROVAL_V3_SCHEMA_VERSION = 3
+APPROVAL_V3_REQUIRED_FIELDS = ("schema_version", "project", "routes_id",
+                               "routes_file_sha256", "routes_md_sha256",
+                               "routes_content_sha256", "renderer_registry_sha256",
+                               "manifest_sha256", "channel", "failure_revision",
+                               "approved_at", "approved_by", "confirmation",
+                               "paid_generation")
 
 # Directories whose contents are, by definition, not approved output. A pose or
 # reference resolving into any of these must never reach a render: raw holds
@@ -838,8 +857,8 @@ def _check_route_failures(rep: GateReport, project_dir: Path) -> None:
             + ". Resolve with route_failures.py, then re-plan and re-approve.")
 
 
-def _check_approval(rep: GateReport, project_dir: Path, manifest: dict | None,
-                    context=None) -> None:
+def _check_approval_v2(rep: GateReport, project_dir: Path, manifest: dict | None,
+                       context=None) -> None:
     """An explicit, human-granted Checkpoint 3 approval, bound to exact bytes.
 
     This is the check the previous single gate did not have. It verified that a
@@ -851,6 +870,15 @@ def _check_approval(rep: GateReport, project_dir: Path, manifest: dict | None,
     Approval is a separate artifact carrying the SHA-256 of both the manifest and
     the plan it approved. Editing either side changes a hash and the approval
     stops applying, which is what makes "approve this exact plan" mean something.
+
+    Renamed from `_check_approval()` (Task 2B-B2b-1): this is now explicitly the
+    v2/legacy validator, called only from `require_generation_ready()`. It binds
+    `visual_plan.json`, never `visual_routes.json` — a v3 approval must never
+    satisfy this function, and this function must never be asked to evaluate one.
+    See `_check_approval_v3()` for the canonical-routes counterpart, and
+    `schema_version in APPROVAL_SCHEMA_VERSIONS` below for where the two part
+    company: a v3 record fails that check immediately, before any v2-shaped
+    field is even read as though it meant something.
     """
     path = project_dir / APPROVAL_NAME
     if not rep.add("Checkpoint 3 approval exists", path.exists(),
@@ -935,6 +963,275 @@ def _check_approval(rep: GateReport, project_dir: Path, manifest: dict | None,
             isinstance(rec.get("paid_generation"), dict)
             and "shots" in rec["paid_generation"],
             "no approved cost summary — the approver saw no spend figure")
+
+
+# ── the v3 approval (canonical visual_routes.json execution) ───────────────────
+#
+# Task 2B-B2b-1: foundation only. Neither `canonical_confirmation_phrase()`,
+# `canonical_paid_generation_summary()`, `_check_approval_v3()`, nor
+# `_canonical_execution_problems()` below is called by anything live yet.
+# `require_canonical_visual_execution_ready()` — the function every canonical
+# adapter actually calls — still unconditionally refuses (Task 2B-B2a) and is
+# untouched by this task. This section exists so that composition can be built
+# and unit-tested in isolation now, and so a later, separately authorized
+# checkpoint (Task 2B-B2b-3) can activate it with a single, reviewable line —
+# swapping require_canonical_visual_execution_ready()'s body from "always
+# raise" to "raise iff _canonical_execution_problems(...).blockers" — rather
+# than writing and activating this logic in the same change.
+
+def canonical_confirmation_phrase(project: str, routes_id: str) -> str:
+    """Names the project AND the exact routes document being approved.
+
+    Deliberate counterpart to approve_checkpoint.confirmation_phrase(), which
+    names a plan_id — this names a routes_id instead, because a v3 approval
+    binds visual_routes.json, never visual_plan.json. Project-specific so a
+    phrase cannot be pasted from one episode into another by habit;
+    routes-specific so a confirmation typed against the routes document a
+    human reviewed cannot be reused for a routes document rebuilt afterward.
+    Lives here, not in approve_checkpoint.py, so the v3 writer (Task 2B-B2b-3)
+    computes the identical phrase this validator checks against — one
+    implementation, not two that could drift apart.
+    """
+    return f"I approve canonical visual execution for {project} routes {routes_id}"
+
+
+def canonical_paid_generation_summary(doc: dict | None) -> dict:
+    """A deterministic paid-route summary derived from a canonical routes
+    document — never independently authored, so it cannot describe spend the
+    routes document itself does not contain.
+
+    A route counts as paid by consulting the CURRENT renderer registry's
+    cost_category for its renderer_id, not by trusting the route's own
+    `paid`/`cost_category` fields — those are validated elsewhere
+    (visual_routes.validate_contract), but this summary exists specifically so
+    an approver's confirmed spend figure is checked against something neither
+    the routes document nor the approval record asserts about itself.
+    """
+    routes = (doc or {}).get("routes") or []
+    paid_ids = sorted(
+        r.get("visual_asset_id") for r in routes
+        if r.get("visual_asset_id")
+        and renderers.RENDERERS.get(r.get("renderer_id") or "", {})
+                       .get("cost_category") == "paid_api")
+    return {"shots": len(routes), "paid_route_ids": paid_ids,
+            "paid_count": len(paid_ids)}
+
+
+def _check_approval_v3(rep: GateReport, project_dir: Path,
+                       routes_load: "visual_routes.ProjectRoutesLoad | None",
+                       context=None) -> None:
+    """The v3 Checkpoint-3 approval binding canonical visual_routes.json
+    execution — the counterpart to `_check_approval_v2()` above, and never a
+    shared implementation with it.
+
+    The first substantive check, after the record merely parsing, is its own
+    schema_version: a missing, malformed, v2, boolean, string, float or any
+    other schema_version value refuses right there and returns, before a
+    single v3-specific field is read as though it meant something. That is
+    what makes cross-version confusion structural rather than a matter of this
+    function's internal discipline — the same property `_check_approval_v2()`
+    already has via `APPROVAL_SCHEMA_VERSIONS`.
+
+    Every hash bound here is recomputed fresh from what is on disk right now —
+    `routes_content_sha256` and `renderer_registry_sha256` are never trusted
+    from either the approval record or the routes document's own self-reported
+    fields, exactly as `visual_routes.validate_contract()` already refuses to
+    trust a document's self-reported `routes_content_sha256`.
+
+    `routes_load` is expected to be the result of
+    `visual_routes.inspect_project_routes()` for this same project — reused
+    rather than re-loaded so this function and its caller agree on exactly
+    which bytes were read. A caller with no such result yet (routes_load is
+    None, or its `.doc` is None) still gets every check that does not require
+    the routes document itself; those become named blockers instead of a
+    crash.
+    """
+    path = project_dir / APPROVAL_NAME
+    if not rep.add("v3 approval exists", path.exists(),
+                   f"{APPROVAL_NAME} missing — a human must run "
+                   f"approve_checkpoint.py after reviewing visual_routes.json"):
+        return
+    try:
+        rec = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        rep.add("v3 approval record parses", False, str(e))
+        return
+    if not rep.add("v3 approval record parses", isinstance(rec, dict),
+                   f"expected a JSON object, found {type(rec).__name__}"):
+        return
+
+    if not rep.add("v3 approval schema_version is exactly 3",
+                   rec.get("schema_version") == APPROVAL_V3_SCHEMA_VERSION,
+                   f"schema_version={rec.get('schema_version')!r} — a v2 record, "
+                   f"or any other value, is never interpreted as v3"):
+        return
+
+    missing = [f for f in APPROVAL_V3_REQUIRED_FIELDS
+               if rec.get(f) in (None, "", [], {})]
+    rep.add("v3 approval record is complete", not missing, f"missing/empty: {missing}")
+
+    rep.add("v3 approval names this project", rec.get("project") == project_dir.name,
+            f"approval is for {rec.get('project')!r}, this is {project_dir.name!r} — "
+            f"a copied project tree carrying otherwise-matching hashes must not "
+            f"inherit another project's approval")
+
+    doc = routes_load.doc if routes_load is not None else None
+    routes_path = (routes_load.routes_path if routes_load is not None
+                  else project_dir / visual_routes.ROUTES_NAME)
+    routes_md_path = (routes_load.routes_md_path if routes_load is not None
+                      else project_dir / visual_routes.ROUTES_MD_NAME)
+
+    current_routes_id = doc.get("routes_id") if doc else None
+    rep.add("v3 approval names the current routes_id",
+            rec.get("routes_id") == current_routes_id,
+            f"approval is for routes {str(rec.get('routes_id'))[:8]}, current "
+            f"routes document is {str(current_routes_id)[:8]}")
+
+    if routes_path.exists():
+        found = visual_routes.file_sha256(routes_path)
+        rep.add("visual_routes.json is unchanged since approval",
+                rec.get("routes_file_sha256") == found,
+                f"approved {str(rec.get('routes_file_sha256'))[:12]}…, found "
+                f"{found[:12]}… — re-approve the current routes document")
+    else:
+        rep.add("visual_routes.json still present", False,
+                f"{visual_routes.ROUTES_NAME} is gone")
+
+    if routes_md_path.exists():
+        found = visual_routes.file_sha256(routes_md_path)
+        rep.add("visual_routes.md is unchanged since approval",
+                rec.get("routes_md_sha256") == found,
+                f"approved {str(rec.get('routes_md_sha256'))[:12]}…, found "
+                f"{found[:12]}…")
+    else:
+        rep.add("visual_routes.md still present", False,
+                f"{visual_routes.ROUTES_MD_NAME} is gone")
+
+    if doc is not None:
+        fresh_content = visual_routes.compute_routes_content_sha256(doc)
+        rep.add("routes_content_sha256 is freshly recomputed and matches",
+                rec.get("routes_content_sha256") == fresh_content,
+                f"approved {str(rec.get('routes_content_sha256'))[:12]}…, "
+                f"recomputed {fresh_content[:12]}… from the current document — "
+                f"neither document's own self-reported field is trusted")
+
+        rids = visual_routes.referenced_renderer_ids(doc.get("routes", []))
+        fresh_registry = visual_routes.compute_renderer_registry_sha256(
+            rids, renderers.RENDERERS)
+        rep.add("renderer_registry_sha256 is freshly recomputed and matches",
+                rec.get("renderer_registry_sha256") == fresh_registry,
+                f"approved {str(rec.get('renderer_registry_sha256'))[:12]}…, "
+                f"recomputed {fresh_registry[:12]}… against the current live "
+                f"renderer registry projection")
+
+    manifest_path = project_dir / "manifest.json"
+    if manifest_path.exists():
+        found = _sha(manifest_path)
+        rep.add("manifest is unchanged since approval",
+                rec.get("manifest_sha256") == found,
+                f"approved {str(rec.get('manifest_sha256'))[:12]}…, found "
+                f"{found[:12]}…")
+    else:
+        rep.add("manifest still present", False, "manifest.json is gone")
+
+    if context is not None:
+        rep.add("v3 approval channel binding matches the current channel",
+                rec.get("channel") == context.plan_binding(),
+                "approval was granted under a different channel binding "
+                "(channel pack, character specification or voice profile has "
+                "changed since approval) — re-plan and re-approve")
+
+    try:
+        current_rev = route_failures.revision(project_dir)
+        rep.add("v3 approval is current with the failure record",
+                rec.get("failure_revision") == current_rev,
+                f"approved at failure revision {rec.get('failure_revision')!r}, "
+                f"now {current_rev} — a route failed or was resolved since "
+                f"approval; re-plan and re-approve")
+    except route_failures.FailureError as e:
+        rep.add("failure record is readable", False, str(e))
+
+    approved_by = rec.get("approved_by")
+    rep.add("v3 approval names a human approver",
+            isinstance(approved_by, str) and approved_by.strip() != "",
+            "approved_by is blank")
+
+    approved_at = rec.get("approved_at")
+    if approved_at:
+        try:
+            when = datetime.fromisoformat(str(approved_at).replace("Z", "+00:00"))
+            rep.add("v3 approval timestamp is timezone-aware", when.tzinfo is not None,
+                    "timestamp carries no timezone")
+        except ValueError as e:
+            rep.add("v3 approval timestamp parses", False, str(e))
+    else:
+        rep.add("v3 approval timestamp parses", False, "approved_at missing")
+
+    expected_confirmation = canonical_confirmation_phrase(
+        project_dir.name, str(current_routes_id or ""))
+    rep.add("v3 approval confirmation names this project and routes_id",
+            rec.get("confirmation") == expected_confirmation,
+            f"expected {expected_confirmation!r}, found {rec.get('confirmation')!r}")
+
+    if doc is not None:
+        expected_summary = canonical_paid_generation_summary(doc)
+        rep.add("v3 approval paid-generation summary matches the approved routes",
+                rec.get("paid_generation") == expected_summary,
+                f"expected {expected_summary}, found {rec.get('paid_generation')}")
+
+
+def _canonical_execution_problems(project, operation: str = "canonical visual execution",
+                                  *, pose_id: str | None = None,
+                                  scene_bound: bool = False) -> GateReport:
+    """The complete v3 canonical-execution validation, composed but NOT wired.
+
+    Task 2B-B2b-1: this function is directly callable and directly testable,
+    but nothing in this commit calls it — in particular,
+    `require_canonical_visual_execution_ready()` does not call it, and keeps
+    its unconditional refusal. Activating it is Task 2B-B2b-3's one-line swap.
+
+    Deliberately never reads or interprets `visual_plan.json` and never calls
+    `_check_approval_v2()` — those describe the legacy pipeline's Checkpoint 3,
+    which does not authorize canonical visual_routes.json execution and must
+    never be conflated with it, even provisionally. Narration is verified via
+    the same `narration_binding_problems()` both this function and (from Task
+    2B-B2b-3 onward) the v3 approval writer call explicitly — it is not left
+    to be an implicit side effect of `manifest_sha256` matching.
+
+    Side-effect-free like every other check in this module: every step here
+    reads a file or computes a hash. Nothing constructs a client, reads a
+    credential, opens a subprocess, downloads anything, creates a directory,
+    or writes.
+    """
+    project_dir = _resolve_project(project)
+    rep = GateReport(operation=operation, project=project_dir.name,
+                     scope="canonical_visual_execution_v3")
+    if not rep.add("project directory exists", project_dir.is_dir(), str(project_dir)):
+        return rep
+
+    ctx = _check_channel(rep, project_dir)
+    manifest = _check_manifest_identity(rep, project_dir, operation)
+    _check_sidecar_currency(rep, project_dir)
+    _check_voice_approved(rep, ctx)
+    _check_narration_binding(rep, project_dir, manifest, ctx)
+    _check_route_failures(rep, project_dir)
+
+    routes_load = visual_routes.inspect_project_routes(project_dir, operation=operation)
+    blockers = routes_load.execution_blockers
+    if blockers:
+        for i, b in enumerate(blockers, 1):
+            rep.add(f"canonical routing artifact is executable [{i}]", False, b)
+    else:
+        rep.add("canonical routing artifact is executable", True)
+
+    _check_approval_v3(rep, project_dir, routes_load, ctx)
+
+    _check_masters(rep, ctx)
+    _check_pose_registry(rep, ctx)
+    if pose_id is not None:
+        _check_pose_selection(rep, pose_id, scene_bound, ctx)
+
+    return rep
 
 
 # ── the gates ────────────────────────────────────────────────────────────────
@@ -1032,7 +1329,7 @@ def require_generation_ready(project,
         _check_narration_binding(rep, project_dir, manifest, ctx)
         _check_route_failures(rep, project_dir)
         _check_visual_plan(rep, project_dir, manifest, ctx)
-        _check_approval(rep, project_dir, manifest, ctx)
+        _check_approval_v2(rep, project_dir, manifest, ctx)
     _check_masters(rep, ctx)
     _check_pose_registry(rep, ctx)
     if pose_id is not None:
