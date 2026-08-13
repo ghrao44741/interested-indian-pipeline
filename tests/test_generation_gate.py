@@ -911,6 +911,255 @@ try:
     check("require_generation_ready still reports the generation scope",
           rep.scope == "generation")
 
+    # ── 24. malformed/unreadable v3 approval inputs — Task 2B-B2b-1 micro-fix ─
+    print("\n24. malformed/unreadable v3 approval inputs become named blockers")
+
+    def v3_only(proj: Path, ctx):
+        """Calls _check_approval_v3() with a placeholder routes_load (no real
+        visual_routes.json ever read) — isolates the approval-file existence/
+        read/parse checks from everything else the full canonical composition
+        also checks, so a Path-method patch here cannot leak into unrelated
+        checks."""
+        placeholder = vr.ProjectRoutesLoad(
+            project_dir=proj, operation="test", doc=None, context=ctx,
+            manifest=None, manifest_sha256=None,
+            routes_path=proj / vr.ROUTES_NAME, routes_md_path=proj / vr.ROUTES_MD_NAME)
+        rep = gate.GateReport(operation="x", project=proj.name, scope="test")
+        gate._check_approval_v3(rep, proj, placeholder, ctx)
+        return rep
+
+    root, proj, ctx, doc = build_canonical_baseline()
+    approval_path = proj / gate.APPROVAL_NAME
+    with mock.patch.object(type(approval_path), "exists",
+                           side_effect=OSError("simulated stat failure")):
+        rep = v3_only(proj, ctx)
+    check("an existence-check failure on the approval path is a named blocker, "
+         "not a crash", blocked_on(rep, "v3 approval exists"), str(rep.blockers))
+
+    root, proj, ctx, doc = build_canonical_baseline()
+    approval_path = proj / gate.APPROVAL_NAME
+    with mock.patch.object(type(approval_path), "read_text",
+                           side_effect=OSError("simulated permission error")):
+        rep = v3_only(proj, ctx)
+    check("a read failure on the approval file is a named blocker, not a crash",
+          blocked_on(rep, "v3 approval record parses"), str(rep.blockers))
+
+    root, proj, ctx, doc = build_canonical_baseline()
+    (proj / gate.APPROVAL_NAME).write_bytes(b"\xff\xfe\x00b\x00a\x00d")
+    rep = v3_only(proj, ctx)
+    check("invalid UTF-8 in the approval file is a named blocker, not a crash",
+          blocked_on(rep, "v3 approval record parses"), str(rep.blockers))
+
+    root, proj, ctx, doc = build_canonical_baseline()
+    (proj / gate.APPROVAL_NAME).write_text("not valid json {", encoding="utf-8")
+    rep = v3_only(proj, ctx)
+    check("malformed JSON in the approval file is a named blocker, not a crash",
+          blocked_on(rep, "v3 approval record parses"), str(rep.blockers))
+
+    for bad_shape, label in ((json.dumps([1, 2, 3]), "a JSON array"),
+                             (json.dumps("hello"), "a JSON string"),
+                             (json.dumps(None), "a JSON null")):
+        root, proj, ctx, doc = build_canonical_baseline()
+        (proj / gate.APPROVAL_NAME).write_text(bad_shape, encoding="utf-8")
+        rep = v3_only(proj, ctx)
+        check(f"{label} instead of a JSON object is a named blocker, not a crash",
+              blocked_on(rep, "v3 approval record parses"), str(rep.blockers))
+
+    # ── 25. immediate schema isolation ────────────────────────────────────────
+    print("\n25. schema-mismatch refusal is immediate — v2 touches nothing v2-specific")
+    root, proj, ctx, doc = build_canonical_baseline()
+    rep_v2_on_v3 = gate.GateReport(operation="x", project=proj.name, scope="test")
+    gate._check_approval_v2(rep_v2_on_v3, proj, None, ctx)
+    check("_check_approval_v2 against a v3 record produces exactly one blocker",
+          len(rep_v2_on_v3.blockers) == 1, str(rep_v2_on_v3.blockers))
+    check("...and it is the unsupported-schema blocker",
+          bool(rep_v2_on_v3.blockers) and "approval schema is supported"
+          in rep_v2_on_v3.blockers[0], str(rep_v2_on_v3.blockers))
+    check("_check_approval_v2 adds no check beyond existence/parse/schema",
+          {n for n, ok, _ in rep_v2_on_v3.checks} == {
+              "Checkpoint 3 approval exists", "approval record parses",
+              "approval schema is supported"}, str(rep_v2_on_v3.checks))
+
+    print("\n25a. valid v2 behavior is unchanged by the early-return fix")
+    root, proj = build_fixture()
+    rep_missing = gate.GateReport(operation="x", project=proj.name, scope="test")
+    gate._check_approval_v2(rep_missing, proj, None, None)
+    check("a project with no approval file at all still blocks on existence, as before",
+          blocked_on(rep_missing, "Checkpoint 3 approval exists"), str(rep_missing.blockers))
+    root, proj = build_fixture()
+    (proj / gate.APPROVAL_NAME).write_text(json.dumps([1, 2, 3]), encoding="utf-8")
+    rep_nonobj = gate.GateReport(operation="x", project=proj.name, scope="test")
+    gate._check_approval_v2(rep_nonobj, proj, None, None)
+    check("a non-object JSON value is a controlled blocker for v2 too, not a crash",
+          blocked_on(rep_nonobj, "approval record parses"), str(rep_nonobj.blockers))
+
+    # ── 26. artifact/recomputation failures during v3 checking ───────────────
+    print("\n26. recomputation/artifact failures are named blockers, not crashes")
+
+    def v3_full_check(root: Path, proj: Path, ctx):
+        a, b, c, d = patched(root)
+        with a, b, c, d:
+            routes_load = vr.inspect_project_routes(proj, operation="test")
+        rep = gate.GateReport(operation="x", project=proj.name, scope="test")
+        gate._check_approval_v3(rep, proj, routes_load, ctx)
+        return rep
+
+    root, proj, ctx, doc = build_canonical_baseline()
+    with mock.patch.object(vr, "file_sha256",
+                           side_effect=OSError("simulated read failure")):
+        rep = v3_full_check(root, proj, ctx)
+    check("a routes-JSON hashing failure is a named blocker",
+          blocked_on(rep, "visual_routes.json still present"), str(rep.blockers))
+    check("a routes-Markdown hashing failure is a named blocker",
+          blocked_on(rep, "visual_routes.md still present"), str(rep.blockers))
+    check("a manifest hashing failure is a named blocker",
+          blocked_on(rep, "manifest still present"), str(rep.blockers))
+
+    root, proj, ctx, doc = build_canonical_baseline()
+    with mock.patch.object(vr, "compute_routes_content_sha256",
+                           side_effect=RuntimeError("simulated")):
+        rep = v3_full_check(root, proj, ctx)
+    check("a routes_content_sha256 recomputation failure is a named blocker",
+          blocked_on(rep, "routes_content_sha256 is freshly recomputed and matches"),
+          str(rep.blockers))
+
+    root, proj, ctx, doc = build_canonical_baseline()
+    with mock.patch.object(vr, "referenced_renderer_ids",
+                           side_effect=RuntimeError("simulated")):
+        rep = v3_full_check(root, proj, ctx)
+    check("a referenced-renderer-id derivation failure is a named blocker",
+          blocked_on(rep, "renderer_registry_sha256 is freshly recomputed and matches"),
+          str(rep.blockers))
+
+    root, proj, ctx, doc = build_canonical_baseline()
+    with mock.patch.object(vr, "compute_renderer_registry_sha256",
+                           side_effect=RuntimeError("simulated")):
+        rep = v3_full_check(root, proj, ctx)
+    check("a renderer_registry_sha256 recomputation failure is a named blocker",
+          blocked_on(rep, "renderer_registry_sha256 is freshly recomputed and matches"),
+          str(rep.blockers))
+
+    root, proj, ctx, doc = build_canonical_baseline()
+    with mock.patch.object(cc.ChannelContext, "plan_binding",
+                           side_effect=RuntimeError("simulated")):
+        rep = v3_full_check(root, proj, ctx)
+    check("a channel plan-binding derivation failure is a named blocker",
+          blocked_on(rep, "v3 approval channel binding matches the current channel"),
+          str(rep.blockers))
+
+    root, proj, ctx, doc = build_canonical_baseline()
+    with mock.patch.object(route_failures, "revision",
+                           side_effect=RuntimeError("simulated")):
+        rep = v3_full_check(root, proj, ctx)
+    check("a failure-revision read failure is a named blocker",
+          blocked_on(rep, "failure record is readable"), str(rep.blockers))
+
+    root, proj, ctx, doc = build_canonical_baseline()
+    with mock.patch.object(gate, "canonical_confirmation_phrase",
+                           side_effect=RuntimeError("simulated")):
+        rep = v3_full_check(root, proj, ctx)
+    check("a confirmation-phrase derivation failure is a named blocker",
+          blocked_on(rep, "v3 approval confirmation names this project and routes_id"),
+          str(rep.blockers))
+
+    root, proj, ctx, doc = build_canonical_baseline()
+    with mock.patch.object(gate, "canonical_paid_generation_summary",
+                           side_effect=RuntimeError("simulated")):
+        rep = v3_full_check(root, proj, ctx)
+    check("a paid-generation summary derivation failure is a named blocker",
+          blocked_on(rep, "v3 approval paid-generation summary matches the approved routes"),
+          str(rep.blockers))
+
+    # ── 27. paid-generation summary truth ─────────────────────────────────────
+    print("\n27. canonical_paid_generation_summary reports PAID shots, truthfully")
+    root, proj, ctx, doc = build_canonical_baseline()
+    summary = gate.canonical_paid_generation_summary(doc)
+    total_routes = len(doc["routes"])
+    paid_ids_expected = sorted(
+        r["visual_asset_id"] for r in doc["routes"]
+        if renderers.RENDERERS.get(r["renderer_id"], {}).get("cost_category") == "paid_api")
+    check("shots equals the paid route count, not the total route count",
+          summary["shots"] == len(paid_ids_expected) and len(paid_ids_expected) < total_routes,
+          f"shots={summary['shots']}, paid={len(paid_ids_expected)}, total={total_routes}")
+    check("paid_count matches shots", summary["paid_count"] == summary["shots"])
+    check("paid_route_ids is sorted and exact",
+          summary["paid_route_ids"] == paid_ids_expected, str(summary))
+
+    print("\n27a. changing a route between paid and free changes the summary")
+    doc2 = json.loads(json.dumps(doc))
+    for r in doc2["routes"]:
+        if r["renderer_id"] == "flux_illustration":
+            r.update(renderer_id="pexels", cost_category="free_api", paid=False,
+                     visual_type="PHOTO", prompt=None,
+                     route_args={"map": None, "chart": None, "timeline": None,
+                                "document": None,
+                                "photo": {"query": "x", "constraints": None},
+                                "illustration": None, "reenactment": None})
+            break
+    summary2 = gate.canonical_paid_generation_summary(doc2)
+    check("flipping one route from paid to free reduces the reported paid count by one",
+          summary2["paid_count"] == summary["paid_count"] - 1,
+          f"before={summary['paid_count']}, after={summary2['paid_count']}")
+
+    print("\n27b. malformed route collections raise rather than silently omitting")
+
+    def expect_summary_error(label, bad_doc):
+        try:
+            gate.canonical_paid_generation_summary(bad_doc)
+            check(label, False, "did not raise CanonicalSummaryError")
+        except gate.CanonicalSummaryError:
+            check(label, True)
+
+    expect_summary_error("a non-list routes value raises", {"routes": "not-a-list"})
+    expect_summary_error("a non-object route raises", {"routes": ["not-a-route"]})
+    expect_summary_error("a duplicate visual_asset_id raises", {"routes": [
+        {"visual_asset_id": "VIS-001-A", "renderer_id": "pexels"},
+        {"visual_asset_id": "VIS-001-A", "renderer_id": "pexels"}]})
+    expect_summary_error("a missing visual_asset_id raises", {"routes": [
+        {"visual_asset_id": None, "renderer_id": "pexels"}]})
+    expect_summary_error("an unregistered renderer_id raises", {"routes": [
+        {"visual_asset_id": "VIS-001-A", "renderer_id": "not_a_real_renderer"}]})
+
+    bad_registry = dict(renderers.RENDERERS)
+    bad_registry["bad_cost_renderer"] = {
+        "module": "x.py", "entry": "main", "cost_category": "not_a_real_category",
+        "implemented": True, "supports_reference_input": False}
+    with mock.patch.object(renderers, "RENDERERS", bad_registry):
+        expect_summary_error("a malformed cost_category raises", {"routes": [
+            {"visual_asset_id": "VIS-001-A", "renderer_id": "bad_cost_renderer"}]})
+
+    print("\n27c. an approval claiming paid shots the routes don't support is refused")
+    root, proj, ctx, doc = build_canonical_baseline()
+    all_ids = sorted(r["visual_asset_id"] for r in doc["routes"])
+    rewrite_approval(proj, lambda rec: rec.__setitem__(
+        "paid_generation", {"shots": len(all_ids), "paid_count": len(all_ids),
+                            "paid_route_ids": all_ids}))
+    rep = run_canonical(root, proj)
+    check("an approval claiming every route is paid (the old, incorrect semantics) "
+         "is refused", blocked_on(
+             rep, "v3 approval paid-generation summary matches the approved routes"),
+          str(rep.blockers))
+
+    # ── 28. universal refusal reconfirmed ─────────────────────────────────────
+    print("\n28. the universal canonical refusal still holds after the micro-fix")
+    root, proj, ctx, doc = build_canonical_baseline()
+    a, b, c, d = patched(root)
+    with a, b, c, d:
+        try:
+            gate.require_canonical_visual_execution_ready(proj)
+            refused, err = False, ""
+        except gate.GateBlocked as e:
+            refused, err = True, str(e)
+    check("require_canonical_visual_execution_ready still refuses unconditionally",
+          refused and "remains disabled" in err, err[:200])
+    canonical_entry = gate.entry_point("images.canonical_adapters")
+    check("all six canonical adapters are still gated by it",
+          {g["function"] for g in canonical_entry["gates"]}
+          == {"adapt_map", "adapt_chart", "adapt_photo", "adapt_flux",
+             "adapt_host_composite", "adapt_flux_reference_anchor"}
+          and all(g["kind"] == "canonical_visual_execution"
+                 for g in canonical_entry["gates"]))
+
 finally:
     for td in _fixtures:
         shutil.rmtree(td, ignore_errors=True)

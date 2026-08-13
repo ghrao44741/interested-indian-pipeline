@@ -890,12 +890,20 @@ def _check_approval_v2(rep: GateReport, project_dir: Path, manifest: dict | None
     except json.JSONDecodeError as e:
         rep.add("approval record parses", False, str(e))
         return
-    rep.add("approval record parses", True)
+    if not rep.add("approval record parses", isinstance(rec, dict),
+                   f"expected a JSON object, found {type(rec).__name__}"):
+        return
 
-    rep.add("approval schema is supported",
-            rec.get("schema_version") in APPROVAL_SCHEMA_VERSIONS,
-            f"schema_version={rec.get('schema_version')!r}, "
-            f"supported: {sorted(APPROVAL_SCHEMA_VERSIONS)}")
+    # Corrective follow-up (Task 2B-B2b-1 micro-fix): schema_version is now
+    # checked and returned on immediately, exactly like _check_approval_v3()
+    # already does — an unsupported schema (a v3 record, or anything else)
+    # must never have its fields interpreted as though they meant something
+    # v2-shaped, even if that interpretation would itself fail harmlessly.
+    if not rep.add("approval schema is supported",
+                   rec.get("schema_version") in APPROVAL_SCHEMA_VERSIONS,
+                   f"schema_version={rec.get('schema_version')!r}, "
+                   f"supported: {sorted(APPROVAL_SCHEMA_VERSIONS)}"):
+        return
 
     # `in (None, "", ...)` rather than falsiness: failure_revision is legitimately
     # 0 on a project that has never had a route fail.
@@ -995,26 +1003,106 @@ def canonical_confirmation_phrase(project: str, routes_id: str) -> str:
     return f"I approve canonical visual execution for {project} routes {routes_id}"
 
 
+class CanonicalSummaryError(RuntimeError):
+    """canonical_paid_generation_summary() could not honestly describe the
+    routes document it was given — a malformed route collection, a missing
+    or duplicate visual_asset_id, an unregistered renderer_id, or a renderer
+    entry with a cost_category outside renderers.COST_CATEGORIES. Raised
+    rather than silently omitted or approximated: a spend figure that quietly
+    drops the route it could not classify is worse than no figure at all."""
+
+
 def canonical_paid_generation_summary(doc: dict | None) -> dict:
-    """A deterministic paid-route summary derived from a canonical routes
+    """A deterministic paid-SHOT summary derived from a canonical routes
     document — never independently authored, so it cannot describe spend the
     routes document itself does not contain.
 
+    `shots` and `paid_count` both mean the number of PAID routes — matching
+    the legacy v2 approval's use of `shots` for the approver's confirmed
+    spend figure. Neither field is the total route count: a routes document
+    that is entirely free/local (maps, charts, composites) must report 0, not
+    "every route," which would tell an approver they are paying for
+    everything even when they are paying for nothing.
+
     A route counts as paid by consulting the CURRENT renderer registry's
-    cost_category for its renderer_id, not by trusting the route's own
+    cost_category for its renderer_id, never by trusting the route's own
     `paid`/`cost_category` fields — those are validated elsewhere
     (visual_routes.validate_contract), but this summary exists specifically so
     an approver's confirmed spend figure is checked against something neither
     the routes document nor the approval record asserts about itself.
+
+    Raises CanonicalSummaryError for anything that would otherwise force a
+    silent guess: a non-list `routes`, a non-object route, a route with a
+    missing/blank/duplicate visual_asset_id, a renderer_id absent from the
+    live registry, or a registered renderer whose cost_category is not one of
+    renderers.COST_CATEGORIES. `_check_approval_v3()` calls this inside its
+    own try/except and turns any such raise into a named blocker — this
+    function itself never downgrades a raise into an incomplete result.
     """
-    routes = (doc or {}).get("routes") or []
-    paid_ids = sorted(
-        r.get("visual_asset_id") for r in routes
-        if r.get("visual_asset_id")
-        and renderers.RENDERERS.get(r.get("renderer_id") or "", {})
-                       .get("cost_category") == "paid_api")
-    return {"shots": len(routes), "paid_route_ids": paid_ids,
-            "paid_count": len(paid_ids)}
+    if doc is not None and not isinstance(doc, dict):
+        raise CanonicalSummaryError(
+            f"routes document must be a JSON object, got {type(doc).__name__}")
+    routes = (doc or {}).get("routes")
+    if routes is None:
+        routes = []
+    if not isinstance(routes, list):
+        raise CanonicalSummaryError(f"routes must be a list, got {type(routes).__name__}")
+
+    seen_ids: set = set()
+    paid_ids: list = []
+    for i, r in enumerate(routes):
+        if not isinstance(r, dict):
+            raise CanonicalSummaryError(f"route [{i}] is not a JSON object: {type(r).__name__}")
+        vid = r.get("visual_asset_id")
+        if not isinstance(vid, str) or not vid:
+            raise CanonicalSummaryError(f"route [{i}] has a missing/blank visual_asset_id")
+        if vid in seen_ids:
+            raise CanonicalSummaryError(f"duplicate visual_asset_id {vid!r} across routes")
+        seen_ids.add(vid)
+
+        renderer_id = r.get("renderer_id")
+        entry = renderers.RENDERERS.get(renderer_id) if renderer_id else None
+        if entry is None:
+            raise CanonicalSummaryError(
+                f"route {vid!r} names unregistered renderer_id {renderer_id!r}")
+        cost_category = entry.get("cost_category")
+        if cost_category not in renderers.COST_CATEGORIES:
+            raise CanonicalSummaryError(
+                f"route {vid!r}: renderer {renderer_id!r} declares unknown "
+                f"cost_category {cost_category!r}")
+        if cost_category == "paid_api":
+            paid_ids.append(vid)
+
+    paid_ids = sorted(paid_ids)
+    return {"shots": len(paid_ids), "paid_route_ids": paid_ids, "paid_count": len(paid_ids)}
+
+
+def _bound_file_check(rep: GateReport, path: Path, recorded_hash, *,
+                      present_check: str, bound_check: str) -> None:
+    """One v3-binding file check: `present_check` fails on missing OR
+    inaccessible (permission error, disappearing file, unreadable bytes —
+    every operational failure collapses into "not present" rather than an
+    uncaught exception, because either way this binding cannot be verified
+    and must not be treated as satisfied); `bound_check` fails on a hash
+    mismatch once the file was read successfully.
+    """
+    try:
+        exists = path.exists()
+    except Exception as e:
+        rep.add(present_check, False,
+                f"could not check for {path.name}: {type(e).__name__}: {e}")
+        return
+    if not exists:
+        rep.add(present_check, False, f"{path.name} is gone")
+        return
+    try:
+        found = visual_routes.file_sha256(path)
+    except Exception as e:
+        rep.add(present_check, False,
+                f"could not read/hash {path.name}: {type(e).__name__}: {e}")
+        return
+    rep.add(bound_check, recorded_hash == found,
+            f"approved {str(recorded_hash)[:12]}…, found {found[:12]}…")
 
 
 def _check_approval_v3(rep: GateReport, project_dir: Path,
@@ -1042,17 +1130,40 @@ def _check_approval_v3(rep: GateReport, project_dir: Path,
     `visual_routes.inspect_project_routes()` for this same project — reused
     rather than re-loaded so this function and its caller agree on exactly
     which bytes were read. A caller with no such result yet (routes_load is
-    None, or its `.doc` is None) still gets every check that does not require
-    the routes document itself; those become named blockers instead of a
-    crash.
+    None, or its `.doc` is None or not a JSON object) still gets every check
+    that does not require the routes document itself; those become named
+    blockers instead of a crash.
+
+    Corrective follow-up (Task 2B-B2b-1 micro-fix): every step below that
+    touches a file, recomputes a hash, or asks another module for a live
+    value is wrapped in its own `try/except Exception` — never `except
+    BaseException`, so KeyboardInterrupt and SystemExit are never swallowed —
+    and turns a genuine operational failure (permission error, a file
+    disappearing mid-check, a malformed routes document, an unregistered
+    renderer) into a named GateReport blocker instead of an uncaught
+    exception. No failed computation is ever silently treated as a passing or
+    default value; every one of them either produces its own named blocker or
+    is skipped entirely, never both silently.
     """
     path = project_dir / APPROVAL_NAME
-    if not rep.add("v3 approval exists", path.exists(),
+    try:
+        exists = path.exists()
+    except Exception as e:
+        rep.add("v3 approval exists", False,
+                f"could not check for {APPROVAL_NAME}: {type(e).__name__}: {e}")
+        return
+    if not rep.add("v3 approval exists", exists,
                    f"{APPROVAL_NAME} missing — a human must run "
                    f"approve_checkpoint.py after reviewing visual_routes.json"):
         return
     try:
-        rec = json.loads(path.read_text(encoding="utf-8"))
+        raw_text = path.read_text(encoding="utf-8")
+    except Exception as e:
+        rep.add("v3 approval record parses", False,
+                f"could not read {APPROVAL_NAME}: {type(e).__name__}: {e}")
+        return
+    try:
+        rec = json.loads(raw_text)
     except json.JSONDecodeError as e:
         rep.add("v3 approval record parses", False, str(e))
         return
@@ -1076,80 +1187,82 @@ def _check_approval_v3(rep: GateReport, project_dir: Path,
             f"inherit another project's approval")
 
     doc = routes_load.doc if routes_load is not None else None
+    if not isinstance(doc, dict):
+        doc = None          # a non-object doc (e.g. malformed JSON) is unusable here;
+                             # visual_routes.inspect_project_routes() already reports
+                             # it as an execution blocker in its own right.
     routes_path = (routes_load.routes_path if routes_load is not None
                   else project_dir / visual_routes.ROUTES_NAME)
     routes_md_path = (routes_load.routes_md_path if routes_load is not None
                       else project_dir / visual_routes.ROUTES_MD_NAME)
 
-    current_routes_id = doc.get("routes_id") if doc else None
+    current_routes_id = doc.get("routes_id") if doc is not None else None
     rep.add("v3 approval names the current routes_id",
             rec.get("routes_id") == current_routes_id,
             f"approval is for routes {str(rec.get('routes_id'))[:8]}, current "
             f"routes document is {str(current_routes_id)[:8]}")
 
-    if routes_path.exists():
-        found = visual_routes.file_sha256(routes_path)
-        rep.add("visual_routes.json is unchanged since approval",
-                rec.get("routes_file_sha256") == found,
-                f"approved {str(rec.get('routes_file_sha256'))[:12]}…, found "
-                f"{found[:12]}… — re-approve the current routes document")
-    else:
-        rep.add("visual_routes.json still present", False,
-                f"{visual_routes.ROUTES_NAME} is gone")
-
-    if routes_md_path.exists():
-        found = visual_routes.file_sha256(routes_md_path)
-        rep.add("visual_routes.md is unchanged since approval",
-                rec.get("routes_md_sha256") == found,
-                f"approved {str(rec.get('routes_md_sha256'))[:12]}…, found "
-                f"{found[:12]}…")
-    else:
-        rep.add("visual_routes.md still present", False,
-                f"{visual_routes.ROUTES_MD_NAME} is gone")
+    _bound_file_check(rep, routes_path, rec.get("routes_file_sha256"),
+                      present_check="visual_routes.json still present",
+                      bound_check="visual_routes.json is unchanged since approval")
+    _bound_file_check(rep, routes_md_path, rec.get("routes_md_sha256"),
+                      present_check="visual_routes.md still present",
+                      bound_check="visual_routes.md is unchanged since approval")
+    _bound_file_check(rep, project_dir / "manifest.json", rec.get("manifest_sha256"),
+                      present_check="manifest still present",
+                      bound_check="manifest is unchanged since approval")
 
     if doc is not None:
-        fresh_content = visual_routes.compute_routes_content_sha256(doc)
-        rep.add("routes_content_sha256 is freshly recomputed and matches",
-                rec.get("routes_content_sha256") == fresh_content,
-                f"approved {str(rec.get('routes_content_sha256'))[:12]}…, "
-                f"recomputed {fresh_content[:12]}… from the current document — "
-                f"neither document's own self-reported field is trusted")
+        try:
+            fresh_content = visual_routes.compute_routes_content_sha256(doc)
+        except Exception as e:
+            rep.add("routes_content_sha256 is freshly recomputed and matches", False,
+                    f"could not recompute routes_content_sha256: {type(e).__name__}: {e}")
+        else:
+            rep.add("routes_content_sha256 is freshly recomputed and matches",
+                    rec.get("routes_content_sha256") == fresh_content,
+                    f"approved {str(rec.get('routes_content_sha256'))[:12]}…, "
+                    f"recomputed {fresh_content[:12]}… from the current document — "
+                    f"neither document's own self-reported field is trusted")
 
-        rids = visual_routes.referenced_renderer_ids(doc.get("routes", []))
-        fresh_registry = visual_routes.compute_renderer_registry_sha256(
-            rids, renderers.RENDERERS)
-        rep.add("renderer_registry_sha256 is freshly recomputed and matches",
-                rec.get("renderer_registry_sha256") == fresh_registry,
-                f"approved {str(rec.get('renderer_registry_sha256'))[:12]}…, "
-                f"recomputed {fresh_registry[:12]}… against the current live "
-                f"renderer registry projection")
-
-    manifest_path = project_dir / "manifest.json"
-    if manifest_path.exists():
-        found = _sha(manifest_path)
-        rep.add("manifest is unchanged since approval",
-                rec.get("manifest_sha256") == found,
-                f"approved {str(rec.get('manifest_sha256'))[:12]}…, found "
-                f"{found[:12]}…")
-    else:
-        rep.add("manifest still present", False, "manifest.json is gone")
+        try:
+            rids = visual_routes.referenced_renderer_ids(doc.get("routes", []))
+            fresh_registry = visual_routes.compute_renderer_registry_sha256(
+                rids, renderers.RENDERERS)
+        except Exception as e:
+            rep.add("renderer_registry_sha256 is freshly recomputed and matches", False,
+                    f"could not recompute renderer_registry_sha256: {type(e).__name__}: {e}")
+        else:
+            rep.add("renderer_registry_sha256 is freshly recomputed and matches",
+                    rec.get("renderer_registry_sha256") == fresh_registry,
+                    f"approved {str(rec.get('renderer_registry_sha256'))[:12]}…, "
+                    f"recomputed {fresh_registry[:12]}… against the current live "
+                    f"renderer registry projection")
 
     if context is not None:
-        rep.add("v3 approval channel binding matches the current channel",
-                rec.get("channel") == context.plan_binding(),
-                "approval was granted under a different channel binding "
-                "(channel pack, character specification or voice profile has "
-                "changed since approval) — re-plan and re-approve")
+        try:
+            binding = context.plan_binding()
+        except Exception as e:
+            rep.add("v3 approval channel binding matches the current channel", False,
+                    f"could not compute the current channel binding: "
+                    f"{type(e).__name__}: {e}")
+        else:
+            rep.add("v3 approval channel binding matches the current channel",
+                    rec.get("channel") == binding,
+                    "approval was granted under a different channel binding "
+                    "(channel pack, character specification or voice profile has "
+                    "changed since approval) — re-plan and re-approve")
 
     try:
         current_rev = route_failures.revision(project_dir)
+    except Exception as e:
+        rep.add("failure record is readable", False, f"{type(e).__name__}: {e}")
+    else:
         rep.add("v3 approval is current with the failure record",
                 rec.get("failure_revision") == current_rev,
                 f"approved at failure revision {rec.get('failure_revision')!r}, "
                 f"now {current_rev} — a route failed or was resolved since "
                 f"approval; re-plan and re-approve")
-    except route_failures.FailureError as e:
-        rep.add("failure record is readable", False, str(e))
 
     approved_by = rec.get("approved_by")
     rep.add("v3 approval names a human approver",
@@ -1160,24 +1273,38 @@ def _check_approval_v3(rep: GateReport, project_dir: Path,
     if approved_at:
         try:
             when = datetime.fromisoformat(str(approved_at).replace("Z", "+00:00"))
+        except Exception as e:
+            rep.add("v3 approval timestamp parses", False, f"{type(e).__name__}: {e}")
+        else:
             rep.add("v3 approval timestamp is timezone-aware", when.tzinfo is not None,
                     "timestamp carries no timezone")
-        except ValueError as e:
-            rep.add("v3 approval timestamp parses", False, str(e))
     else:
         rep.add("v3 approval timestamp parses", False, "approved_at missing")
 
-    expected_confirmation = canonical_confirmation_phrase(
-        project_dir.name, str(current_routes_id or ""))
-    rep.add("v3 approval confirmation names this project and routes_id",
-            rec.get("confirmation") == expected_confirmation,
-            f"expected {expected_confirmation!r}, found {rec.get('confirmation')!r}")
+    try:
+        expected_confirmation = canonical_confirmation_phrase(
+            project_dir.name, str(current_routes_id or ""))
+    except Exception as e:
+        rep.add("v3 approval confirmation names this project and routes_id", False,
+                f"could not derive the expected confirmation phrase: "
+                f"{type(e).__name__}: {e}")
+    else:
+        rep.add("v3 approval confirmation names this project and routes_id",
+                rec.get("confirmation") == expected_confirmation,
+                f"expected {expected_confirmation!r}, found {rec.get('confirmation')!r}")
 
     if doc is not None:
-        expected_summary = canonical_paid_generation_summary(doc)
-        rep.add("v3 approval paid-generation summary matches the approved routes",
-                rec.get("paid_generation") == expected_summary,
-                f"expected {expected_summary}, found {rec.get('paid_generation')}")
+        try:
+            expected_summary = canonical_paid_generation_summary(doc)
+        except Exception as e:
+            rep.add("v3 approval paid-generation summary matches the approved routes",
+                    False,
+                    f"could not derive the expected paid-generation summary: "
+                    f"{type(e).__name__}: {e}")
+        else:
+            rep.add("v3 approval paid-generation summary matches the approved routes",
+                    rec.get("paid_generation") == expected_summary,
+                    f"expected {expected_summary}, found {rec.get('paid_generation')}")
 
 
 def _canonical_execution_problems(project, operation: str = "canonical visual execution",
