@@ -1160,6 +1160,170 @@ try:
           and all(g["kind"] == "canonical_visual_execution"
                  for g in canonical_entry["gates"]))
 
+    # ── 29. type-strict schema versions — Task 2B-B2b-1 final micro-fix ──────
+    print("\n29. schema_version must be an exact int — float/bool/string/null all refuse")
+
+    V2_BASE = {
+        "schema_version": 2, "project": "demo_project", "plan_id": "aaaaaaaa",
+        "manifest_sha256": "a" * 64, "visual_plan_sha256": "a" * 64,
+        "visual_plan_md_sha256": "a" * 64, "prompts_sha256": "a" * 64,
+        "failure_revision": 0, "approved_at": "2026-01-01T00:00:00+00:00",
+        "approved_by": "Giri", "confirmation": "x", "paid_generation": {"shots": 1},
+        "channel": {"channel_id": "fixture_channel", "channel_dna_version": 1,
+                   "channel_json_sha256": "a" * 64, "character_spec_sha256": "a" * 64,
+                   "voice_profile_sha256": "a" * 64},
+    }
+
+    # (label, value_kind, schema check should pass). value_kind is a marker
+    # string for VALID/FLOAT/STR/WRONG/MISSING, or the literal True/False/None
+    # value itself for the boolean/null cases.
+    SCHEMA_VERSION_CASES = [
+        ("valid integer version", "VALID", True),
+        ("corresponding float (X.0)", "FLOAT", False),
+        ("boolean True", True, False),
+        ("boolean False", False, False),
+        ("numeric string", "STR", False),
+        ("null", None, False),
+        ("missing field", "MISSING", False),
+        ("wrong integer", "WRONG", False),
+    ]
+
+    def _apply_schema_case(rec: dict, value_kind, valid_int: int) -> None:
+        if value_kind == "VALID":
+            rec["schema_version"] = valid_int
+        elif value_kind == "FLOAT":
+            rec["schema_version"] = float(valid_int)
+        elif value_kind == "STR":
+            rec["schema_version"] = str(valid_int)
+        elif value_kind == "WRONG":
+            rec["schema_version"] = valid_int + 97
+        elif value_kind == "MISSING":
+            rec.pop("schema_version", None)
+        else:
+            rec["schema_version"] = value_kind          # True / False / None
+
+    def run_v2_schema_case(value_kind):
+        root, proj = build_fixture()
+        rec = dict(V2_BASE)
+        _apply_schema_case(rec, value_kind, 2)
+        (proj / gate.APPROVAL_NAME).write_text(json.dumps(rec, indent=2), encoding="utf-8")
+        rep = gate.GateReport(operation="x", project=proj.name, scope="test")
+        gate._check_approval_v2(rep, proj, None, None)
+        return rep
+
+    for label, value_kind, should_pass in SCHEMA_VERSION_CASES:
+        rep = run_v2_schema_case(value_kind)
+        schema_ok = not blocked_on(rep, "approval schema is supported")
+        check(f"v2 schema_version [{label}]: "
+             f"{'accepted' if should_pass else 'refused immediately'}",
+              schema_ok == should_pass, str(rep.blockers))
+        if not should_pass:
+            check(f"v2 schema_version [{label}]: no v2-specific field was inspected",
+                  {n for n, ok, _ in rep.checks} == {
+                      "Checkpoint 3 approval exists", "approval record parses",
+                      "approval schema is supported"}, str(rep.checks))
+
+    def run_v3_schema_case(value_kind):
+        root, proj, ctx, doc = build_canonical_baseline()
+        rewrite_approval(proj, lambda rec: _apply_schema_case(rec, value_kind, 3))
+        placeholder = vr.ProjectRoutesLoad(
+            project_dir=proj, operation="test", doc=doc, context=ctx,
+            manifest=None, manifest_sha256=None,
+            routes_path=proj / vr.ROUTES_NAME, routes_md_path=proj / vr.ROUTES_MD_NAME)
+        rep = gate.GateReport(operation="x", project=proj.name, scope="test")
+        gate._check_approval_v3(rep, proj, placeholder, ctx)
+        return rep
+
+    for label, value_kind, should_pass in SCHEMA_VERSION_CASES:
+        rep = run_v3_schema_case(value_kind)
+        schema_ok = not blocked_on(rep, "v3 approval schema_version is exactly 3")
+        check(f"v3 schema_version [{label}]: "
+             f"{'accepted' if should_pass else 'refused immediately'}",
+              schema_ok == should_pass, str(rep.blockers))
+        if not should_pass:
+            check(f"v3 schema_version [{label}]: no v3-specific field was inspected",
+                  {n for n, ok, _ in rep.checks} == {
+                      "v3 approval exists", "v3 approval record parses",
+                      "v3 approval schema_version is exactly 3"}, str(rep.checks))
+
+    # ── 30. canonical_paid_generation_summary — complete input strictness ────
+    print("\n30. canonical_paid_generation_summary rejects every malformed input class")
+
+    def expect_summary_error(label, bad_doc):
+        try:
+            gate.canonical_paid_generation_summary(bad_doc)
+            check(label, False, "did not raise CanonicalSummaryError")
+        except gate.CanonicalSummaryError:
+            check(label, True)
+        except Exception as e:
+            check(label, False, f"raised {type(e).__name__}, not CanonicalSummaryError: {e}")
+
+    expect_summary_error("doc is None raises", None)
+    expect_summary_error("doc is a non-dict (list) raises", [1, 2, 3])
+    expect_summary_error("doc is a non-dict (string) raises", "not a doc")
+    expect_summary_error("missing 'routes' key raises", {})
+    expect_summary_error("null 'routes' raises", {"routes": None})
+    expect_summary_error("non-list 'routes' (dict) raises", {"routes": {}})
+    expect_summary_error("non-list 'routes' (string) raises", {"routes": "x"})
+    expect_summary_error("non-dict route raises", {"routes": ["not-a-route"]})
+    expect_summary_error("missing visual_asset_id raises",
+                         {"routes": [{"renderer_id": "pexels"}]})
+    expect_summary_error("non-string visual_asset_id raises",
+                         {"routes": [{"visual_asset_id": 123, "renderer_id": "pexels"}]})
+    expect_summary_error("empty visual_asset_id raises",
+                         {"routes": [{"visual_asset_id": "", "renderer_id": "pexels"}]})
+    expect_summary_error("whitespace-only visual_asset_id raises",
+                         {"routes": [{"visual_asset_id": "   ", "renderer_id": "pexels"}]})
+    expect_summary_error("missing renderer_id raises",
+                         {"routes": [{"visual_asset_id": "VIS-001-A"}]})
+    expect_summary_error("non-string renderer_id raises",
+                         {"routes": [{"visual_asset_id": "VIS-001-A", "renderer_id": 123}]})
+    expect_summary_error("empty renderer_id raises",
+                         {"routes": [{"visual_asset_id": "VIS-001-A", "renderer_id": ""}]})
+    expect_summary_error("whitespace-only renderer_id raises",
+                         {"routes": [{"visual_asset_id": "VIS-001-A",
+                                     "renderer_id": "   "}]})
+    expect_summary_error("unregistered renderer_id raises",
+                         {"routes": [{"visual_asset_id": "VIS-001-A",
+                                     "renderer_id": "not_a_real_renderer"}]})
+    expect_summary_error("duplicate visual_asset_id raises (after exact validation)",
+                         {"routes": [
+                             {"visual_asset_id": "VIS-001-A", "renderer_id": "pexels"},
+                             {"visual_asset_id": "VIS-001-A", "renderer_id": "pexels"}]})
+
+    bad_registry = dict(renderers.RENDERERS)
+    bad_registry["malformed_entry_renderer"] = "not-a-mapping"
+    with mock.patch.object(renderers, "RENDERERS", bad_registry):
+        expect_summary_error(
+            "a malformed (non-mapping) renderer registry entry raises",
+            {"routes": [{"visual_asset_id": "VIS-001-A",
+                        "renderer_id": "malformed_entry_renderer"}]})
+
+    bad_registry2 = dict(renderers.RENDERERS)
+    bad_registry2["no_cost_category_renderer"] = {
+        "module": "x.py", "entry": "main", "implemented": True,
+        "supports_reference_input": False}
+    with mock.patch.object(renderers, "RENDERERS", bad_registry2):
+        expect_summary_error(
+            "a renderer entry with no cost_category raises",
+            {"routes": [{"visual_asset_id": "VIS-001-A",
+                        "renderer_id": "no_cost_category_renderer"}]})
+
+    empty_summary = gate.canonical_paid_generation_summary({"routes": []})
+    check("a genuinely empty, genuinely valid routes list returns the zero summary",
+          empty_summary == {"shots": 0, "paid_count": 0, "paid_route_ids": []},
+          str(empty_summary))
+
+    print("\n30a. the v3 validator still converts a CanonicalSummaryError into a blocker")
+    root, proj, ctx, doc = build_canonical_baseline()
+    with mock.patch.object(gate, "canonical_paid_generation_summary",
+                           side_effect=gate.CanonicalSummaryError("simulated")):
+        rep = v3_full_check(root, proj, ctx)
+    check("a CanonicalSummaryError from the summary function is a named blocker, "
+         "not a crash",
+          blocked_on(rep, "v3 approval paid-generation summary matches the approved routes"),
+          str(rep.blockers))
+
 finally:
     for td in _fixtures:
         shutil.rmtree(td, ignore_errors=True)

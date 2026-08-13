@@ -85,6 +85,26 @@ APPROVAL_V3_REQUIRED_FIELDS = ("schema_version", "project", "routes_id",
                                "approved_at", "approved_by", "confirmation",
                                "paid_generation")
 
+
+def _is_exact_int_schema_version(value, allowed) -> bool:
+    """True only if `value` is a plain `int` — never `bool`, which is an
+    `int` subclass in Python, so `True == 1` and `False == 0` would
+    otherwise leak through — equal to `allowed` (a single int) or a member
+    of `allowed` (a set/frozenset/list/tuple of ints).
+
+    Deliberately `type(value) is int` rather than `isinstance(value, int)`:
+    a schema version gates what downstream code is willing to execute, and
+    Python's own equality is looser than that gate should be — `2.0 == 2`,
+    `Decimal(2) == 2`, and `True == 1` are all real, and none of them is an
+    integer schema_version 2. A numeric string, `None`, a missing field, or
+    any other type simply is not `int` and fails immediately.
+    """
+    if type(value) is not int:
+        return False
+    if isinstance(allowed, (set, frozenset, list, tuple)):
+        return value in allowed
+    return value == allowed
+
 # Directories whose contents are, by definition, not approved output. A pose or
 # reference resolving into any of these must never reach a render: raw holds
 # pre-alpha generator output, pose_candidates holds unreviewed replacements,
@@ -900,9 +920,11 @@ def _check_approval_v2(rep: GateReport, project_dir: Path, manifest: dict | None
     # must never have its fields interpreted as though they meant something
     # v2-shaped, even if that interpretation would itself fail harmlessly.
     if not rep.add("approval schema is supported",
-                   rec.get("schema_version") in APPROVAL_SCHEMA_VERSIONS,
+                   _is_exact_int_schema_version(rec.get("schema_version"),
+                                                APPROVAL_SCHEMA_VERSIONS),
                    f"schema_version={rec.get('schema_version')!r}, "
-                   f"supported: {sorted(APPROVAL_SCHEMA_VERSIONS)}"):
+                   f"supported: {sorted(APPROVAL_SCHEMA_VERSIONS)} (exact int only — "
+                   f"not a float, bool, or numeric string)"):
         return
 
     # `in (None, "", ...)` rather than falsiness: failure_revision is legitimately
@@ -1012,7 +1034,7 @@ class CanonicalSummaryError(RuntimeError):
     drops the route it could not classify is worse than no figure at all."""
 
 
-def canonical_paid_generation_summary(doc: dict | None) -> dict:
+def canonical_paid_generation_summary(doc: dict) -> dict:
     """A deterministic paid-SHOT summary derived from a canonical routes
     document — never independently authored, so it cannot describe spend the
     routes document itself does not contain.
@@ -1031,45 +1053,83 @@ def canonical_paid_generation_summary(doc: dict | None) -> dict:
     an approver's confirmed spend figure is checked against something neither
     the routes document nor the approval record asserts about itself.
 
-    Raises CanonicalSummaryError for anything that would otherwise force a
-    silent guess: a non-list `routes`, a non-object route, a route with a
-    missing/blank/duplicate visual_asset_id, a renderer_id absent from the
-    live registry, or a registered renderer whose cost_category is not one of
-    renderers.COST_CATEGORIES. `_check_approval_v3()` calls this inside its
-    own try/except and turns any such raise into a named blocker — this
-    function itself never downgrades a raise into an incomplete result.
+    Raises CanonicalSummaryError — never returns a partial, approximate, or
+    "treat the unreadable part as empty/free" result — for anything that
+    would otherwise force a silent guess:
+
+      - `doc` is `None` or not a JSON object;
+      - `doc` has no `routes` key, `routes` is `None`, or `routes` is not a
+        list;
+      - a route is not a JSON object;
+      - a route's `visual_asset_id` is missing, non-string, blank/whitespace-
+        only, or a duplicate of an earlier (already-validated) route's;
+      - a route's `renderer_id` is missing, non-string, or blank/whitespace-
+        only;
+      - a route's `renderer_id` is absent from the live renderer registry;
+      - the matched renderer registry entry is not itself a mapping;
+      - the matched entry's `cost_category` is missing or not one of
+        `renderers.COST_CATEGORIES`.
+
+    Validating a route's own shape *before* checking it against `seen_ids`
+    means a malformed route is always reported on its own terms — it never
+    gets blamed for "colliding" with an id that was itself never validated.
+
+    A genuinely empty, genuinely valid `routes` list returns
+    `{"shots": 0, "paid_count": 0, "paid_route_ids": []}` — emptiness is only
+    ever the answer when the input said so explicitly, never when the input
+    could not be read. `_check_approval_v3()` calls this inside its own
+    try/except and turns any raise into a named blocker; this function itself
+    never downgrades a raise into an incomplete result, and never raises
+    anything other than CanonicalSummaryError for a validation failure — an
+    unhashable or wrong-type `renderer_id`, for instance, is caught by the
+    `isinstance(renderer_id, str)` check before it ever reaches a dict
+    lookup, so it cannot surface as an incidental TypeError.
     """
-    if doc is not None and not isinstance(doc, dict):
+    if not isinstance(doc, dict):
         raise CanonicalSummaryError(
             f"routes document must be a JSON object, got {type(doc).__name__}")
-    routes = (doc or {}).get("routes")
-    if routes is None:
-        routes = []
+    if "routes" not in doc:
+        raise CanonicalSummaryError("routes document has no 'routes' field")
+    routes = doc["routes"]
     if not isinstance(routes, list):
-        raise CanonicalSummaryError(f"routes must be a list, got {type(routes).__name__}")
+        raise CanonicalSummaryError(
+            f"routes must be a list, got {type(routes).__name__}")
 
     seen_ids: set = set()
     paid_ids: list = []
     for i, r in enumerate(routes):
         if not isinstance(r, dict):
-            raise CanonicalSummaryError(f"route [{i}] is not a JSON object: {type(r).__name__}")
+            raise CanonicalSummaryError(
+                f"route [{i}] is not a JSON object: {type(r).__name__}")
+
         vid = r.get("visual_asset_id")
-        if not isinstance(vid, str) or not vid:
-            raise CanonicalSummaryError(f"route [{i}] has a missing/blank visual_asset_id")
+        if not isinstance(vid, str) or not vid.strip():
+            raise CanonicalSummaryError(
+                f"route [{i}] has a missing, non-string, or blank "
+                f"visual_asset_id ({vid!r})")
         if vid in seen_ids:
             raise CanonicalSummaryError(f"duplicate visual_asset_id {vid!r} across routes")
         seen_ids.add(vid)
 
         renderer_id = r.get("renderer_id")
-        entry = renderers.RENDERERS.get(renderer_id) if renderer_id else None
+        if not isinstance(renderer_id, str) or not renderer_id.strip():
+            raise CanonicalSummaryError(
+                f"route {vid!r} has a missing, non-string, or blank "
+                f"renderer_id ({renderer_id!r})")
+        entry = renderers.RENDERERS.get(renderer_id)
         if entry is None:
             raise CanonicalSummaryError(
                 f"route {vid!r} names unregistered renderer_id {renderer_id!r}")
-        cost_category = entry.get("cost_category")
+        try:
+            cost_category = entry.get("cost_category")
+        except AttributeError:
+            raise CanonicalSummaryError(
+                f"route {vid!r}: renderer registry entry for {renderer_id!r} is "
+                f"malformed (not a mapping): {type(entry).__name__}") from None
         if cost_category not in renderers.COST_CATEGORIES:
             raise CanonicalSummaryError(
-                f"route {vid!r}: renderer {renderer_id!r} declares unknown "
-                f"cost_category {cost_category!r}")
+                f"route {vid!r}: renderer {renderer_id!r} declares a missing or "
+                f"unsupported cost_category {cost_category!r}")
         if cost_category == "paid_api":
             paid_ids.append(vid)
 
@@ -1172,9 +1232,11 @@ def _check_approval_v3(rep: GateReport, project_dir: Path,
         return
 
     if not rep.add("v3 approval schema_version is exactly 3",
-                   rec.get("schema_version") == APPROVAL_V3_SCHEMA_VERSION,
+                   _is_exact_int_schema_version(rec.get("schema_version"),
+                                                APPROVAL_V3_SCHEMA_VERSION),
                    f"schema_version={rec.get('schema_version')!r} — a v2 record, "
-                   f"or any other value, is never interpreted as v3"):
+                   f"a float/bool/numeric-string 3, or any other value, is never "
+                   f"interpreted as v3"):
         return
 
     missing = [f for f in APPROVAL_V3_REQUIRED_FIELDS
