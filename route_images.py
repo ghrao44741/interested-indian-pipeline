@@ -31,6 +31,7 @@ USAGE:
 
 import argparse
 import json
+import os
 import re
 import shlex
 import subprocess
@@ -39,8 +40,12 @@ from pathlib import Path
 
 import channel_context
 import composite_character
+import generation_gate
 import pose_registry
+import renderer_adapters
+import renderers
 import route_failures
+import visual_routes
 from generation_gate import (GateBlocked, VISUAL_PLAN_NAME,
                              PLAN_SCHEMA_VERSION,
                              require_generation_ready,
@@ -483,15 +488,24 @@ def validate_plan(project_dir: Path, plan: dict) -> list[dict]:
     return shots
 
 
-def dispatch_routes(project_dir: Path, script_dir: Path, plan: dict,
-                    overwrite: bool) -> int:
-    """Generation-gated. The first thing that can spend or write episode artwork.
+def dispatch_routes_legacy_v2(project_dir: Path, script_dir: Path, plan: dict,
+                              overwrite: bool) -> int:
+    """The legacy, schema-v2, visual_plan.json-driven dispatcher.
 
-    Executes the APPROVED PLAN, not the prompts file. The prompts markdown is
-    mutable and is re-read on every run; dispatching from it meant an edit made
-    after approval changed what got generated while both approved hashes stayed
-    intact. The plan is the contract, and the gate has already verified it is the
-    one that was approved.
+    Renamed from `dispatch_routes()` (Task 2B-B2b-2a): that name is now the
+    CANONICAL, visual_routes.json-only dispatcher below, which accepts no
+    plan/route-list argument at all. This function's behavior is otherwise
+    completely unchanged — it still requires the legacy v2
+    require_generation_ready() approval and still executes the APPROVED
+    PLAN, never the prompts file. Kept, not retired: plan_visuals.py and the
+    legacy provider CLIs remain functional through B2b-2a, per that task's
+    explicit scope.
+
+    The prompts markdown is mutable and is re-read on every run;
+    dispatching from it meant an edit made after approval changed what got
+    generated while both approved hashes stayed intact. The plan is the
+    contract, and the gate has already verified it is the one that was
+    approved.
     """
     require_generation_ready(project_dir, "route dispatch")
     shots = validate_plan(project_dir, plan)
@@ -566,15 +580,322 @@ def dispatch_routes(project_dir: Path, script_dir: Path, plan: dict,
     return 0
 
 
+# ── canonical dispatch (Task 2B-B2b-2a) ──────────────────────────────────────
+#
+# dispatch_routes() below is canonical-only: it reads visual_routes.json
+# through visual_routes.require_executable_routes(), never a caller-supplied
+# plan or route list, never image_prompts_one_line_per_prompt.md or
+# visual_plan.json/.md during dispatch, and never invokes a legacy provider
+# CLI through subprocess. The universal canonical-execution guard is its
+# first meaningful operation — before route loading, target resolution,
+# mkdir, adapter lookup, credentials, clients, subprocesses, downloads, or
+# writes — so this whole function is currently unreachable in normal
+# runtime (Task 2B-B2a/B2b-1's guard always refuses). It is exercised only
+# in tests with that guard explicitly patched.
+
+def _working_target_for(final_target: Path) -> Path:
+    """The route-level working target for one route's final asset — same
+    directory as `final_target` (so its own os.replace() commit stays on
+    the same filesystem), a dotfile so it never collides with, or is
+    mistaken for, any route's own final target."""
+    return final_target.with_name(f".{final_target.name}.working")
+
+
+def _preflight_targets(snapshot: "visual_routes.DispatchSnapshot",
+                       images_dir: Path, overwrite: bool) -> dict:
+    """Validates the COMPLETE output-target set for every route in
+    `snapshot` before anything is created — no mkdir, no adapter call, no
+    temporary file exists until this returns cleanly. Raises RouteError
+    naming every problem found (not just the first) otherwise.
+
+    Returns {visual_asset_id: final_target_path} — the only target mapping
+    dispatch_routes() below trusts; nothing else in this module builds one.
+    """
+    problems: list[str] = []
+    targets: dict[str, Path] = {}
+    seen_targets: dict[Path, str] = {}
+
+    project_dir = snapshot.project_dir
+    try:
+        resolved_project = project_dir.resolve()
+        images_dir_is_symlink = images_dir.is_symlink()
+        resolved_images_dir = images_dir.resolve()
+    except OSError as e:
+        raise RouteError(f"cannot resolve the images directory {images_dir}: {e}")
+    if images_dir_is_symlink:
+        problems.append(f"images directory {images_dir} is itself a symlink — refused")
+    elif not resolved_images_dir.is_relative_to(resolved_project):
+        problems.append(
+            f"images directory {images_dir} resolves to {resolved_images_dir}, "
+            f"outside the project {project_dir} — refused")
+
+    for route in snapshot.routes:
+        vid = route.get("visual_asset_id")
+        output_file = route.get("output_file")
+        try:
+            target = visual_routes.resolve_output_target(images_dir, output_file)
+        except visual_routes.VisualRoutesError as e:
+            problems.append(f"{vid}: {e}")
+            continue
+        targets[vid] = target
+
+        if target in seen_targets:
+            problems.append(
+                f"{vid} and {seen_targets[target]} both resolve to the same final "
+                f"target {target} — duplicate/colliding output")
+        else:
+            seen_targets[target] = vid
+
+        try:
+            target_is_symlink = target.is_symlink()
+            target_exists = target.exists()
+            target_is_dir = target.is_dir() if target_exists else False
+        except OSError as e:
+            problems.append(f"{vid}: could not inspect existing target {target}: {e}")
+            continue
+        if target_is_symlink:
+            problems.append(f"{vid}: existing target {target} is a symlink — refused")
+        elif target_is_dir:
+            problems.append(f"{vid}: existing target {target} is a directory — refused")
+        elif target_exists and not overwrite:
+            problems.append(
+                f"{vid}: target {target} already exists and --overwrite was not given")
+
+        renderer_id = route.get("renderer_id")
+        if not isinstance(renderer_id, str) or not renderer_id.strip():
+            problems.append(f"{vid}: no usable renderer_id ({renderer_id!r})")
+        else:
+            try:
+                fn = renderers.dispatch_adapter(renderer_id)
+                if not callable(fn):
+                    problems.append(f"{vid}: renderer {renderer_id!r}'s adapter is not callable")
+                elif not renderers.get(renderer_id).get("implemented"):
+                    problems.append(
+                        f"{vid}: renderer {renderer_id!r} is registered but not implemented")
+            except renderers.RendererError as e:
+                problems.append(f"{vid}: primary renderer problem: {e}")
+
+        host_present = bool(route.get("host_present"))
+        host_method = route.get("host_method")
+        host_renderer_id = route.get("host_renderer_id")
+        if not host_present:
+            if host_method is not None or host_renderer_id is not None:
+                problems.append(
+                    f"{vid}: host_present is false but host_method/host_renderer_id "
+                    f"is set — malformed host relationship")
+        elif host_method == "approved_pose_composite":
+            if not isinstance(host_renderer_id, str) or not host_renderer_id.strip():
+                problems.append(
+                    f"{vid}: approved_pose_composite route has no usable "
+                    f"host_renderer_id ({host_renderer_id!r})")
+            else:
+                try:
+                    hfn = renderers.dispatch_adapter(host_renderer_id)
+                    if not callable(hfn):
+                        problems.append(
+                            f"{vid}: host renderer {host_renderer_id!r}'s adapter is "
+                            f"not callable")
+                    elif not renderers.get(host_renderer_id).get("implemented"):
+                        problems.append(
+                            f"{vid}: host renderer {host_renderer_id!r} is registered "
+                            f"but not implemented")
+                except renderers.RendererError as e:
+                    problems.append(f"{vid}: host renderer problem: {e}")
+        elif host_method == "reference_anchored_generation":
+            if host_renderer_id is not None:
+                problems.append(
+                    f"{vid}: reference_anchored_generation must not carry a "
+                    f"host_renderer_id, got {host_renderer_id!r} — the primary "
+                    f"renderer performs the anchored generation itself")
+        else:
+            problems.append(f"{vid}: unrecognised host_method {host_method!r}")
+
+    if problems:
+        detail = "\n".join(f"  - {p}" for p in problems)
+        raise RouteError(
+            f"preflight failed for {len(problems)} issue(s) across the routing "
+            f"artifact — nothing was created:\n{detail}")
+    return targets
+
+
+def _dispatch_one(route, final_target: Path,
+                  snapshot: "visual_routes.DispatchSnapshot", images_dir: Path) -> bool:
+    """Runs one route's complete stage sequence against a route-level
+    working target, committing it onto `final_target` only once every
+    required stage has succeeded (Task 2B-B2b-2a item 6). Each adapter's own
+    atomic_commit() only ever protects a SINGLE file replacement — this
+    layers the base+host two-stage transaction on top of that, so a route
+    requiring a host composite can never expose a base-only or half-
+    composited image as the successful final asset.
+
+    On any stage failure the working target is removed and `final_target`
+    (if it pre-existed) is left byte-for-byte untouched — os.replace() onto
+    `final_target` happens exactly once, only on total success.
+
+    A DispatchIntegrityError (route/renderer-entry/context mismatch, or any
+    other structural violation) propagates immediately rather than being
+    converted into a route_failures record — it is a bug in the dispatcher
+    or its inputs, never an ordinary provider failure, and must never be
+    disguised as one.
+    """
+    working_target = _working_target_for(final_target)
+
+    def _run_stage(renderer_field: str, fn, target: Path) -> bool:
+        ctx = renderer_adapters.build_dispatch_context(
+            snapshot, route, output_root=images_dir, renderer_field=renderer_field)
+        try:
+            return bool(fn(route, target, ctx))
+        except renderer_adapters.DispatchIntegrityError:
+            raise
+        except Exception as e:
+            # The adapter itself is the sole writer of an ordinary-failure
+            # route_failures record; reaching this branch means it raised
+            # instead of returning False, so it never got the chance to
+            # record one itself — this is the one case the dispatcher
+            # records on the adapter's behalf.
+            route_failures.record_failure(snapshot.project_dir, route,
+                                          reason=f"{renderer_field} adapter raised: {e}")
+            return False
+
+    primary_fn = renderers.dispatch_adapter(route.get("renderer_id"))
+    if not _run_stage("renderer_id", primary_fn, working_target):
+        _remove_if_exists(working_target)
+        return False
+
+    if bool(route.get("host_present")) and route.get("host_method") == "approved_pose_composite":
+        host_fn = renderers.dispatch_adapter(route.get("host_renderer_id"))
+        if not _run_stage("host_renderer_id", host_fn, working_target):
+            _remove_if_exists(working_target)
+            return False
+    # reference_anchored_generation: the primary renderer already performed
+    # the anchored generation above — no second host stage runs, ever.
+
+    try:
+        os.replace(str(working_target), str(final_target))
+    except OSError as e:
+        route_failures.record_failure(
+            snapshot.project_dir, route,
+            reason=f"could not commit the final asset (working target -> final): {e}")
+        _remove_if_exists(working_target)
+        return False
+    return True
+
+
+def _remove_if_exists(p: Path) -> None:
+    try:
+        if p.exists():
+            p.unlink()
+    except OSError:
+        pass
+
+
+def dispatch_routes(project_dir: Path, *, overwrite: bool = False) -> int:
+    """The canonical dispatcher (Task 2B-B2b-2a). Executes ONLY a validated
+    `visual_routes.json` artifact — never a caller-supplied plan or route
+    list, never the prompts markdown, never a legacy provider CLI through
+    subprocess.
+
+    The universal canonical-execution gate is the first meaningful
+    operation, before route loading, target resolution, mkdir, adapter
+    lookup, credentials, clients, subprocesses, downloads, or writes. It
+    currently always refuses (Task 2B-B2a/B2b-1); this function's body
+    below it is exercised only in tests with the guard explicitly patched,
+    and goes live only when a later, separately authorized checkpoint
+    (Task 2B-B2b-3) activates that guard — no code here changes when that
+    happens.
+
+    Stops immediately on the first route's failure — never attempts a
+    later free, local, derived, free-API, or paid route, and never batches
+    paid routes through a legacy CLI.
+    """
+    generation_gate.require_canonical_visual_execution_ready(
+        project_dir, operation="route dispatch (canonical visual execution)")
+
+    result = visual_routes.require_executable_routes(project_dir, operation="dispatch")
+    snapshot = visual_routes.build_dispatch_snapshot(result)
+
+    images_dir = snapshot.project_dir / "images"
+    targets = _preflight_targets(snapshot, images_dir, overwrite)
+
+    # Only now, after the WHOLE target set has passed preflight, may
+    # anything be created.
+    images_dir.mkdir(parents=True, exist_ok=True)
+
+    produced = 0
+    for route in snapshot.routes:
+        vid = route.get("visual_asset_id")
+        final_target = targets[vid]
+        print(f"  {route.get('visual_type', '?'):12s} {vid}  {final_target.name}",
+              end="  ", flush=True)
+        ok = _dispatch_one(route, final_target, snapshot, images_dir)
+        if not ok:
+            print("FAILED")
+            print(f"\n  Dispatch stopped at {vid}. Nothing further was generated.")
+            print(f"\n  Recorded in {route_failures.FAILURES_NAME}. Nothing further "
+                  f"was generated, and this approval no longer permits a retry.")
+            return 1
+        print("ok")
+        produced += 1
+
+    print(f"\n{'=' * 58}")
+    print(f"  Canonical routing complete — {produced} route(s) produced.")
+    print(f"{'=' * 58}\n")
+    return 0
+
+
+def dry_run_report(project_dir: Path) -> tuple[int, "visual_routes.ProjectRoutesLoad"]:
+    """Canonical dry-run (Task 2B-B2b-2a): inspects and reports
+    visual_routes.json WITHOUT executing anything and WITHOUT requiring a
+    v3 approval — visual_routes.inspect_project_routes() never checks for
+    one, only whether the artifact is internally honest and executable.
+
+    No mkdir, no write, no generation, no download — inspect_project_routes()
+    is read-only by its own contract. The printed report is informational
+    only: it is never itself a dispatch authority. dispatch_routes() never
+    calls this function and never consults its return value; it always
+    re-derives its own snapshot independently through
+    require_executable_routes().
+
+    Returns (exit_code, result) — exit_code is 0 iff the artifact is
+    currently executable, 1 otherwise; `result` is returned for callers
+    (tests) that want the full ProjectRoutesLoad without re-inspecting.
+    """
+    result = visual_routes.inspect_project_routes(project_dir, operation="dry-run inspect")
+    print(f"\n{'=' * 58}")
+    print(f"Canonical Route Inspection (dry run) — {project_dir.name}")
+    if isinstance(result.doc, dict):
+        routes = result.doc.get("routes", [])
+        print(f"  Total routes : {len(routes)}")
+        counts: dict[str, int] = {}
+        for r in routes:
+            t = r.get("visual_type", "?") if isinstance(r, dict) else "?"
+            counts[t] = counts.get(t, 0) + 1
+        for t in sorted(counts):
+            print(f"  {t:12s}: {counts[t]}")
+    print(f"  Executable   : {result.is_executable}")
+    if result.execution_blockers:
+        print(f"\n  {len(result.execution_blockers)} blocker(s):")
+        for b in result.execution_blockers:
+            print(f"    - {b}")
+    print(f"{'=' * 58}\n")
+    print("-- DRY RUN — nothing was generated, downloaded, or written; this report "
+         "authorizes nothing --")
+    return (0 if result.is_executable else 1), result
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Route image generation by scene type"
+        description="Canonical image route dispatch (Task 2B-B2b-2a). "
+                    "--dry-run inspects visual_routes.json only; non-dry-run "
+                    "dispatch requires the canonical execution gate, which "
+                    "currently always refuses (Task 2B-B2a/B2b-1)."
     )
     parser.add_argument("--project", required=True, help="Project folder (e.g. ep01)")
     parser.add_argument("--overwrite", action="store_true",
-                        help="Overwrite existing images")
+                        help="Permit atomic replacement of an existing final asset")
     parser.add_argument("--dry-run", action="store_true",
-                        help="Classify and report only - identity gate only, no writes")
+                        help="Inspect/report visual_routes.json only — no v3 approval "
+                             "required, no writes, no dispatch authority granted")
     args = parser.parse_args()
 
     script_dir = Path(__file__).parent
@@ -585,70 +906,23 @@ def main():
     if not project_dir.is_dir():
         print(f"Project folder not found: {project_dir}")
         sys.exit(1)
-    if not (project_dir / PROMPTS_FILE).exists():
-        print(f"{PROMPTS_FILE} not found in: {project_dir}")
-        sys.exit(1)
-
-    # -- phase 1: classification (identity only) ------------------------------
-    try:
-        shots, review = classify(project_dir)
-    except GateBlocked as e:
-        print(f"\n{e}")
-        print("\nNothing was classified, written or generated.")
-        sys.exit(1)
-
-    counts = {}
-    for s in shots:
-        counts[s["type"]] = counts.get(s["type"], 0) + 1
-    print(f"\n{'=' * 58}")
-    print(f"Image Router - {project_dir.name}")
-    print(f"  Total shots  : {len(shots)}")
-    for t_ in sorted(counts):
-        print(f"  {t_:12s}: {counts[t_]}")
-    print(f"  NEEDS_REVIEW : {len(review)}")
-    print(f"{'=' * 58}\n")
 
     if args.dry_run:
-        print("-- DRY RUN - nothing generated --")
-        for s in shots:
-            extra = (s["map_args"] or s["chart_args"] or s["pose_id"] or "")
-            flag = ("  NEEDS_REVIEW: " + s["review_reason"]) if s["needs_review"] else ""
-            print(f"  {s['type']:8s} SHOT {s['shot_num']:02d}  {s['file']}  "
-                  f"{extra[:50]}{flag}")
-        return 0
-
-    if review:
-        print(f"{len(review)} shot(s) need review before anything can be generated:")
-        for r in review:
-            print(f"    SHOT {r['shot']:02d} ({r['planned_route']}): {r['reason']}")
-        print("\nNo route was substituted. Fix the prompts, re-run plan_visuals.py, "
-              "and approve the new plan.")
-        return 1
-
-    # -- phase 2: dispatch (requires Checkpoint 3) ----------------------------
-    #
-    # The approved PLAN is the input here, not the shots just parsed. The prompts
-    # file is mutable; the plan is what a human read and approved, and the gate
-    # has already proven the prompts file has not changed since it was built.
-    plan_path = project_dir / VISUAL_PLAN_NAME
-    if not plan_path.exists():
-        print(f"\nNo {VISUAL_PLAN_NAME}. Run plan_visuals.py, review it, then "
-              f"approve_checkpoint.py before generating.")
-        return 1
-    try:
-        plan = json.loads(plan_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
-        print(f"\n{VISUAL_PLAN_NAME} is unreadable: {e}")
-        return 1
+        code, _ = dry_run_report(project_dir)
+        return code
 
     try:
-        return dispatch_routes(project_dir, script_dir, plan, args.overwrite)
+        return dispatch_routes(project_dir, overwrite=args.overwrite)
     except GateBlocked as e:
         print(f"\n{e}")
         print("\nNothing was generated, downloaded or written.")
         return 1
-    except RouteError as e:
-        print(f"\nThe approved plan cannot be executed: {e}")
+    except renderer_adapters.DispatchIntegrityError as e:
+        print(f"\nINTERNAL DISPATCH-INTEGRITY VIOLATION — stopped immediately, "
+              f"nothing further was attempted: {e}")
+        return 1
+    except (RouteError, visual_routes.VisualRoutesError) as e:
+        print(f"\nThe canonical routing artifact cannot be executed: {e}")
         print("\nNothing was generated, downloaded or written.")
         return 1
 

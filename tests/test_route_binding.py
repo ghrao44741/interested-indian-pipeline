@@ -45,9 +45,13 @@ import composite_character  # noqa: E402
 import generation_gate as gate  # noqa: E402
 import plan_visuals  # noqa: E402
 import pose_registry  # noqa: E402
+import render_channel_dna as rd  # noqa: E402
+import renderer_adapters  # noqa: E402
+import renderers  # noqa: E402
 import route_failures  # noqa: E402
 import route_images  # noqa: E402
 import source_ids  # noqa: E402
+import visual_routes as vr  # noqa: E402
 import channel_context as cc  # noqa: E402
 import channel_fixture  # noqa: E402
 
@@ -98,6 +102,16 @@ def _png(path: Path, alpha=True):
                    (250, 247, 242, 0) if alpha else (250, 247, 242))
     im.paste(Image.new("RGBA", (80, 160), (60, 60, 60, 255)), (88, 60))
     im.save(path)
+
+
+def _canonical_png(path: Path):
+    """A real 1280x720 PNG — the exact size atomic_commit()'s
+    _validate_canonical_png() requires of every canonical adapter's output
+    (Task 2B-B2b-2a). _png() above is deliberately smaller (256x256), for
+    character/pose master fixtures the canonical dispatch path never
+    produces."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (1280, 720), (10, 20, 30)).save(path, "PNG")
 
 
 def build_fixture(prompts: str = PROMPTS_OK) -> tuple[Path, Path]:
@@ -221,6 +235,74 @@ def load_plan(proj):
     return json.loads((proj / plan_visuals.PLAN_JSON).read_text(encoding="utf-8"))
 
 
+# ── canonical (v3) dispatch fixtures — Task 2B-B2b-2a ───────────────────────
+
+def install_canonical_channel(root: Path, extra_capabilities: dict | None = None) -> None:
+    """Extends the fixture channel pack with additional renderer
+    capabilities (MAP/ILLUSTRATION/etc.) beyond channel_fixture's default
+    PHOTO/HOST_COMPOSITE — needed so a canonical routes fixture can name
+    those visual_types."""
+    doc = channel_fixture.pack_document()
+    doc["renderers"]["capabilities"].update(extra_capabilities or {})
+    d = root / "channels" / channel_fixture.CHANNEL_ID
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "channel.json").write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n",
+                                    encoding="utf-8")
+    (d / cc.DNA_NAME).write_text(rd.render_dna(doc), encoding="utf-8")
+
+
+def canonical_route(scene, visual_type, renderer_id, cost_category, paid, route_args,
+                    narration="n", prompt=None, host_present=False, host_method=None,
+                    host_pose_id=None, host_scene_bound=None, host_renderer_id=None,
+                    host_reference_asset_ids=None, host_placement=None) -> dict:
+    return {
+        "visual_asset_id": scene["visual_asset_id"], "source_ids": scene["source_ids"],
+        "shot_instance_id": scene["shot_instance_id"], "scene_id": scene["id"],
+        "output_file": scene["image"], "status": "READY", "review_reasons": [],
+        "candidate_visual_types": [], "routing_confidence": 0.9, "manual_override": None,
+        "visual_type": visual_type, "route_args": route_args, "narration": narration,
+        "prompt": prompt, "visual_cue": None, "overlay_text": None,
+        "renderer_id": renderer_id, "host_renderer_id": host_renderer_id,
+        "cost_category": cost_category, "paid": paid,
+        "host_present": host_present, "host_method": host_method,
+        "host_pose_id": host_pose_id, "host_scene_bound": host_scene_bound,
+        "host_reference_asset_ids": host_reference_asset_ids,
+        "host_placement": host_placement,
+    }
+
+
+def install_canonical_routes(proj: Path, ctx, routes: list) -> dict:
+    """Writes a schema-valid visual_routes.json/.md pair for `routes`.
+    Raises (loudly, at fixture-build time) if the document is not actually
+    schema-valid — a broken fixture must never silently produce a
+    misleading test result."""
+    doc = {
+        "schema_version": vr.SCHEMA_VERSION, "project_id": proj.name,
+        "routes_id": vr.new_routes_id(), "generated_at": "2026-01-01T00:00:00+00:00",
+        "inputs": {"manifest_sha256": vr.file_sha256(proj / "manifest.json")},
+        "channel": ctx.plan_binding(), "routes": routes,
+        "renderer_registry_sha256": "0" * 64, "routes_content_sha256": "0" * 64,
+    }
+    rids = vr.referenced_renderer_ids(routes)
+    doc["renderer_registry_sha256"] = vr.compute_renderer_registry_sha256(rids, renderers.RENDERERS)
+    doc["routes_content_sha256"] = vr.compute_routes_content_sha256(doc)
+    errs = vr.schema_errors(doc)
+    if errs:
+        raise AssertionError(f"canonical fixture is not schema-valid: {errs}")
+    vr.write_atomic(doc, proj)
+    return doc
+
+
+def canonical_dispatch(root: Path, proj: Path, **kw):
+    """Runs the canonical dispatch_routes() with the universal gate patched
+    to allow execution through — the only way this task's dispatch code is
+    ever exercised, since the real guard remains unconditional."""
+    with World(root), \
+         mock.patch.object(gate, "require_canonical_visual_execution_ready",
+                           return_value=None):
+        return route_images.dispatch_routes(proj, **kw)
+
+
 REPO_BEFORE = census(ROOT)
 
 try:
@@ -255,7 +337,7 @@ try:
          mock.patch.object(route_images, "run_host",
                            lambda *a, **k: touched.append("host") or True):
         try:
-            route_images.dispatch_routes(proj, ROOT, load_plan(proj), overwrite=True)
+            route_images.dispatch_routes_legacy_v2(proj, ROOT, load_plan(proj), overwrite=True)
             check("dispatch refused", False, "it dispatched")
         except gate.GateBlocked:
             check("dispatch refused", True)
@@ -265,11 +347,29 @@ try:
     print("\n   dispatch executes the plan, not the prompts file")
     src = ast.parse((ROOT / "route_images.py").read_text(encoding="utf-8"))
     fn = next(n for n in ast.walk(src)
-              if isinstance(n, ast.FunctionDef) and n.name == "dispatch_routes")
+              if isinstance(n, ast.FunctionDef) and n.name == "dispatch_routes_legacy_v2")
     body = ast.unparse(fn)
-    check("dispatch_routes never parses the prompts file",
+    check("dispatch_routes_legacy_v2 never parses the prompts file",
           "parse_shots" not in body and "PROMPTS_FILE" not in body)
-    check("dispatch_routes takes a plan", "plan" in [a.arg for a in fn.args.args])
+    check("dispatch_routes_legacy_v2 takes a plan", "plan" in [a.arg for a in fn.args.args])
+
+    print("\n   dispatch_routes() itself is now canonical-only (Task 2B-B2b-2a)")
+    canonical_fn = next(n for n in ast.walk(src)
+                        if isinstance(n, ast.FunctionDef) and n.name == "dispatch_routes")
+    check("dispatch_routes() accepts no plan/route-list parameter",
+          [a.arg for a in canonical_fn.args.args] == ["project_dir"],
+          str([a.arg for a in canonical_fn.args.args]))
+    canonical_body = ast.unparse(canonical_fn)
+    check("dispatch_routes() never parses the prompts file",
+          "parse_shots" not in canonical_body and "PROMPTS_FILE" not in canonical_body)
+    check("dispatch_routes() never reads visual_plan.json/.md",
+          "VISUAL_PLAN_NAME" not in canonical_body and "VISUAL_PLAN_MD_NAME" not in canonical_body)
+    non_docstring_stmts = [s for s in canonical_fn.body
+                           if not (isinstance(s, ast.Expr) and isinstance(s.value, ast.Constant)
+                                   and isinstance(s.value.value, str))]
+    first_stmt_src = ast.unparse(non_docstring_stmts[0])
+    check("dispatch_routes()'s first real statement calls the universal canonical gate",
+          "require_canonical_visual_execution_ready" in first_stmt_src, first_stmt_src)
 
     # ── 2. no unknown route reaches AI ───────────────────────────────────────
     print("\n2. missing, misspelled and future TYPEs all need review")
@@ -315,7 +415,7 @@ try:
          mock.patch.object(route_images, "run_host",
                            lambda *a, **k: touched.append("host") or True):
         try:
-            route_images.dispatch_routes(proj, ROOT, tampered, overwrite=True)
+            route_images.dispatch_routes_legacy_v2(proj, ROOT, tampered, overwrite=True)
             check("refused", False, "it dispatched")
         except route_images.RouteError as e:
             check("refused", "HOLOGRAM" in str(e), str(e))
@@ -339,7 +439,7 @@ try:
          mock.patch.object(route_images, "run_map",
                            lambda *a, **k: touched.append("map") or True):
         try:
-            route_images.dispatch_routes(proj, ROOT, late, overwrite=True)
+            route_images.dispatch_routes_legacy_v2(proj, ROOT, late, overwrite=True)
             check("refused", False, "it dispatched")
         except route_images.RouteError:
             check("refused", True)
@@ -363,7 +463,7 @@ try:
          mock.patch.object(route_images, "run_ai_batch", counter("ai", True)), \
          mock.patch.object(route_images, "run_map", counter("map", True)), \
          mock.patch.object(route_images, "run_host", counter("host", True)):
-        code = route_images.dispatch_routes(proj, ROOT, load_plan(proj), overwrite=True)
+        code = route_images.dispatch_routes_legacy_v2(proj, ROOT, load_plan(proj), overwrite=True)
     check("dispatch reports failure", code == 1, f"exit={code}")
     check("the PHOTO route was attempted", calls["pexels"] == 1)
     check("the AI batch never ran", calls["ai"] == 0, f"ai={calls['ai']}")
@@ -387,7 +487,7 @@ try:
     with World(root), \
          mock.patch.object(route_images, "run_ai_batch", counter("ai", True)):
         try:
-            route_images.dispatch_routes(proj, ROOT, load_plan(proj), overwrite=True)
+            route_images.dispatch_routes_legacy_v2(proj, ROOT, load_plan(proj), overwrite=True)
             check("a second dispatch is refused", False, "it dispatched")
         except gate.GateBlocked:
             check("a second dispatch is refused", True)
@@ -412,7 +512,7 @@ try:
     with World(root), \
          mock.patch.object(route_images, "run_pexels", lambda *a, **k: False), \
          mock.patch.object(route_images, "run_ai_batch", lambda *a, **k: True):
-        route_images.dispatch_routes(proj, ROOT, load_plan(proj), overwrite=True)
+        route_images.dispatch_routes_legacy_v2(proj, ROOT, load_plan(proj), overwrite=True)
     rev_before = route_failures.revision(proj)
     route_failures.resolve(proj, "VIS-001-A", "Reviewer", "Pexels was down",
                            route_failures.TRANSIENT_RETRY)
@@ -436,7 +536,7 @@ try:
     with World(root), \
          mock.patch.object(route_images, "run_pexels", lambda *a, **k: False), \
          mock.patch.object(route_images, "run_ai_batch", lambda *a, **k: True):
-        route_images.dispatch_routes(proj, ROOT, load_plan(proj), overwrite=True)
+        route_images.dispatch_routes_legacy_v2(proj, ROOT, load_plan(proj), overwrite=True)
     old_plan_id = load_plan(proj)["plan_id"]
     (proj / route_images.PROMPTS_FILE).write_text(
         PROMPTS_OK.replace(
@@ -483,7 +583,7 @@ try:
         mutate(bad)
         try:
             with World(root):
-                route_images.dispatch_routes(proj, ROOT, bad, overwrite=True)
+                route_images.dispatch_routes_legacy_v2(proj, ROOT, bad, overwrite=True)
             check(f"refused ({fragment})", False, "it dispatched")
         except (route_images.RouteError, gate.GateBlocked) as e:
             check(f"refused ({fragment})", fragment in str(e), str(e)[:140])
@@ -560,48 +660,35 @@ try:
             [sys.executable, str(ROOT / "route_images.py"), "--project", str(proj), *args],
             capture_output=True, text=True, encoding="utf-8", errors="replace", env=env)
 
-    # A real subprocess sees the real character spec, so the fixture project must
-    # reference poses that exist there. The MAP/PHOTO/CARTOON shots do not. It
-    # also sees the real channels/ directory, not the fixture pack World patches
-    # in — so these projects point at the real installed channel instead.
-    root, proj = build_fixture(
-        '**SHOT 01** · SCENE-001 · standalone → `SCENE-001.png` TYPE: MAP '
-        'NARRATION: "one" PROMPT: a map\n')          # MAP with no args -> review
+    # Task 2B-B2b-2a: the CLI's --dry-run now inspects/reports the canonical
+    # visual_routes.json artifact (never the legacy prompts/plan), and
+    # requires no v3 approval; non-dry-run dispatch always refuses right now
+    # (the universal canonical gate is still unconditional, Task 2B-B2a/
+    # B2b-1). Neither of these fixture projects ever gets a visual_routes.json
+    # written — none of the sections above build one — so a dry run reports
+    # the artifact as unavailable/not-executable and exits nonzero; that is
+    # the correct, honest report, not a false "clean" pass.
+    root, proj = build_fixture()
     use_real_channel(proj)
     r = run_cli(root, proj, "--dry-run")
-    check("a dry run with review items exits 0 (it only reports)", r.returncode == 0,
-          r.stdout[-300:])
-    r = run_cli(root, proj)
-    check("classification with NEEDS_REVIEW exits nonzero", r.returncode == 1,
-          f"exit={r.returncode}: {r.stdout[-300:]}")
+    check("a dry run with no canonical routing artifact reports unexecutable "
+         "and exits nonzero", r.returncode == 1, f"exit={r.returncode}: {r.stdout[-400:]}")
+    check("the report names the missing artifact",
+          "visual_routes.json" in r.stdout, r.stdout[-400:])
+    check("a dry run creates no images directory",
+          not (proj / "images").exists())
 
-    root, proj = build_fixture(
-        '**SHOT 01** · SCENE-001 · standalone → `SCENE-001.png` TYPE: CARTOON '
-        'NARRATION: "one" PROMPT: a thing\n')
-    use_real_channel(proj)
-    r = run_cli(root, proj, "--dry-run")
-    check("a clean dry run exits 0", r.returncode == 0, r.stdout[-300:])
     r = run_cli(root, proj)
-    check("no plan at all exits nonzero", r.returncode == 1,
-          f"exit={r.returncode}: {r.stdout[-300:]}")
-    check("and says a plan is needed first",
-          "visual_plan.json" in r.stdout, r.stdout[-300:])
+    check("non-dry-run dispatch refuses (the universal canonical gate is "
+         "still unconditional)", r.returncode == 1, f"exit={r.returncode}: {r.stdout[-400:]}")
+    check("nothing was generated, downloaded or written according to the CLI's "
+         "own message", "Nothing was generated" in r.stdout, r.stdout[-400:])
+    check("no images directory was created by a refused non-dry-run dispatch",
+          not (proj / "images").exists())
 
-    # With a plan but no approval, the gate itself is what refuses. Planning goes
-    # back through World(root), so the project reverts to the fixture channel
-    # that lives on that patched path.
-    m = json.loads((proj / "manifest.json").read_text(encoding="utf-8"))
-    channel_fixture.stamp(m)
-    (proj / "manifest.json").write_text(json.dumps(m, indent=2), encoding="utf-8")
-    plan(root, proj)
-    use_real_channel(proj)
-    r = run_cli(root, proj)
-    check("a missing approval exits nonzero", r.returncode == 1,
-          f"exit={r.returncode}: {r.stdout[-400:]}")
-    check("and it names the checkpoint", "Checkpoint 3 approval" in r.stdout,
-          r.stdout[-400:])
-
-    print("\n   an approved dispatch exits 0, and a runtime failure exits nonzero")
+    print("\n   an approved LEGACY (v2) dispatch exits 0, and a runtime failure "
+         "exits nonzero — direct calls, not the CLI, since the CLI's dispatch "
+         "path is canonical-only now")
     root, proj = build_fixture()
     plan(root, proj)
     approve(root, proj)
@@ -610,7 +697,7 @@ try:
          mock.patch.object(route_images, "run_map", lambda *a, **k: True), \
          mock.patch.object(route_images, "run_host", lambda *a, **k: True), \
          mock.patch.object(route_images, "run_ai_batch", lambda *a, **k: True):
-        code = route_images.dispatch_routes(proj, ROOT, load_plan(proj), overwrite=True)
+        code = route_images.dispatch_routes_legacy_v2(proj, ROOT, load_plan(proj), overwrite=True)
     check("a fully successful dispatch returns 0", code == 0, f"exit={code}")
 
     root, proj = build_fixture()
@@ -619,7 +706,7 @@ try:
     with World(root), \
          mock.patch.object(route_images, "run_pexels", lambda *a, **k: False), \
          mock.patch.object(route_images, "run_ai_batch", lambda *a, **k: True):
-        code = route_images.dispatch_routes(proj, ROOT, load_plan(proj), overwrite=True)
+        code = route_images.dispatch_routes_legacy_v2(proj, ROOT, load_plan(proj), overwrite=True)
     check("a runtime failure returns nonzero", code == 1, f"exit={code}")
 
     # ── 7. the real projects ─────────────────────────────────────────────────
@@ -642,6 +729,250 @@ try:
           blocked_on(gate.require_generation_ready(ROOT / "test_2min", "x",
                                                    raise_on_block=False),
                      "Checkpoint 3 approval exists"))
+
+    # ── 8. the canonical dispatcher (Task 2B-B2b-2a) ─────────────────────────
+    print("\n8. dispatch_routes() — canonical only, universally refused normally")
+    root, proj = build_fixture()
+    try:
+        route_images.dispatch_routes(proj)
+        check("dispatch_routes() raises unpatched (universal refusal)", False,
+              "returned instead of raising")
+    except gate.GateBlocked as e:
+        check("dispatch_routes() raises unpatched (universal refusal)", True)
+        check("...and the message names canonical visual execution as disabled",
+              "canonical visual execution" in str(e).lower(), str(e))
+    check("no images directory was created", not (proj / "images").exists())
+
+    map_args = {"map": {"regions": ["Kerala"], "callout": None}, "chart": None,
+               "timeline": None, "document": None, "photo": None,
+               "illustration": None, "reenactment": None}
+
+    print("\n8a. a fully successful canonical dispatch")
+    root, proj = build_fixture()
+    install_canonical_channel(root, {"MAP": "india_geojson"})
+    with World(root):
+        ctx = cc.load_channel_for_project(proj)
+        manifest = json.loads((proj / "manifest.json").read_text(encoding="utf-8"))
+        scenes = manifest["scenes"]
+        # Manifest coverage requires exactly one route per manifest scene —
+        # every scene gets a MAP route (simplest, no extra registry setup).
+        all_routes = [canonical_route(sc, "MAP", "india_geojson", "free_local", False,
+                                      map_args) for sc in scenes]
+        install_canonical_routes(proj, ctx, all_routes)
+
+    def fake_map_subprocess(cmd, capture_output, text):
+        out = Path(cmd[cmd.index("--out") + 1])
+        _canonical_png(out)
+        return types.SimpleNamespace(returncode=0, stderr="", stdout="")
+
+    with mock.patch("subprocess.run", side_effect=fake_map_subprocess):
+        code = canonical_dispatch(root, proj)
+    check("a fully successful canonical dispatch returns 0", code == 0, f"exit={code}")
+    final = proj / "images" / scenes[0]["image"]
+    check("the final asset exists", final.exists())
+    check("no leftover working file remains",
+          not (final.parent / f".{final.name}.working").exists())
+
+    print("\n8b. preflight refuses duplicate output targets before mkdir")
+    # visual_routes.validate_contract() already refuses a route whose
+    # output_file disagrees with its manifest scene's own filename, so a
+    # genuine collision can never survive require_executable_routes() in the
+    # first place — this exercises route_images._preflight_targets() (the
+    # dispatcher's OWN defense-in-depth duplicate check) directly, against a
+    # hand-built snapshot, the same technique test_renderer_adapters.py uses
+    # for its own snapshot-identity tests.
+    root, proj = build_fixture()
+    install_canonical_channel(root, {"MAP": "india_geojson"})
+    with World(root):
+        ctx = cc.load_channel_for_project(proj)
+        manifest = json.loads((proj / "manifest.json").read_text(encoding="utf-8"))
+        scenes = manifest["scenes"]
+        r1 = canonical_route(scenes[0], "MAP", "india_geojson", "free_local", False, map_args)
+        r2 = dict(canonical_route(scenes[1], "MAP", "india_geojson", "free_local",
+                                  False, map_args))
+        r2["output_file"] = r1["output_file"]   # force a collision, bypassing schema binding
+        fake_snapshot = vr.DispatchSnapshot(
+            project_dir=proj, routes_id="r1", routes_file_sha256="a" * 64,
+            routes_content_sha256="b" * 64, channel=ctx, routes=(r1, r2),
+            approved_poses=types.MappingProxyType({}), poses_asset_base=None,
+            poses_root=None, approved_references=types.MappingProxyType({}),
+            references_asset_base=None, references_root=None)
+        try:
+            route_images._preflight_targets(fake_snapshot, proj / "images", False)
+            check("duplicate output targets are refused before anything is created",
+                  False, "did not raise")
+        except route_images.RouteError as e:
+            check("duplicate output targets are refused before anything is created",
+                  "duplicate" in str(e).lower() or "colliding" in str(e).lower(), str(e))
+        check("no images directory was created by the isolated preflight check",
+              not (proj / "images").exists())
+    check("no images directory was created", not (proj / "images").exists())
+
+    print("\n8c. preflight refuses an existing target without --overwrite")
+    root, proj = build_fixture()
+    install_canonical_channel(root, {"MAP": "india_geojson"})
+    with World(root):
+        ctx = cc.load_channel_for_project(proj)
+        manifest = json.loads((proj / "manifest.json").read_text(encoding="utf-8"))
+        scenes = manifest["scenes"]
+        all_routes = [canonical_route(sc, "MAP", "india_geojson", "free_local", False,
+                                      map_args) for sc in scenes]
+        install_canonical_routes(proj, ctx, all_routes)
+    _png(proj / "images" / scenes[0]["image"], alpha=False)   # pre-existing final
+    try:
+        canonical_dispatch(root, proj, overwrite=False)
+        check("an existing target without --overwrite is refused", False, "dispatched")
+    except route_images.RouteError as e:
+        check("an existing target without --overwrite is refused",
+              "already exists" in str(e), str(e))
+
+    print("\n8d. first failure stops dispatch — a later route never runs")
+    root, proj = build_fixture()
+    install_canonical_channel(root, {"MAP": "india_geojson", "CHART": "matplotlib_chart"})
+    with World(root):
+        ctx = cc.load_channel_for_project(proj)
+        manifest = json.loads((proj / "manifest.json").read_text(encoding="utf-8"))
+        scenes = manifest["scenes"]
+        r1 = canonical_route(scenes[0], "MAP", "india_geojson", "free_local", False, map_args)
+        r2 = canonical_route(
+            scenes[1], "CHART", "matplotlib_chart", "free_local", False,
+            {"map": None, "chart": {"chart_type": "bar",
+                                    "data": [{"label": "a", "value": 1}]},
+             "timeline": None, "document": None, "photo": None, "illustration": None,
+             "reenactment": None})
+        rest = [canonical_route(sc, "MAP", "india_geojson", "free_local", False, map_args)
+               for sc in scenes[2:]]
+        install_canonical_routes(proj, ctx, [r1, r2] + rest)
+
+    chart_calls = []
+
+    def failing_map_ok_chart(cmd, capture_output, text):
+        script = cmd[1]
+        if "generate_india_map.py" in script:
+            return types.SimpleNamespace(returncode=1, stderr="simulated map failure",
+                                         stdout="")
+        chart_calls.append(cmd)
+        out = Path(cmd[cmd.index("--out") + 1])
+        _canonical_png(out)
+        return types.SimpleNamespace(returncode=0, stderr="", stdout="")
+
+    with mock.patch("subprocess.run", side_effect=failing_map_ok_chart):
+        code = canonical_dispatch(root, proj)
+    check("dispatch reports failure", code == 1, f"exit={code}")
+    check("the second (CHART) route never ran after the first failed",
+          not chart_calls, str(chart_calls))
+    check("the failure was recorded", len(route_failures.unresolved(proj)) == 1,
+          str(route_failures.unresolved(proj)))
+
+    print("\n8e. the digest changes when an execution field changes, not display fields")
+    r_a = canonical_route(scenes[0], "MAP", "india_geojson", "free_local", False, map_args,
+                          narration="original narration")
+    r_b = dict(r_a)
+    r_b["narration"] = "a completely different narration"
+    r_b["scene_id"] = "SCENE-999"
+    check("changing only display fields (narration, scene_id) does not change the digest",
+          route_failures.route_args_digest(r_a) == route_failures.route_args_digest(r_b))
+    r_c = dict(r_a)
+    r_c["route_args"] = {**map_args, "map": {"regions": ["Goa"], "callout": None}}
+    check("changing route_args changes the digest",
+          route_failures.route_args_digest(r_a) != route_failures.route_args_digest(r_c))
+
+    print("\n8f. cross-project containment — a route from project A refuses "
+         "against project B's snapshot")
+    root_a, proj_a = build_fixture()
+    install_canonical_channel(root_a, {"MAP": "india_geojson"})
+    with World(root_a):
+        ctx_a = cc.load_channel_for_project(proj_a)
+        manifest_a = json.loads((proj_a / "manifest.json").read_text(encoding="utf-8"))
+        routes_a = [canonical_route(sc, "MAP", "india_geojson", "free_local", False,
+                                    map_args) for sc in manifest_a["scenes"]]
+        install_canonical_routes(proj_a, ctx_a, routes_a)
+        result_a = vr.require_executable_routes(proj_a, operation="test")
+        snapshot_a = vr.build_dispatch_snapshot(result_a)
+
+    root_b, proj_b = build_fixture()
+    install_canonical_channel(root_b, {"MAP": "india_geojson"})
+    with World(root_b):
+        ctx_b = cc.load_channel_for_project(proj_b)
+        manifest_b = json.loads((proj_b / "manifest.json").read_text(encoding="utf-8"))
+        routes_b = [canonical_route(sc, "MAP", "india_geojson", "free_local", False,
+                                    map_args) for sc in manifest_b["scenes"]]
+        install_canonical_routes(proj_b, ctx_b, routes_b)
+        result_b = vr.require_executable_routes(proj_b, operation="test")
+        snapshot_b = vr.build_dispatch_snapshot(result_b)
+
+    try:
+        renderer_adapters.build_dispatch_context(
+            snapshot_a, snapshot_b.routes[0], output_root=proj_a / "images")
+        check("a route from project B's snapshot is refused against project A's "
+             "snapshot", False, "did not raise")
+    except renderer_adapters.DispatchIntegrityError:
+        check("a route from project B's snapshot is refused against project A's "
+             "snapshot", True)
+    check("project A's snapshot is bound to project A's own directory",
+          snapshot_a.project_dir == proj_a)
+    check("project B's snapshot is bound to project B's own directory",
+          snapshot_b.project_dir == proj_b)
+
+    print("\n8g. route-level transaction: base success + host success commits "
+         "one final composite")
+    root, proj = build_fixture()
+    install_canonical_channel(root, {"MAP": "india_geojson"})
+    with World(root):
+        ctx = cc.load_channel_for_project(proj)
+        manifest = json.loads((proj / "manifest.json").read_text(encoding="utf-8"))
+        scenes = manifest["scenes"]
+        host_route = canonical_route(
+            scenes[0], "MAP", "india_geojson", "free_local", False, map_args,
+            host_present=True, host_method="approved_pose_composite",
+            host_pose_id="neutral_presenter", host_scene_bound=False,
+            host_renderer_id="approved_pose_compositor")
+        rest = [canonical_route(sc, "MAP", "india_geojson", "free_local", False, map_args)
+               for sc in scenes[1:]]
+        install_canonical_routes(proj, ctx, [host_route] + rest)
+
+    with mock.patch("subprocess.run", side_effect=fake_map_subprocess):
+        code = canonical_dispatch(root, proj)
+    check("a route requiring base+host composite succeeds end to end",
+          code == 0, f"exit={code}")
+    final = proj / "images" / scenes[0]["image"]
+    check("the final composite asset exists", final.exists())
+    from PIL import Image as _Img
+    with _Img.open(final) as im:
+        check("the final composite is the canonical 1280x720 size",
+              im.size == (1280, 720), im.size)
+    check("no working file was left behind",
+          not (final.parent / f".{final.name}.working").exists())
+
+    print("\n8h. route-level transaction: a host-stage failure preserves the "
+         "old final and never exposes the base-only image")
+    root, proj = build_fixture()
+    install_canonical_channel(root, {"MAP": "india_geojson"})
+    with World(root):
+        ctx = cc.load_channel_for_project(proj)
+        manifest = json.loads((proj / "manifest.json").read_text(encoding="utf-8"))
+        scenes = manifest["scenes"]
+        host_route = canonical_route(
+            scenes[0], "MAP", "india_geojson", "free_local", False, map_args,
+            host_present=True, host_method="approved_pose_composite",
+            host_pose_id="neutral_presenter", host_scene_bound=False,
+            host_renderer_id="approved_pose_compositor")
+        rest = [canonical_route(sc, "MAP", "india_geojson", "free_local", False, map_args)
+               for sc in scenes[1:]]
+        install_canonical_routes(proj, ctx, [host_route] + rest)
+    old_final = proj / "images" / scenes[0]["image"]
+    _canonical_png(old_final)
+    old_bytes = old_final.read_bytes()
+
+    with mock.patch("subprocess.run", side_effect=fake_map_subprocess), \
+         mock.patch.object(composite_character, "_composite",
+                           side_effect=RuntimeError("simulated host composite failure")):
+        code = canonical_dispatch(root, proj, overwrite=True)
+    check("a host-stage failure makes dispatch report failure", code == 1, f"exit={code}")
+    check("the pre-existing final asset is preserved byte-for-byte",
+          old_final.read_bytes() == old_bytes)
+    check("no working file was left behind after a host-stage failure",
+          not (old_final.parent / f".{old_final.name}.working").exists())
 
 finally:
     for td in _fixtures:

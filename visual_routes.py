@@ -56,6 +56,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path, PureWindowsPath
+from types import MappingProxyType
 
 import channel_context
 from channel_context import canonical_sha256, _write_atomic_text
@@ -1050,6 +1051,18 @@ class ProjectRoutesLoad:
     schema_problems: list = field(default_factory=list)
     integrity_problems: list = field(default_factory=list)
     status_problems: list = field(default_factory=list)
+    # Populated by inspect_project_routes() alongside the contract-validation
+    # pass below (Task 2B-B2b-2a) — the SAME pose/reference registry load
+    # validate_contract() was already given, kept on the result so
+    # build_dispatch_snapshot() can bind a DispatchSnapshot against exactly
+    # what was validated, rather than re-loading (and risking a second,
+    # possibly different, live read of) the registry a second time.
+    approved_poses: dict = field(default_factory=dict)
+    poses_asset_base: Path | None = None
+    poses_root: Path | None = None
+    approved_references: dict = field(default_factory=dict)
+    references_asset_base: Path | None = None
+    references_root: Path | None = None
 
     @property
     def execution_blockers(self) -> list:
@@ -1206,6 +1219,12 @@ def inspect_project_routes(project, *, operation: str = "inspect") -> "ProjectRo
         result.integrity_problems.append(
             f"could not load the approved pose/reference registry: {e}")
         return result
+    result.approved_poses = approved_poses
+    result.poses_asset_base = poses_asset_base
+    result.poses_root = poses_root
+    result.approved_references = approved_references
+    result.references_asset_base = references_asset_base
+    result.references_root = references_root
 
     try:
         integrity = list(validate_contract(
@@ -1254,6 +1273,133 @@ def require_executable_routes(project, *, operation: str = "dispatch") -> "Proje
         raise VisualRoutesError(
             f"{operation}: the canonical routing artifact is not executable:\n{detail}")
     return result
+
+
+# ── the immutable dispatch snapshot (Task 2B-B2b-2a) ────────────────────────
+#
+# A mutable dict copied from visual_routes.json is never sufficient dispatch
+# authority — nothing stops a caller from mutating it after validation, or
+# handing a route from one project's snapshot to another project's dispatch.
+# DispatchSnapshot is the one immutable, fully-bound object a canonical
+# dispatcher (route_images.py) is allowed to iterate; it is built only by
+# build_dispatch_snapshot(), only from a ProjectRoutesLoad that has already
+# proven is_executable — there is no other constructor.
+
+class _FrozenDict(dict):
+    """A dict SUBCLASS whose mutating methods all raise TypeError — genuinely
+    immutable, while `isinstance(x, dict)` still holds. That matters because
+    an existing consumer's own type check must not be weakened just because
+    its input now comes from a validated dispatch snapshot instead of a
+    freshly-parsed JSON document: prompt_policy.typed_prompt() checks
+    `isinstance(route_args, dict)` / `isinstance(args, dict)`, and a
+    MappingProxyType (not a dict subclass) would fail that check and turn
+    every canonical illustration/reenactment route into a false
+    PromptPolicyError. A dict subclass satisfies both goals at once."""
+
+    def _refuse(self, *a, **kw):
+        raise TypeError(
+            "this mapping is part of an immutable, validated dispatch-"
+            "snapshot route and cannot be mutated")
+
+    __setitem__ = __delitem__ = clear = pop = popitem = update = setdefault = _refuse
+
+
+class _FrozenList(list):
+    """The list-shaped counterpart to _FrozenDict, for the same reason —
+    e.g. renderer_adapters._exactly_body_then_face()'s
+    `isinstance(ref_ids, list)` on route['host_reference_asset_ids']."""
+
+    def _refuse(self, *a, **kw):
+        raise TypeError(
+            "this list is part of an immutable, validated dispatch-snapshot "
+            "route and cannot be mutated")
+
+    __setitem__ = __delitem__ = __iadd__ = __imul__ = _refuse
+    append = extend = insert = remove = pop = clear = sort = reverse = _refuse
+
+
+def _freeze_route(obj):
+    """Recursively converts a validated route (or anything nested inside
+    one — route_args, host_reference_asset_ids, host_placement, and so on)
+    into an immutable but type-compatible form: a dict becomes a
+    _FrozenDict, a list becomes a _FrozenList. Both remain real
+    dict/list instances for isinstance purposes; both raise on every
+    mutating method. Anything else (str, int, float, bool, None) is
+    returned unchanged — already immutable."""
+    if isinstance(obj, dict):
+        return _FrozenDict({k: _freeze_route(v) for k, v in obj.items()})
+    if isinstance(obj, list):
+        return _FrozenList(_freeze_route(v) for v in obj)
+    return obj
+
+
+@dataclass(frozen=True)
+class DispatchSnapshot:
+    """The complete, immutable dispatch authority for one project's
+    canonical visual_routes.json — the only thing a canonical dispatcher may
+    execute against. Built only by build_dispatch_snapshot()."""
+    project_dir: Path
+    routes_id: str
+    routes_file_sha256: str
+    routes_content_sha256: str
+    channel: object                      # channel_context.ChannelContext
+    routes: tuple                        # tuple of _FrozenDict, canonical document order
+    approved_poses: MappingProxyType
+    poses_asset_base: Path | None
+    poses_root: Path | None
+    approved_references: MappingProxyType
+    references_asset_base: Path | None
+    references_root: Path | None
+
+
+def build_dispatch_snapshot(result: "ProjectRoutesLoad") -> DispatchSnapshot:
+    """THE only way to obtain a DispatchSnapshot.
+
+    Raises VisualRoutesError unless `result` is genuinely a ProjectRoutesLoad
+    that has already proven is_executable — a caller cannot build one from a
+    hand-assembled ProjectRoutesLoad-shaped object, a dict, or any other
+    caller-supplied structure standing in for one; the check is
+    `isinstance(result, ProjectRoutesLoad)` plus `result.execution_blockers`
+    being genuinely empty, not merely "looks executable."
+
+    Every route in the returned snapshot is deep-frozen via _freeze_route();
+    the routes/poses/references registries are hashed/copied from `result`
+    exactly as inspect_project_routes() already validated them — nothing
+    here re-reads the filesystem or re-derives anything validate_contract()
+    did not already check.
+    """
+    if not isinstance(result, ProjectRoutesLoad):
+        raise VisualRoutesError(
+            f"build_dispatch_snapshot() requires a ProjectRoutesLoad, got "
+            f"{type(result).__name__}")
+    if result.execution_blockers:
+        detail = "\n".join(f"  - {b}" for b in result.execution_blockers)
+        raise VisualRoutesError(
+            f"cannot build a dispatch snapshot: the routing artifact is not "
+            f"executable:\n{detail}")
+    doc = result.doc
+    if not isinstance(doc, dict):
+        raise VisualRoutesError(
+            f"cannot build a dispatch snapshot: result.doc is not a JSON "
+            f"object ({type(doc).__name__}) despite reporting no execution "
+            f"blockers — this should be unreachable")
+
+    routes = tuple(_freeze_route(r) for r in doc.get("routes", []))
+    from renderer_adapters import _deep_freeze as _freeze_registry
+    return DispatchSnapshot(
+        project_dir=result.project_dir,
+        routes_id=doc.get("routes_id"),
+        routes_file_sha256=file_sha256(result.routes_path),
+        routes_content_sha256=compute_routes_content_sha256(doc),
+        channel=result.context,
+        routes=routes,
+        approved_poses=_freeze_registry(dict(result.approved_poses or {})),
+        poses_asset_base=result.poses_asset_base,
+        poses_root=result.poses_root,
+        approved_references=_freeze_registry(dict(result.approved_references or {})),
+        references_asset_base=result.references_asset_base,
+        references_root=result.references_root,
+    )
 
 
 # ── CLI ──────────────────────────────────────────────────────────────────────

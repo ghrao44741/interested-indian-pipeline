@@ -52,46 +52,78 @@ import prompt_policy
 import route_failures
 
 
-def _verify_dispatch_entry(route: dict, ctx: "DispatchContext", expected_adapter) -> None:
+class DispatchIntegrityError(RuntimeError):
+    """A dispatch-integrity violation: a route/renderer-entry/context
+    mismatch, a malformed canonical entry, or an atomic-output invariant
+    broken by code rather than by a provider. Never converted into an
+    ordinary route_failures record and a `False` return — there is no route
+    content that could excuse it, and disguising it as an ordinary provider
+    failure would let dispatch continue as though nothing structural were
+    wrong. A subclass of RuntimeError, so every existing `except
+    RuntimeError` boundary in this module and in callers still catches it."""
+
+
+def _verify_dispatch_entry(route, ctx: "DispatchContext", expected_adapter, *,
+                           renderer_field: str = "renderer_id") -> None:
     """Every adapter calls this immediately after the universal refusal
     guard, before any other meaningful operation (final boundary micro-fix,
-    item 1). Proves `ctx.renderer_entry` IS — by object identity, not
-    equal-looking content — the exact, canonical, deeply-frozen entry
-    `renderers.get(route['renderer_id'])` returns for THIS route, and that
-    its registered `adapter` is the function currently executing.
+    item 1; extended for Task 2B-B2b-2a's snapshot-binding requirement).
 
-    A caller-constructed dict, a fresh MappingProxyType built to look
-    identical, a copy of the real entry, or another renderer's real entry
-    all fail the `is` check below — copying or re-freezing an entry would
-    only prove the *values* match at one instant, never that dispatch is
-    still reading the one canonical object every other reader (the hash
-    projection, a future dispatcher) also reads. Raises RuntimeError — this
-    is a dispatch-integrity violation, not an ordinary per-route failure,
-    so it is never converted into a route_failures record and a `False`
-    return; there is no route content that could excuse it.
+    Proves two things, both by object identity, never by equal-looking
+    content:
+
+      1. `route` IS `ctx.route` — the exact route object the dispatcher
+         built this context for. A mutable dict, an equal copied dict, an
+         independently frozen mapping, another route from the same
+         snapshot, or a route from another snapshot/project all fail this —
+         copying or re-freezing a route would only prove the *values* match
+         at one instant, never that this call is still operating on the one
+         route object the dispatcher's preflight and snapshot validation
+         actually covered.
+      2. `ctx.renderer_entry` IS the canonical, deeply-frozen entry
+         `renderers.get(route[renderer_field])` returns for THIS route, and
+         that entry's registered `adapter` is the function currently
+         executing. `renderer_field` is `"renderer_id"` for every primary
+         adapter and `"host_renderer_id"` for `adapt_host_composite` —
+         binding against the wrong field (a host adapter reading
+         `renderer_id`, or vice versa) is exactly the "primary/host
+         renderer-field confusion" this parameter exists to prevent.
+
+    Raises DispatchIntegrityError (a RuntimeError) on either failure — this
+    is a dispatch-integrity violation, not an ordinary per-route failure.
 
     `renderers` is imported locally: renderers.py imports this module for
     its adapter callables, so a module-level `import renderers` here would
     close the same import cycle documented for `generation_gate` above."""
     import renderers
 
-    renderer_id = route.get("renderer_id")
+    if route is not ctx.route:
+        raise DispatchIntegrityError(
+            "route argument is not the exact object ctx.route governs "
+            "(identity check failed) — a mutable dict, an equal copy, an "
+            "independently frozen mapping, another route from the same "
+            "snapshot, or a route from another snapshot/project is never "
+            "trusted")
+
+    renderer_id = route.get(renderer_field)
     if not isinstance(renderer_id, str) or not renderer_id.strip():
-        raise RuntimeError(f"route has no usable renderer_id: {renderer_id!r}")
+        raise DispatchIntegrityError(
+            f"route has no usable {renderer_field}: {renderer_id!r}")
     try:
         canonical_entry = renderers.get(renderer_id)
     except renderers.RendererError as e:
-        raise RuntimeError(f"route names an unregistered renderer_id: {e}") from e
+        raise DispatchIntegrityError(
+            f"route names an unregistered {renderer_field}: {e}") from e
     if ctx.renderer_entry is not canonical_entry:
-        raise RuntimeError(
+        raise DispatchIntegrityError(
             f"ctx.renderer_entry is not the canonical registry entry for "
-            f"renderer_id {renderer_id!r} (identity check failed) — a "
+            f"{renderer_field} {renderer_id!r} (identity check failed) — a "
             f"caller-substituted, copied, re-frozen, or mismatched-renderer "
             f"entry is refused, never trusted")
     if canonical_entry.get("adapter") is not expected_adapter:
-        raise RuntimeError(
-            f"renderer_id {renderer_id!r}'s registered adapter does not match "
-            f"the adapter currently being invoked")
+        raise DispatchIntegrityError(
+            f"{renderer_field} {renderer_id!r}'s registered adapter does not "
+            f"match the adapter currently being invoked")
 
 
 def _require_execution_settings(entry) -> dict:
@@ -191,7 +223,14 @@ class DispatchContext:
     references_asset_base: Path | None
     references_root: Path | None
     output_root: Path                     # images_dir, already confirmed to exist
-    renderer_entry: MappingProxyType      # RENDERERS[route["renderer_id"]] — this route's entry only
+    renderer_entry: MappingProxyType      # RENDERERS[route[<renderer_field>]] — this route's entry only
+    # The exact snapshot route this context governs (Task 2B-B2b-2a). Every
+    # adapter's _verify_dispatch_entry() call requires its `route` parameter
+    # to be THIS object, by identity. Defaults to None (last field, so every
+    # other field keeps its no-default position) — a context built without
+    # one can never pass that check, which is correct: there is no dispatch
+    # without a bound route.
+    route: object = None
 
     def __post_init__(self):
         object.__setattr__(self, "approved_poses", _deep_freeze(dict(self.approved_poses or {})))
@@ -199,78 +238,295 @@ class DispatchContext:
                           _deep_freeze(dict(self.approved_references or {})))
 
 
+def build_dispatch_context(snapshot, route, *, output_root: Path,
+                           renderer_field: str = "renderer_id") -> "DispatchContext":
+    """THE only factory that produces a trustworthy DispatchContext (Task
+    2B-B2b-2a) — the canonical dispatcher (route_images.py) must build every
+    context through this function, never through `DispatchContext(...)`
+    directly with caller-assembled pieces.
+
+    `route` must be the exact object (by identity) already present in
+    `snapshot.routes` — not merely equal to one — or this raises
+    DispatchIntegrityError before anything else. `approved_poses`/
+    `approved_references` and their asset roots are read from `snapshot`
+    itself, never accepted as separate parameters here: a caller cannot
+    substitute its own registry dict by calling this factory with different
+    arguments, because there is no argument that would let it.
+
+    `renderer_field` selects which of the route's two renderer-id fields the
+    resolved `renderer_entry` is bound against — `"renderer_id"` for every
+    primary adapter (the default), `"host_renderer_id"` for the host-
+    composite stage. Raises DispatchIntegrityError for a missing/blank/
+    unregistered id at that field, exactly like `_verify_dispatch_entry()`
+    will independently re-check when the adapter itself runs.
+
+    `visual_routes`/`renderers` are imported locally: this module is itself
+    imported by renderers.py (for its adapter callables), and visual_routes.py
+    is imported by channel_context.py, which renderers.py also imports — a
+    module-level import here would risk the same import-cycle class already
+    documented above for `generation_gate`/`renderers`.
+    """
+    import renderers as _renderers
+    import visual_routes as _visual_routes
+
+    if not isinstance(snapshot, _visual_routes.DispatchSnapshot):
+        raise DispatchIntegrityError(
+            f"build_dispatch_context() requires a visual_routes.DispatchSnapshot, "
+            f"got {type(snapshot).__name__}")
+    if not any(route is r for r in snapshot.routes):
+        raise DispatchIntegrityError(
+            "route is not a member (by identity) of snapshot.routes — a "
+            "mutable dict, an equal copy, an independently frozen mapping, "
+            "or a route from another snapshot/project is never trusted")
+
+    renderer_id = route.get(renderer_field)
+    if not isinstance(renderer_id, str) or not renderer_id.strip():
+        raise DispatchIntegrityError(
+            f"route has no usable {renderer_field}: {renderer_id!r}")
+    try:
+        renderer_entry = _renderers.get(renderer_id)
+    except _renderers.RendererError as e:
+        raise DispatchIntegrityError(
+            f"route names an unregistered {renderer_field}: {e}") from e
+
+    return DispatchContext(
+        project_dir=snapshot.project_dir,
+        channel=snapshot.channel,
+        approved_poses=snapshot.approved_poses,
+        approved_references=snapshot.approved_references,
+        poses_asset_base=snapshot.poses_asset_base,
+        poses_root=snapshot.poses_root,
+        references_asset_base=snapshot.references_asset_base,
+        references_root=snapshot.references_root,
+        output_root=output_root,
+        renderer_entry=renderer_entry,
+        route=route,
+    )
+
+
+# ── atomic output — every adapter's sole write path ─────────────────────────
+#
+# The canonical episode-artwork frame — 16:9, matching the pipeline's fixed
+# output size for every generated shot. Defined here (not beside
+# apply_output_transform() below) because _validate_canonical_png() needs it
+# and every adapter's atomic_commit() call runs before that section.
+CANONICAL_WIDTH, CANONICAL_HEIGHT = 1280, 720
+OUTPUT_TRANSFORM_VERSION = 1
+
+
+def _validate_canonical_png(path: Path) -> None:
+    """Raises RuntimeError unless `path` is a regular, non-symlink, nonempty
+    file that decodes as a PNG exactly CANONICAL_WIDTH x CANONICAL_HEIGHT.
+    Called on the TEMPORARY file, before atomic_commit()'s os.replace() —
+    a caller must never commit a final asset that fails this."""
+    if path.is_symlink():
+        raise RuntimeError(f"{path} is a symlink — refusing to treat it as adapter output")
+    if not path.is_file():
+        raise RuntimeError(f"{path} does not exist or is not a regular file")
+    if path.stat().st_size == 0:
+        raise RuntimeError(f"{path} is empty")
+    from PIL import Image
+    try:
+        with Image.open(path) as img:
+            img.load()
+            fmt, size = img.format, img.size
+    except RuntimeError:
+        raise
+    except Exception as e:
+        raise RuntimeError(f"{path} does not decode as a valid image: {e}") from e
+    if fmt != "PNG":
+        raise RuntimeError(f"{path} is not a PNG (decoded format: {fmt})")
+    if size != (CANONICAL_WIDTH, CANONICAL_HEIGHT):
+        raise RuntimeError(
+            f"{path} is {size[0]}x{size[1]}, expected "
+            f"{CANONICAL_WIDTH}x{CANONICAL_HEIGHT}")
+
+
+def atomic_commit(target: Path, producer) -> None:
+    """THE shared atomic-output transaction every adapter uses — including
+    the two subprocess-driven ones (map/chart), which pass the temporary
+    path to their subprocess rather than `target` directly.
+
+    `producer(tmp_path)` is called with a unique temporary path inside
+    `target`'s own directory, created via tempfile.mkstemp() with `target`'s
+    own suffix preserved (some subprocess/library callees infer format from
+    the extension). `producer` must write/render/download its ENTIRE output
+    to `tmp_path` and ONLY `tmp_path` — never `target` directly, and never
+    partial bytes anywhere `target` could later be mistaken for.
+
+    On return, `tmp_path` is validated as a genuine canonical PNG
+    (`_validate_canonical_png`), then committed onto `target` via
+    `os.replace()` — an atomic rename, so any other process ever sees either
+    the complete old `target` bytes or the complete new ones, never a
+    partial file.
+
+    On ANY failure — `producer` raising, validation failing, or
+    `os.replace()` itself failing — the temporary file is removed and
+    `target` (if it already existed) is left byte-for-byte untouched. The
+    original exception (or the RuntimeError from validation) propagates;
+    callers convert that into a route_failures record themselves — this
+    function has no `route`/`project_dir` to record against.
+    """
+    target = Path(target)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    import tempfile
+    fd, tmp_name = tempfile.mkstemp(dir=str(target.parent), suffix=target.suffix or ".png")
+    os.close(fd)
+    tmp_path = Path(tmp_name)
+    try:
+        producer(tmp_path)
+        _validate_canonical_png(tmp_path)
+        os.replace(str(tmp_path), str(target))
+    except Exception:
+        try:
+            if tmp_path.exists():
+                tmp_path.unlink()
+        except OSError:
+            pass
+        raise
+
+
 # ── free/local renderers ─────────────────────────────────────────────────────
 
-def adapt_map(route: dict, target: Path, ctx: DispatchContext) -> bool:
+def adapt_map(route, target: Path, ctx: DispatchContext) -> bool:
     """Deterministic GeoJSON map render. No paid call, no credentials — still
-    canonical-execution-gated, because it writes approved episode artwork."""
+    canonical-execution-gated, because it writes approved episode artwork.
+
+    Writes exclusively through atomic_commit(): the subprocess is given the
+    unique temporary path, never `target` directly, so a crash mid-render or
+    a non-zero exit can never leave a partial or stale-but-successful-looking
+    file at `target`."""
     import generation_gate
     generation_gate.require_canonical_visual_execution_ready(
         ctx.project_dir, operation="adapt_map (canonical visual execution)")
     _verify_dispatch_entry(route, ctx, adapt_map)
     args = (route.get("route_args") or {}).get("map") or {}
-    cmd = [sys.executable, str(Path(__file__).parent / "generate_india_map.py"),
-           "--out", str(target)]
-    if args.get("regions"):
-        cmd += ["--highlight", ",".join(args["regions"])]
-    if args.get("secondary_regions"):
-        cmd += ["--highlight2", ",".join(args["secondary_regions"])]
-    if args.get("callout"):
-        cmd += ["--callout", str(args["callout"])]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
+    map_script = Path(__file__).parent / "generate_india_map.py"
+
+    def _producer(tmp_path: Path) -> None:
+        cmd = [sys.executable, str(map_script), "--out", str(tmp_path)]
+        if args.get("regions"):
+            cmd += ["--highlight", ",".join(args["regions"])]
+        if args.get("secondary_regions"):
+            cmd += ["--highlight2", ",".join(args["secondary_regions"])]
+        if args.get("callout"):
+            cmd += ["--callout", str(args["callout"])]
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True)
+        except OSError as e:
+            raise RuntimeError(f"could not launch generate_india_map.py: {e}") from e
+        if result.returncode != 0:
+            raise RuntimeError(f"map render failed: {result.stderr[-500:]}")
+
+    try:
+        atomic_commit(target, _producer)
+    except Exception as e:
         route_failures.record_failure(ctx.project_dir, route,
-                                       reason=f"map render failed: {result.stderr[-500:]}")
+                                       reason=f"map render failed: {e}")
         return False
     return True
 
 
-def adapt_chart(route: dict, target: Path, ctx: DispatchContext) -> bool:
+def adapt_chart(route, target: Path, ctx: DispatchContext) -> bool:
     """Deterministic matplotlib chart render. No paid call, no credentials —
-    still canonical-execution-gated, for the same reason as adapt_map."""
+    still canonical-execution-gated, for the same reason as adapt_map. Same
+    atomic_commit() discipline: the subprocess only ever sees the temporary
+    path."""
     import generation_gate
     generation_gate.require_canonical_visual_execution_ready(
         ctx.project_dir, operation="adapt_chart (canonical visual execution)")
     _verify_dispatch_entry(route, ctx, adapt_chart)
     import json as _json
     args = (route.get("route_args") or {}).get("chart") or {}
-    cmd = [sys.executable, str(Path(__file__).parent / "generate_chart.py"),
-           "--out", str(target), "--type", str(args.get("chart_type")),
-           "--data", _json.dumps(args.get("data"))]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
+    chart_script = Path(__file__).parent / "generate_chart.py"
+
+    def _producer(tmp_path: Path) -> None:
+        cmd = [sys.executable, str(chart_script), "--out", str(tmp_path),
+               "--type", str(args.get("chart_type")),
+               "--data", _json.dumps(args.get("data"))]
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True)
+        except OSError as e:
+            raise RuntimeError(f"could not launch generate_chart.py: {e}") from e
+        if result.returncode != 0:
+            raise RuntimeError(f"chart render failed: {result.stderr[-500:]}")
+
+    try:
+        atomic_commit(target, _producer)
+    except Exception as e:
         route_failures.record_failure(ctx.project_dir, route,
-                                       reason=f"chart render failed: {result.stderr[-500:]}")
+                                       reason=f"chart render failed: {e}")
         return False
     return True
 
 
-def adapt_host_composite(route: dict, target: Path, ctx: DispatchContext) -> bool:
-    """Composites an already-approved pose asset. Spends nothing, but writes
-    approved episode artwork, so composite_character.render_production()
-    re-checks generation-readiness itself — deliberately, per its own
-    contract — rather than trusting this adapter's caller alone."""
+def adapt_host_composite(route, target: Path, ctx: DispatchContext) -> bool:
+    """Composites an already-approved pose asset over `target`'s CURRENT
+    content, treated as the base image (Task 2B-B2b-2a: `target` here is the
+    dispatcher's route-level working target — the primary renderer's output
+    — never the project's live final asset; the dispatcher alone decides
+    when a working target becomes final).
+
+    Binds against `route['host_renderer_id']`, not `route['renderer_id']` —
+    the whole reason `_verify_dispatch_entry()` takes a `renderer_field`
+    parameter. Deliberately does NOT call
+    composite_character.render_production(): that public entry point is
+    gated by the legacy v2 require_generation_ready(), which does not (and
+    must not be made to) authorize canonical execution. Instead this calls
+    composite_character's private `_composite()` core directly — the same
+    rendering logic, with none of render_production()'s own authorization
+    layered on top, since this adapter's own canonical guard and identity
+    checks are the authorization here.
+
+    host_placement carries free-text `position`/`framing` fields (used only
+    to build the AI-generation prompt for the background render, in
+    prompt_policy.py) with no controlled vocabulary the compositor's
+    left/right/center placement understands — there is no deterministic
+    mapping from arbitrary text to a placement side, so it is never passed
+    to the compositor at all. The compositor's own canonical default (the
+    pose's own negative_space metadata) always governs; this adapter never
+    invents a side from text no schema constrains."""
     import generation_gate
     generation_gate.require_canonical_visual_execution_ready(
         ctx.project_dir, operation="adapt_host_composite (canonical visual execution)")
-    _verify_dispatch_entry(route, ctx, adapt_host_composite)
+    _verify_dispatch_entry(route, ctx, adapt_host_composite, renderer_field="host_renderer_id")
+
+    pose_id = route.get("host_pose_id")
+    if not isinstance(pose_id, str) or not pose_id.strip():
+        route_failures.record_failure(
+            ctx.project_dir, route,
+            reason=f"host composite route has no usable host_pose_id: {pose_id!r}")
+        return False
+    if not target.exists():
+        route_failures.record_failure(
+            ctx.project_dir, route,
+            reason="host composite has no base image to composite onto — the "
+                   "primary renderer must succeed first")
+        return False
+
     import composite_character
+
+    def _producer(tmp_path: Path) -> None:
+        composite_character._composite(
+            pose_id, background=target, out=tmp_path,
+            scene_bound=bool(route.get("host_scene_bound")), context=ctx.channel)
+
     try:
-        result = composite_character.render_production(
-            ctx.project_dir, route["host_pose_id"], background=target, out=target,
-            scene_bound=bool(route.get("host_scene_bound")))
+        atomic_commit(target, _producer)
     except Exception as e:
         route_failures.record_failure(ctx.project_dir, route,
                                        reason=f"host composite failed: {e}")
         return False
-    return bool(result)
+    return True
 
 
 # ── free-api renderer ────────────────────────────────────────────────────────
 
-def adapt_photo(route: dict, target: Path, ctx: DispatchContext) -> bool:
+def adapt_photo(route, target: Path, ctx: DispatchContext) -> bool:
     """Pexels photo fetch. Free of charge, but writes approved episode
-    artwork, so it is treated like any other approval-gated route."""
+    artwork, so it is treated like any other approval-gated route. Downloads
+    and resizes exclusively into the temporary path atomic_commit() gives
+    it — never `target` directly."""
     import generation_gate
     generation_gate.require_canonical_visual_execution_ready(
         ctx.project_dir, operation="adapt_photo (canonical visual execution)")
@@ -282,12 +538,27 @@ def adapt_photo(route: dict, target: Path, ctx: DispatchContext) -> bool:
         route_failures.record_failure(ctx.project_dir, route,
                                        reason="photo route has no route_args.photo.query")
         return False
-    api_key = search_pexels._get_api_key()
-    ok = search_pexels.fetch_photo(query, target, api_key)
-    if not ok:
+    try:
+        api_key = search_pexels._get_api_key()
+        if not api_key:
+            raise RuntimeError("PEXELS_API_KEY is not configured")
+    except Exception as e:
         route_failures.record_failure(ctx.project_dir, route,
-                                       reason=f"pexels fetch failed for query {query!r}")
-    return bool(ok)
+                                       reason=f"pexels credential unavailable: {e}")
+        return False
+
+    def _producer(tmp_path: Path) -> None:
+        ok = search_pexels.fetch_photo(query, tmp_path, api_key)
+        if not ok:
+            raise RuntimeError(f"pexels fetch failed for query {query!r}")
+
+    try:
+        atomic_commit(target, _producer)
+    except Exception as e:
+        route_failures.record_failure(ctx.project_dir, route,
+                                       reason=f"pexels fetch failed: {e}")
+        return False
+    return True
 
 
 # ── shared: credentials, response extraction, output transform ─────────────
@@ -362,12 +633,6 @@ def _extract_image_bytes(response, *, response_format_policy: str,
     if b64:
         return base64.b64decode(b64)
     return None
-
-
-# The canonical episode-artwork frame — 16:9, matching the pipeline's fixed
-# output size for every generated shot.
-CANONICAL_WIDTH, CANONICAL_HEIGHT = 1280, 720
-OUTPUT_TRANSFORM_VERSION = 1
 
 
 def apply_output_transform(image_bytes: bytes) -> bytes:
@@ -467,11 +732,22 @@ def adapt_flux(route: dict, target: Path, ctx: DispatchContext) -> bool:
         final_bytes = settings["transform"](img_bytes)
     except Exception as e:
         # Never leave a successful-looking final file behind on a transform
-        # failure — nothing has been written to `target` at all yet.
+        # failure — nothing has been written to `target` at all yet, and
+        # atomic_commit() below is never even reached.
         route_failures.record_failure(ctx.project_dir, route,
                                        reason=f"output transform failed: {e}")
         return False
-    target.write_bytes(final_bytes)
+
+    try:
+        atomic_commit(target, lambda tmp_path: tmp_path.write_bytes(final_bytes))
+    except Exception as e:
+        # The transformed bytes are already the registered-transform's own
+        # output; a failure here is atomic_commit's own validation or
+        # os.replace() failing, never "untransformed bytes" — this adapter
+        # never writes final_bytes anywhere except through atomic_commit.
+        route_failures.record_failure(ctx.project_dir, route,
+                                       reason=f"could not commit the final asset: {e}")
+        return False
     return True
 
 
@@ -595,5 +871,11 @@ def adapt_flux_reference_anchor(route: dict, target: Path, ctx: DispatchContext)
         route_failures.record_failure(ctx.project_dir, route,
                                        reason=f"output transform failed: {e}")
         return False
-    target.write_bytes(final_bytes)
+
+    try:
+        atomic_commit(target, lambda tmp_path: tmp_path.write_bytes(final_bytes))
+    except Exception as e:
+        route_failures.record_failure(ctx.project_dir, route,
+                                       reason=f"could not commit the final asset: {e}")
+        return False
     return True

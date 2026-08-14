@@ -615,12 +615,21 @@ try:
     check("route_images created no new image files", before == after,
           str(after - before))
 
+    # Task 2B-B2b-2a: --dry-run now inspects/reports the canonical
+    # visual_routes.json artifact, never the legacy prompts/plan.
+    # test_2min has no visual_routes.json (canonical authoring is a separate,
+    # later milestone — see the B2b-1 handoff), so an honest dry-run report
+    # says the artifact is unavailable and exits nonzero — that is correct
+    # reporting, not a false "clean" pass, and it still writes nothing.
     before = {p.name for p in (ROOT / "test_2min" / "images").glob("*")}
     r = subprocess.run([sys.executable, str(ROOT / "route_images.py"),
                         "--project", "test_2min", "--dry-run"],
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
     after = {p.name for p in (ROOT / "test_2min" / "images").glob("*")}
-    check("a dry run on a passing project exits 0", r.returncode == 0, r.stderr[-300:])
+    check("a dry run with no canonical routing artifact reports unexecutable "
+         "and exits nonzero", r.returncode == 1, r.stdout[-400:] + r.stderr[-300:])
+    check("the report names the missing artifact",
+          "visual_routes.json" in r.stdout, r.stdout[-400:])
     check("a dry run creates no image files", before == after, str(after - before))
 
     print("\n18. direct and orchestrated execution give the same verdict")

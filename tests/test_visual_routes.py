@@ -49,6 +49,7 @@ import shutil
 import sys
 import tempfile
 from pathlib import Path
+from types import MappingProxyType
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -2613,6 +2614,105 @@ def s9_every_execution_field_changes_the_visual_routes_hash():
               h != base_hash, f"{field}: {new_value!r} did not change the hash")
 
 
+# ── 10. the immutable dispatch snapshot (Task 2B-B2b-2a) ────────────────────
+
+def s10_build_dispatch_snapshot_requires_a_project_routes_load():
+    for bad in (None, {"doc": "not a real load"}, ["not", "a", "load"], "also not one"):
+        try:
+            vr.build_dispatch_snapshot(bad)
+            check(f"build_dispatch_snapshot rejects {type(bad).__name__} input",
+                  False, "did not raise")
+        except vr.VisualRoutesError:
+            check(f"build_dispatch_snapshot rejects {type(bad).__name__} input", True)
+
+
+def s10_build_dispatch_snapshot_raises_for_an_unexecutable_load():
+    root = temp_root()
+    proj = root / "unmigrated"
+    proj.mkdir(parents=True, exist_ok=True)
+    result = vr.inspect_project_routes(proj, operation="test")
+    check("the fixture load is genuinely not executable", not result.is_executable)
+    try:
+        vr.build_dispatch_snapshot(result)
+        check("build_dispatch_snapshot raises for a non-executable load", False, "no raise")
+    except vr.VisualRoutesError as e:
+        check("build_dispatch_snapshot raises for a non-executable load", True)
+        check("naming why it is not executable",
+              "canonical routing is unavailable" in str(e), str(e))
+
+
+def s10_snapshot_binds_exact_project_routes_id_and_hashes():
+    root = temp_root()
+    with World(root):
+        proj, doc, manifest_sha256 = _loader_project(root)
+        result = vr.require_executable_routes(proj, operation="test")
+        snap = vr.build_dispatch_snapshot(result)
+        check("snapshot.project_dir is the exact resolved project directory",
+              snap.project_dir == proj)
+        check("snapshot.routes_id matches the document's routes_id",
+              snap.routes_id == doc["routes_id"])
+        check("snapshot.routes_file_sha256 matches the file's exact bytes",
+              snap.routes_file_sha256 == vr.file_sha256(proj / vr.ROUTES_NAME))
+        check("snapshot.routes_content_sha256 matches a fresh recomputation",
+              snap.routes_content_sha256 == vr.compute_routes_content_sha256(doc))
+        check("snapshot carries exactly one route",
+              len(snap.routes) == 1, len(snap.routes))
+        check("snapshot.channel is the governing ChannelContext",
+              snap.channel is not None and snap.channel.channel_id == "loaderchan")
+
+
+def s10_snapshot_routes_are_deeply_immutable_but_dict_list_compatible():
+    root = temp_root()
+    with World(root):
+        proj, doc, _ = _loader_project(root)
+        result = vr.require_executable_routes(proj, operation="test")
+        snap = vr.build_dispatch_snapshot(result)
+    r0 = snap.routes[0]
+    check("a snapshot route is a dict subclass (isinstance(x, dict) holds)",
+          isinstance(r0, dict))
+    check("a nested route_args value is also a dict subclass",
+          isinstance(r0["route_args"], dict))
+    check("a nested route_args.map value is also a dict subclass",
+          isinstance(r0["route_args"]["map"], dict))
+    for label, mutate in (
+        ("top-level __setitem__", lambda: r0.__setitem__("renderer_id", "hacked")),
+        ("top-level pop", lambda: r0.pop("renderer_id")),
+        ("top-level update", lambda: r0.update(renderer_id="hacked")),
+        ("nested route_args __setitem__",
+         lambda: r0["route_args"].__setitem__("map", "hacked")),
+    ):
+        try:
+            mutate()
+            check(f"mutating a snapshot route ({label}) is refused", False,
+                  "mutation succeeded")
+        except TypeError:
+            check(f"mutating a snapshot route ({label}) is refused", True)
+    lst = r0["route_args"]["map"].get("regions")
+    if isinstance(lst, list):
+        check("a nested list value is also a list subclass", isinstance(lst, list))
+        try:
+            lst.append("hacked")
+            check("mutating a nested list is refused", False, "mutation succeeded")
+        except TypeError:
+            check("mutating a nested list is refused", True)
+
+
+def s10_snapshot_pose_reference_registries_come_from_the_same_validated_load():
+    root = temp_root()
+    with World(root):
+        proj, doc, _ = _loader_project(root)
+        result = vr.require_executable_routes(proj, operation="test")
+        check("a host-disabled project's ProjectRoutesLoad carries empty pose/"
+             "reference registries, not None", result.approved_poses == {}
+              and result.approved_references == {})
+        snap = vr.build_dispatch_snapshot(result)
+        check("the snapshot's approved_poses is the frozen form of the SAME "
+             "(empty) registry the load already validated against",
+              dict(snap.approved_poses) == {})
+        check("the snapshot's approved_poses is itself immutable",
+              isinstance(snap.approved_poses, MappingProxyType))
+
+
 def main() -> int:
     try:
         run("1a. a complete READY MAP route validates", s1_ready_map_valid)
@@ -2799,6 +2899,17 @@ def main() -> int:
             s9_dispatch_and_hashing_read_the_same_renderers_object)
         run("9d. every execution field changes the visual_routes renderer hash",
             s9_every_execution_field_changes_the_visual_routes_hash)
+
+        run("10a. build_dispatch_snapshot requires a real ProjectRoutesLoad",
+            s10_build_dispatch_snapshot_requires_a_project_routes_load)
+        run("10b. build_dispatch_snapshot raises for an unexecutable load",
+            s10_build_dispatch_snapshot_raises_for_an_unexecutable_load)
+        run("10c. snapshot binds exact project/routes_id/hashes",
+            s10_snapshot_binds_exact_project_routes_id_and_hashes)
+        run("10d. snapshot routes are deeply immutable but dict/list-compatible",
+            s10_snapshot_routes_are_deeply_immutable_but_dict_list_compatible)
+        run("10e. snapshot pose/reference registries come from the validated load",
+            s10_snapshot_pose_reference_registries_come_from_the_same_validated_load)
     finally:
         for td in _temps:
             shutil.rmtree(td, ignore_errors=True)

@@ -31,6 +31,7 @@ import sys
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
+from types import MappingProxyType
 
 PIPELINE_DIR = Path(__file__).parent
 FAILURES_NAME = "route_failures.json"
@@ -46,21 +47,72 @@ class FailureError(RuntimeError):
     """A failure record could not be read or resolved."""
 
 
-def route_args_digest(shot: dict) -> str:
-    """Stable digest of everything that determines what a route will produce.
+def _thaw_for_digest(obj):
+    """Recursively converts a MappingProxyType/tuple-based frozen structure
+    (as found in a DispatchSnapshot's routes — visual_routes.py's deep-frozen
+    route_args, host_reference_asset_ids, host_placement) back into plain
+    dict/list so json.dumps can serialize it; the stdlib json module does not
+    natively handle MappingProxyType. Read-only — never mutates `obj`, and the
+    caller never reuses the returned structure as though it were still
+    canonical/immutable."""
+    if isinstance(obj, (MappingProxyType, dict)):
+        return {k: _thaw_for_digest(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_thaw_for_digest(v) for v in obj]
+    return obj
 
-    Used to tell "the operator actually changed this route" from "the operator
-    re-ran the planner and hoped". Only executable inputs are included; shot
-    numbers and filenames are excluded because re-splitting changes them without
-    changing the work.
-    """
+
+def route_args_digest(route) -> str:
+    """Stable digest of the complete canonical execution input a route will
+    produce (Task 2B-B2b-2a): visual_type, renderer_id, host_renderer_id,
+    route_args, prompt, output_file, host_present, host_method,
+    host_pose_id, host_scene_bound, host_reference_asset_ids, and
+    host_placement. Changing any one of these changes the digest.
+
+    Deliberately excludes display-only fields — scene_id, shot number,
+    narration text used only for legacy classification/display — so
+    re-splitting the narration or reordering shots never changes this value
+    on its own. There is no map_args/chart_args/pose_id fallback: those are
+    legacy visual_plan.json fields, not canonical execution inputs, and
+    mixing them into this digest would let a legacy-shaped shot and a
+    canonical route that execute completely differently hash identically (or
+    vice versa) purely by coincidence of which fields happen to be set.
+
+    `route` may be a plain dict or an immutable MappingProxyType (a
+    DispatchSnapshot route) — both work identically; this function never
+    mutates its input. A caller passing a legacy visual_plan.json shot (which
+    carries none of the canonical field names above except a route-type
+    label) still gets a deterministic digest — every canonical field reads
+    as absent except the route type — it is simply not a meaningful one for
+    detecting a legacy route's own change; auto_resolve_changed() is not
+    wired against canonical routes by this task.
+
+    `visual_type` alone reads `route.get("visual_type") or route.get("type")`
+    — not a route_args/pose_id-style legacy fallback (there is deliberately
+    none of those), but plain compatibility with the two different dict
+    shapes this module's own EXISTING callers already pass for the identical
+    concept: a plan_visuals.py-built shot names it `visual_type`, while a
+    freshly parse_shots()-parsed shot (route_images.py's legacy classifier,
+    which auto_resolve_changed() is called against) names the same thing
+    `type`. Reading only `visual_type` would make every fresh legacy shot
+    hash as though it had no route at all, causing auto_resolve_changed() to
+    treat an UNCHANGED legacy route as if it had changed — the opposite of
+    what that function exists to detect. A canonical route always carries
+    `visual_type`, never `type`, so this reads identically for it either
+    way."""
     payload = json.dumps({
-        "route": shot.get("visual_type") or shot.get("type") or shot.get("planned_type"),
-        "map_args": shot.get("map_args", ""),
-        "chart_args": shot.get("chart_args", ""),
-        "pose_id": shot.get("pose_id", ""),
-        "scene_bound": bool(shot.get("scene_bound", False)),
-        "narration": shot.get("narration", ""),
+        "visual_type": route.get("visual_type") or route.get("type"),
+        "renderer_id": route.get("renderer_id"),
+        "host_renderer_id": route.get("host_renderer_id"),
+        "route_args": _thaw_for_digest(route.get("route_args")),
+        "prompt": route.get("prompt"),
+        "output_file": route.get("output_file"),
+        "host_present": bool(route.get("host_present")),
+        "host_method": route.get("host_method"),
+        "host_pose_id": route.get("host_pose_id"),
+        "host_scene_bound": route.get("host_scene_bound"),
+        "host_reference_asset_ids": _thaw_for_digest(route.get("host_reference_asset_ids")),
+        "host_placement": _thaw_for_digest(route.get("host_placement")),
     }, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 

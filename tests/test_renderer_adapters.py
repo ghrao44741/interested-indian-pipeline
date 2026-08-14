@@ -346,7 +346,7 @@ def s5_reference_anchored_passes_both_exact_master_bytes_body_then_face():
         project_dir=root, channel=channel, approved_poses={}, approved_references={},
         poses_asset_base=None, poses_root=None,
         references_asset_base=None, references_root=None,
-        output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"])
+        output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"], route=route)
 
     captured = {}
 
@@ -394,7 +394,7 @@ def s5_reference_anchored_edit_failure_never_calls_images_generate():
         project_dir=root, channel=channel, approved_poses={}, approved_references={},
         poses_asset_base=None, poses_root=None,
         references_asset_base=None, references_root=None,
-        output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"])
+        output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"], route=route)
 
     class _FakeImages:
         edit_calls = []
@@ -446,7 +446,7 @@ def s5_reference_anchored_refuses_before_provider_call_when_a_reference_is_missi
         project_dir=root, channel=channel, approved_poses={}, approved_references={},
         poses_asset_base=None, poses_root=None,
         references_asset_base=None, references_root=None,
-        output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"])
+        output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"], route=route)
 
     with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
                           return_value=None), \
@@ -474,7 +474,7 @@ def s5_reference_anchored_rejects_a_stale_hash_before_any_provider_call():
         project_dir=root, channel=channel, approved_poses={}, approved_references={},
         poses_asset_base=None, poses_root=None,
         references_asset_base=None, references_root=None,
-        output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"])
+        output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"], route=route)
 
     with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
                           return_value=None), \
@@ -500,7 +500,7 @@ def s5_reference_anchored_rejects_a_non_approved_status_before_any_provider_call
         project_dir=root, channel=channel, approved_poses={}, approved_references={},
         poses_asset_base=None, poses_root=None,
         references_asset_base=None, references_root=None,
-        output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"])
+        output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"], route=route)
 
     with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
                           return_value=None), \
@@ -525,7 +525,7 @@ def s5_reference_anchored_rejects_top_level_master_disagreement_before_any_provi
         project_dir=root, channel=channel, approved_poses={}, approved_references={},
         poses_asset_base=None, poses_root=None,
         references_asset_base=None, references_root=None,
-        output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"])
+        output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"], route=route)
 
     with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
                           return_value=None), \
@@ -569,7 +569,7 @@ def s5_reference_anchored_rejects_traversal_and_archive_paths_before_any_provide
             project_dir=root, channel=channel, approved_poses={}, approved_references={},
             poses_asset_base=None, poses_root=None,
             references_asset_base=None, references_root=None,
-            output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"])
+            output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"], route=route)
 
         with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
                               return_value=None), \
@@ -717,7 +717,7 @@ def s8_adapt_flux_applies_the_registered_transform_to_a_non_16x9_response():
     ctx = ra.DispatchContext(
         project_dir=root, channel=None, approved_poses={}, approved_references={},
         poses_asset_base=None, poses_root=None, references_asset_base=None,
-        references_root=None, output_root=root, renderer_entry=real_entry)
+        references_root=None, output_root=root, renderer_entry=real_entry, route=route)
 
     non_16x9 = _non_16x9_png_bytes((1536, 1024))
     b64 = __import__("base64").b64encode(non_16x9).decode()
@@ -767,7 +767,7 @@ def s8_adapt_flux_reference_anchor_applies_the_registered_transform():
     ctx = ra.DispatchContext(
         project_dir=root, channel=channel, approved_poses={}, approved_references={},
         poses_asset_base=None, poses_root=None, references_asset_base=None,
-        references_root=None, output_root=root, renderer_entry=real_entry)
+        references_root=None, output_root=root, renderer_entry=real_entry, route=route)
 
     non_16x9 = _non_16x9_png_bytes((1536, 1024))
     b64 = __import__("base64").b64encode(non_16x9).decode()
@@ -808,7 +808,7 @@ def s8_transform_failure_leaves_no_successful_looking_final_file():
         project_dir=root, channel=None, approved_poses={}, approved_references={},
         poses_asset_base=None, poses_root=None, references_asset_base=None,
         references_root=None, output_root=root,
-        renderer_entry=renderers.RENDERERS["flux_illustration"])
+        renderer_entry=renderers.RENDERERS["flux_illustration"], route=route)
 
     b64 = __import__("base64").b64encode(b"not-a-real-image").decode()
 
@@ -952,11 +952,12 @@ def s9_all_adapters_reject_an_entry_whose_registered_adapter_does_not_match():
 
 # item 3: no execution-setting fallbacks
 
-def _flux_ctx(root, renderer_entry, channel=None):
+def _flux_ctx(root, renderer_entry, channel=None, route=None):
     return ra.DispatchContext(
         project_dir=root, channel=channel, approved_poses={}, approved_references={},
         poses_asset_base=None, poses_root=None, references_asset_base=None,
-        references_root=None, output_root=root, renderer_entry=renderer_entry)
+        references_root=None, output_root=root, renderer_entry=renderer_entry,
+        route=route)
 
 
 def s9_adapt_flux_refuses_malformed_execution_settings_before_credentials_or_client():
@@ -1013,7 +1014,7 @@ def s9_credential_lookup_refuses_before_client_construction_when_unavailable():
         mock.patch("openai.OpenAI") as mock_openai, \
         mock.patch.object(ra, "route_failures") as mock_rf, \
         mock.patch.object(Path, "exists", return_value=False):
-        ctx = _flux_ctx(root, real_entry)
+        ctx = _flux_ctx(root, real_entry, route=route)
         target = root / "out.png"
         ok = ra.adapt_flux(route, target, ctx)
     check("adapt_flux refuses (records a failure) rather than raising when the "
@@ -1047,7 +1048,7 @@ def s9_reference_anchored_requires_exactly_two_distinct_reference_ids():
         route = _base_route(host_present=True, host_method="reference_anchored_generation",
                             host_reference_asset_ids=bad_ids,
                             renderer_id="flux_reference_anchor")
-        ctx = _flux_ctx(root, real_entry, channel=channel)
+        ctx = _flux_ctx(root, real_entry, channel=channel, route=route)
         target = root / f"out_refids_{hash(label) & 0xffff}.png"
         with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
                               return_value=None), \
@@ -1068,6 +1069,209 @@ def s9_reference_anchored_requires_exactly_two_distinct_reference_ids():
     check("['face_master', 'body_master'] (order-normalized) is accepted by "
           "the id-shape check itself",
           ra._exactly_body_then_face(good_route["host_reference_asset_ids"]))
+
+
+# ── 10. atomic_commit and build_dispatch_context (Task 2B-B2b-2a) ──────────
+
+def _canonical_png_bytes() -> bytes:
+    from PIL import Image
+    img = Image.new("RGB", (ra.CANONICAL_WIDTH, ra.CANONICAL_HEIGHT), (10, 20, 30))
+    out = io.BytesIO()
+    img.save(out, format="PNG")
+    return out.getvalue()
+
+
+def s10_atomic_commit_success_writes_via_temp_file_then_replace():
+    root = temp_dir()
+    target = root / "out.png"
+    seen_tmp_paths = []
+
+    def producer(tmp_path: Path):
+        seen_tmp_paths.append(tmp_path)
+        check("the temp path is inside target's own directory",
+              tmp_path.parent == target.parent)
+        check("the temp path is not target itself", tmp_path != target)
+        tmp_path.write_bytes(_canonical_png_bytes())
+
+    ra.atomic_commit(target, producer)
+    check("atomic_commit produced the final target", target.exists())
+    check("the temp file no longer exists after a successful commit",
+          not seen_tmp_paths[0].exists())
+    from PIL import Image
+    img = Image.open(target)
+    check("the committed file is a valid canonical PNG",
+          img.format == "PNG" and img.size == (ra.CANONICAL_WIDTH, ra.CANONICAL_HEIGHT))
+
+
+def s10_atomic_commit_failure_removes_temp_and_preserves_existing_final():
+    root = temp_dir()
+    target = root / "out.png"
+    target.write_bytes(b"PRE-EXISTING FINAL BYTES")
+    before = target.read_bytes()
+
+    captured = {}
+
+    def bad_producer(tmp_path: Path):
+        captured["tmp_path"] = tmp_path
+        tmp_path.write_bytes(b"not a real png")
+
+    try:
+        ra.atomic_commit(target, bad_producer)
+        check("atomic_commit raises when the producer's output is invalid",
+              False, "did not raise")
+    except RuntimeError:
+        check("atomic_commit raises when the producer's output is invalid", True)
+    check("the temp file was removed on failure", not captured["tmp_path"].exists())
+    check("the pre-existing final target is preserved byte-for-byte",
+          target.read_bytes() == before)
+
+
+def s10_atomic_commit_wrong_size_is_rejected():
+    root = temp_dir()
+    target = root / "out.png"
+
+    def producer(tmp_path: Path):
+        from PIL import Image
+        img = Image.new("RGB", (640, 480), (1, 2, 3))
+        img.save(tmp_path, format="PNG")
+
+    try:
+        ra.atomic_commit(target, producer)
+        check("a wrong-size PNG is rejected", False, "did not raise")
+    except RuntimeError as e:
+        check("a wrong-size PNG is rejected", "640x480" in str(e) or "1280" in str(e), str(e))
+    check("no final file was left behind", not target.exists())
+
+
+def s10_atomic_commit_empty_output_is_rejected():
+    root = temp_dir()
+    target = root / "out.png"
+
+    def producer(tmp_path: Path):
+        pass  # leaves the mkstemp-created file empty
+
+    try:
+        ra.atomic_commit(target, producer)
+        check("empty producer output is rejected", False, "did not raise")
+    except RuntimeError as e:
+        check("empty producer output is rejected", "empty" in str(e), str(e))
+
+
+def s10_atomic_commit_producer_exception_removes_temp_preserves_final():
+    root = temp_dir()
+    target = root / "out.png"
+    target.write_bytes(b"OLD FINAL")
+
+    captured = {}
+
+    def raising_producer(tmp_path: Path):
+        captured["tmp_path"] = tmp_path
+        tmp_path.write_bytes(b"partial garbage")
+        raise RuntimeError("simulated producer failure")
+
+    try:
+        ra.atomic_commit(target, raising_producer)
+        check("a producer exception propagates", False, "did not raise")
+    except RuntimeError as e:
+        check("a producer exception propagates", "simulated producer failure" in str(e), str(e))
+    check("the temp file was removed", not captured["tmp_path"].exists())
+    check("the old final target is untouched", target.read_bytes() == b"OLD FINAL")
+
+
+def s10_atomic_commit_replace_failure_preserves_final():
+    root = temp_dir()
+    target = root / "out.png"
+    target.write_bytes(b"OLD FINAL")
+
+    def producer(tmp_path: Path):
+        tmp_path.write_bytes(_canonical_png_bytes())
+
+    with mock.patch("os.replace", side_effect=OSError("simulated replace failure")):
+        try:
+            ra.atomic_commit(target, producer)
+            check("an os.replace() failure propagates", False, "did not raise")
+        except OSError:
+            check("an os.replace() failure propagates", True)
+    check("the old final target survives an os.replace() failure",
+          target.read_bytes() == b"OLD FINAL")
+
+
+def s10_build_dispatch_context_requires_a_real_snapshot():
+    import visual_routes as vr
+    route = _base_route()
+    for bad_snapshot in (None, {"routes": (route,)}, "not a snapshot"):
+        try:
+            ra.build_dispatch_context(bad_snapshot, route, output_root=temp_dir())
+            check(f"build_dispatch_context rejects a {type(bad_snapshot).__name__} "
+                 f"snapshot", False, "did not raise")
+        except ra.DispatchIntegrityError:
+            check(f"build_dispatch_context rejects a {type(bad_snapshot).__name__} "
+                 f"snapshot", True)
+
+
+def _fake_snapshot(routes: tuple, root: Path, channel=None):
+    import visual_routes as vr
+    return vr.DispatchSnapshot(
+        project_dir=root, routes_id="r1", routes_file_sha256="a" * 64,
+        routes_content_sha256="b" * 64, channel=channel, routes=routes,
+        approved_poses=MappingProxyType({}), poses_asset_base=None, poses_root=None,
+        approved_references=MappingProxyType({}), references_asset_base=None,
+        references_root=None)
+
+
+def s10_build_dispatch_context_requires_route_membership_by_identity():
+    root = temp_dir()
+    real_route = _base_route(renderer_id="pexels", visual_type="PHOTO")
+    snapshot = _fake_snapshot((real_route,), root)
+
+    equal_copy = dict(real_route)
+    for label, candidate in (
+        ("an equal copy (not the same object)", equal_copy),
+        ("an independently frozen mapping of the same content",
+         MappingProxyType(dict(real_route))),
+    ):
+        try:
+            ra.build_dispatch_context(snapshot, candidate, output_root=root)
+            check(f"build_dispatch_context rejects {label}", False, "did not raise")
+        except ra.DispatchIntegrityError:
+            check(f"build_dispatch_context rejects {label}", True)
+
+    other_route = _base_route(renderer_id="pexels", visual_type="PHOTO",
+                              visual_asset_id="VIS-002-A")
+    other_snapshot = _fake_snapshot((other_route,), root)
+    try:
+        ra.build_dispatch_context(other_snapshot, real_route, output_root=root)
+        check("build_dispatch_context rejects a route from another snapshot",
+              False, "did not raise")
+    except ra.DispatchIntegrityError:
+        check("build_dispatch_context rejects a route from another snapshot", True)
+
+    ctx = ra.build_dispatch_context(snapshot, real_route, output_root=root)
+    check("build_dispatch_context accepts the genuine member route",
+          ctx.route is real_route)
+    check("ctx.renderer_entry is the canonical entry for the route's renderer_id",
+          ctx.renderer_entry is renderers.get("pexels"))
+
+
+def s10_build_dispatch_context_binds_the_requested_renderer_field():
+    root = temp_dir()
+    route = _base_route(renderer_id="pexels", host_present=True,
+                        host_method="approved_pose_composite",
+                        host_renderer_id="approved_pose_compositor",
+                        visual_type="PHOTO")
+    snapshot = _fake_snapshot((route,), root)
+
+    primary_ctx = ra.build_dispatch_context(snapshot, route, output_root=root,
+                                            renderer_field="renderer_id")
+    check("renderer_field='renderer_id' binds the primary renderer's entry",
+          primary_ctx.renderer_entry is renderers.get("pexels"))
+
+    host_ctx = ra.build_dispatch_context(snapshot, route, output_root=root,
+                                         renderer_field="host_renderer_id")
+    check("renderer_field='host_renderer_id' binds the host renderer's entry",
+          host_ctx.renderer_entry is renderers.get("approved_pose_compositor"))
+    check("the two contexts bind different renderer entries",
+          primary_ctx.renderer_entry is not host_ctx.renderer_entry)
 
 
 for title, fn in (
@@ -1140,6 +1344,22 @@ for title, fn in (
      s9_credential_lookup_refuses_before_client_construction_when_unavailable),
     ("9h. reference-anchored requires exactly two distinct reference ids",
      s9_reference_anchored_requires_exactly_two_distinct_reference_ids),
+    ("10a. atomic_commit success writes via temp file then os.replace",
+     s10_atomic_commit_success_writes_via_temp_file_then_replace),
+    ("10b. atomic_commit failure removes temp and preserves existing final",
+     s10_atomic_commit_failure_removes_temp_and_preserves_existing_final),
+    ("10c. atomic_commit rejects a wrong-size PNG", s10_atomic_commit_wrong_size_is_rejected),
+    ("10d. atomic_commit rejects empty output", s10_atomic_commit_empty_output_is_rejected),
+    ("10e. atomic_commit: a producer exception removes temp, preserves final",
+     s10_atomic_commit_producer_exception_removes_temp_preserves_final),
+    ("10f. atomic_commit: an os.replace failure preserves the final target",
+     s10_atomic_commit_replace_failure_preserves_final),
+    ("10g. build_dispatch_context requires a real DispatchSnapshot",
+     s10_build_dispatch_context_requires_a_real_snapshot),
+    ("10h. build_dispatch_context requires route membership by identity",
+     s10_build_dispatch_context_requires_route_membership_by_identity),
+    ("10i. build_dispatch_context binds the requested renderer_field",
+     s10_build_dispatch_context_binds_the_requested_renderer_field),
 ):
     run(title, fn)
 

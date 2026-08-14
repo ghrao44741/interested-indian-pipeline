@@ -145,13 +145,23 @@ PAID_ENTRY_POINTS = [
         "id": "images.router",
         "module": "route_images.py",
         "gates": [{"kind": "identity", "function": "classify"},
-                  {"kind": "generation", "function": "dispatch_routes"}],
+                  {"kind": "generation", "function": "dispatch_routes_legacy_v2"},
+                  {"kind": "canonical_visual_execution", "function": "dispatch_routes"}],
         "provider": "delegated (xai, pexels) + local",
-        "operation": "classify shots, then dispatch to generators",
+        "operation": "classify shots, then dispatch to generators (legacy v2) or "
+                     "execute a validated visual_routes.json (canonical, Task "
+                     "2B-B2b-2a)",
         "retry_paths": ["--overwrite"],
         "implemented": True,
-        "note": "two phases: classification and --dry-run need identity only; "
-                "the first dispatch needs approval",
+        "note": "classify()/--dry-run need identity (legacy) or nothing at all "
+                "(canonical dry-run just inspects visual_routes.json). "
+                "dispatch_routes_legacy_v2 is the renamed original plan-driven "
+                "dispatcher (Task 2B-B2b-2a; unchanged behavior, still gated by "
+                "the legacy v2 approval). dispatch_routes is the new canonical, "
+                "visual_routes.json-only dispatcher — gated by the same "
+                "universal, currently-unconditional refusal as the six "
+                "renderer_adapters.py adapters below, and it is the FIRST thing "
+                "that function does, before any route loading.",
     },
     {
         "id": "images.flux_batch",

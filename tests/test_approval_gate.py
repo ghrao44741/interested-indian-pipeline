@@ -488,7 +488,7 @@ try:
          mock.patch.object(route_images, "run_ai_batch", count_ai), \
          mock.patch.object(route_images, "run_map", lambda *a, **k: True), \
          mock.patch.object(route_images, "run_host", lambda *a, **k: True):
-        code = route_images.dispatch_routes(proj, ROOT, executable, overwrite=True)
+        code = route_images.dispatch_routes_legacy_v2(proj, ROOT, executable, overwrite=True)
     check("the failing PHOTO shot was attempted once", calls["pexels"] == 1)
     check("it did not become an AI generation", calls["ai"] == 0,
           f"AI batch ran {calls['ai']}x after a PHOTO failure")
@@ -583,7 +583,7 @@ try:
         executable = json.loads(
             (proj / plan_visuals.PLAN_JSON).read_text(encoding="utf-8"))
         try:
-            route_images.dispatch_routes(proj, ROOT, executable, overwrite=True)
+            route_images.dispatch_routes_legacy_v2(proj, ROOT, executable, overwrite=True)
             check("dispatch refused", False, "it dispatched")
         except gate.GateBlocked:
             check("dispatch refused", True)
@@ -620,7 +620,16 @@ try:
     r = subprocess.run([sys.executable, str(ROOT / "route_images.py"),
                         "--project", "test_2min", "--dry-run"],
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
-    check("a dry run still works without approval", r.returncode == 0, r.stdout[-400:])
+    # Task 2B-B2b-2a: --dry-run now inspects the canonical visual_routes.json
+    # artifact (never requiring a v3 approval, which is the property this
+    # check exists to prove) rather than classifying the legacy prompts file.
+    # test_2min has no visual_routes.json yet, so it honestly reports
+    # unexecutable and exits nonzero — still without ever asking for an
+    # approval of any kind.
+    check("a dry run still works (runs to completion) without any approval",
+          r.returncode in (0, 1), r.stdout[-400:])
+    check("a dry run never mentions Checkpoint 3 approval at all",
+          "Checkpoint 3" not in r.stdout, r.stdout[-400:])
 
     # ── 15 ───────────────────────────────────────────────────────────────────
     print("\n15. character work is separate from episode approval")
