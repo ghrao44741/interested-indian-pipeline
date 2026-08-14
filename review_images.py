@@ -50,6 +50,16 @@ sys.path.insert(0, str(Path(__file__).parent))
 import route_images
 from generation_gate import GateBlocked, require_generation_ready
 
+# Everything below this constants block down to "CANONICAL REVIEW" is the
+# LEGACY v2 review path — AI vision QA via the Anthropic API, gated by the
+# legacy require_generation_ready() approval. Task 2B-B2b-2b's canonical
+# review path is a structurally SEPARATE section further down: different
+# functions, no shared state, no call from one path into the other. The
+# canonical path is a read-only structural integrity check (does the exact
+# asset a sealed route names exist, as a genuine canonical PNG, at its
+# exact contained target) — it makes no provider/API call at all, unlike
+# this legacy vision-review path below.
+
 # ── constants ──────────────────────────────────────────────────────────────────
 PROMPTS_FILE = "image_prompts_one_line_per_prompt.md"
 
@@ -706,6 +716,104 @@ def run_feedback_loop(cfl, shots: list[dict], images_dir: Path, project_dir: Pat
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# CANONICAL REVIEW (Task 2B-B2b-2b) — structurally separate from the legacy
+# v2 AI-vision path above. No shared state, no call in either direction.
+#
+# A read-only, no-provider structural integrity check: for every route in a
+# sealed DispatchSnapshot, does the exact asset that route's dispatch stage
+# is supposed to have produced actually exist, as a genuine canonical
+# (1280x720, non-symlink, decodable) PNG, at its exact contained target?
+# Never a vision/API call — that is what makes this callable as an
+# ordinary, cheap post-dispatch and post-overlay integrity gate from
+# in-process orchestration (pipeline_agents.py), not just a paid QA pass a
+# human explicitly requests.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+from dataclasses import dataclass as _dataclass
+
+
+@_dataclass(frozen=True)
+class RouteReviewResult:
+    visual_asset_id: str
+    output_file: str
+    target: Path
+    verdict: str            # "PASS" or "FAIL"
+    reason: str
+
+
+def review_snapshot_canonical(snapshot: "visual_routes.DispatchSnapshot") -> list:
+    """The narrow, trusted internal reviewer (Task 2B-B2b-2b) — reviews an
+    ALREADY-SEALED DispatchSnapshot the caller obtained itself, so
+    in-process orchestration can review the SAME snapshot it dispatched
+    against rather than re-deriving one (a second load could in principle
+    see a routes file that changed mid-pass).
+
+    Performs its OWN universal canonical-execution gate check first, like
+    every entry point into this codebase's paid/writing/reviewing surface
+    does, even though a caller invoking this from an already-gated pass
+    has necessarily already passed it too.
+
+    Expected assets and their exact targets come ONLY from `snapshot.routes`
+    — never from globbing `images/` (which could review an asset no current
+    route names, or silently skip a route whose target moved) and never
+    from a caller-supplied route list. Each target is resolved through
+    visual_routes.resolve_output_target() — the SAME containment/traversal/
+    symlink-escape logic route_images.py's dispatcher and preflight use —
+    so a review can never be pointed at a path outside
+    snapshot.project_dir/images. Read-only: no file is created, deleted, or
+    modified; no provider/API/download call is made anywhere in this
+    function.
+    """
+    import renderer_adapters
+    import visual_routes as _visual_routes
+
+    if not isinstance(snapshot, _visual_routes.DispatchSnapshot):
+        raise TypeError(
+            f"review_snapshot_canonical() requires a visual_routes.DispatchSnapshot, "
+            f"got {type(snapshot).__name__}")
+    import generation_gate
+    generation_gate.require_canonical_visual_execution_ready(
+        snapshot.project_dir, operation="canonical image review")
+
+    images_dir = snapshot.project_dir / "images"
+    results = []
+    for route in snapshot.routes:
+        vid = route.get("visual_asset_id")
+        output_file = route.get("output_file")
+        try:
+            target = _visual_routes.resolve_output_target(images_dir, output_file)
+        except _visual_routes.VisualRoutesError as e:
+            results.append(RouteReviewResult(vid, output_file, images_dir, "FAIL", str(e)))
+            continue
+        try:
+            renderer_adapters._validate_canonical_png(target)
+        except RuntimeError as e:
+            results.append(RouteReviewResult(vid, output_file, target, "FAIL", str(e)))
+            continue
+        results.append(RouteReviewResult(vid, output_file, target, "PASS", "ok"))
+    return results
+
+
+def review_project_canonical(project_dir) -> list:
+    """The public canonical review entry point (Task 2B-B2b-2b). Performs
+    its own gate check and loads its own sealed snapshot, then delegates to
+    `review_snapshot_canonical()`. Its literal first operational boundary is
+    generation_gate.require_canonical_visual_execution_ready() — before any
+    route loading, target resolution, or filesystem read; it currently
+    always refuses (Task 2B-B2a/B2b-1's universal guard), so this function's
+    body is exercised only in tests with that guard explicitly patched.
+    """
+    import generation_gate
+    import visual_routes as _visual_routes
+
+    generation_gate.require_canonical_visual_execution_ready(
+        project_dir, operation="canonical image review")
+    result = _visual_routes.require_executable_routes(project_dir, operation="review")
+    snapshot = _visual_routes.build_dispatch_snapshot(result)
+    return review_snapshot_canonical(snapshot)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # MAIN
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -715,6 +823,12 @@ def main():
     )
     parser.add_argument("--project", required=True,
                         help="Project folder (e.g. ep01), relative or absolute")
+    parser.add_argument("--canonical", action="store_true",
+                        help="Canonical structural review (Task 2B-B2b-2b): reviews the "
+                             "sealed visual_routes.json dispatch snapshot only — no vision "
+                             "API call, no legacy v2 approval. Structurally separate from "
+                             "every other flag below, which drives the legacy v2 AI-vision "
+                             "review path.")
     parser.add_argument("--shot", type=int, default=None,
                         help="Review a single shot number (e.g. --shot 7)")
     parser.add_argument("--fail-only", action="store_true",
@@ -747,6 +861,27 @@ def main():
     if not project_dir.is_dir():
         print(f"❌ Project folder not found: {project_dir}")
         sys.exit(1)
+
+    if args.canonical:
+        # Structurally separate from everything below: no vision API call,
+        # no legacy v2 approval, no shared state with the AI-review path.
+        from generation_gate import GateBlocked as _GateBlocked
+        try:
+            results = review_project_canonical(project_dir)
+        except _GateBlocked as e:
+            print(f"\n{e}")
+            print("\nNothing was reviewed.")
+            sys.exit(1)
+        fails = [r for r in results if r.verdict != "PASS"]
+        print(f"\n{'=' * 55}")
+        print(f"Canonical Image Review — {project_dir.name}")
+        for r in results:
+            icon = "✓" if r.verdict == "PASS" else "✗"
+            print(f"  {icon} {r.verdict}  {r.visual_asset_id}  {r.output_file}"
+                  + (f"  — {r.reason}" if r.verdict != "PASS" else ""))
+        print(f"\n  {len(results) - len(fails)}/{len(results)} passed")
+        print(f"{'=' * 55}\n")
+        sys.exit(1 if fails else 0)
 
     # Vision QA is billed per image. Same gate as generation: reviewing artwork
     # that is attached to uncertain words produces a confident verdict about the

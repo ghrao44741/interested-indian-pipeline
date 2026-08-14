@@ -850,15 +850,47 @@ def dispatch_routes(project_dir: Path, *, overwrite: bool = False) -> int:
     (Task 2B-B2b-3) activates that guard — no code here changes when that
     happens.
 
-    Stops immediately on the first route's failure — never attempts a
-    later free, local, derived, free-API, or paid route, and never batches
-    paid routes through a legacy CLI.
+    A thin public wrapper: performs its own gate check and loads its own
+    snapshot, then delegates to `dispatch_snapshot_routes()`. A caller that
+    already holds a sealed snapshot for this same project (Task 2B-B2b-2b's
+    in-process orchestration, which must stay bound to ONE snapshot across
+    dispatch/review/overlay stages rather than re-deriving one per stage)
+    calls `dispatch_snapshot_routes()` directly instead of this function.
     """
     generation_gate.require_canonical_visual_execution_ready(
         project_dir, operation="route dispatch (canonical visual execution)")
 
     result = visual_routes.require_executable_routes(project_dir, operation="dispatch")
     snapshot = visual_routes.build_dispatch_snapshot(result)
+    return dispatch_snapshot_routes(snapshot, overwrite=overwrite)
+
+
+def dispatch_snapshot_routes(snapshot: "visual_routes.DispatchSnapshot", *,
+                             overwrite: bool = False) -> int:
+    """The narrow, trusted internal dispatcher (Task 2B-B2b-2b) — executes
+    an ALREADY-SEALED DispatchSnapshot the caller obtained itself. This is
+    what lets in-process orchestration (pipeline_agents.py) and
+    `dispatch_routes()` above share the identical dispatch logic while
+    staying bound to exactly one snapshot per orchestrated pass, instead of
+    each stage re-deriving its own (a second load could in principle see a
+    changed routes file mid-pass).
+
+    Still performs its OWN universal canonical-execution gate check first —
+    every entry point into paid/writing behavior in this codebase checks
+    its own gate rather than trusting a caller to have checked, and this is
+    no exception, even though every realistic caller already has. Requires
+    a genuinely sealed snapshot (`isinstance(snapshot._seal, ...)`,
+    enforced deeper down by build_dispatch_context() on every route) —
+    never accepts a caller-assembled route list or a directly-constructed
+    DispatchSnapshot as dispatch authority.
+    """
+    import visual_routes as _visual_routes
+    if not isinstance(snapshot, _visual_routes.DispatchSnapshot):
+        raise RouteError(
+            f"dispatch_snapshot_routes() requires a visual_routes.DispatchSnapshot, "
+            f"got {type(snapshot).__name__}")
+    generation_gate.require_canonical_visual_execution_ready(
+        snapshot.project_dir, operation="route dispatch (canonical visual execution)")
 
     images_dir = snapshot.project_dir / "images"
     targets = _preflight_targets(snapshot, images_dir, overwrite)

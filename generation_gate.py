@@ -166,32 +166,49 @@ PAID_ENTRY_POINTS = [
     {
         "id": "images.flux_batch",
         "module": "generate_images_flux.py",
-        "gates": [{"kind": "generation", "function": "main"}],
+        "gates": [{"kind": "generation", "function": "main_legacy_v2"}],
         "provider": "xai | replicate",
         "operation": "episode image batch (illustration/reenactment shots)",
         "retry_paths": ["--from-report", "--shot", "--overwrite"],
         "implemented": True,
+        "note": "Task 2B-B2b-2b: main() is now a refusal shim for the "
+                "obsolete project-mode CLI (never calls the gate — there is "
+                "nothing left to gate once every path refuses "
+                "unconditionally); the real, still-gated implementation "
+                "moved to main_legacy_v2(), reachable only by calling it "
+                "directly, never through this module's CLI entry point.",
     },
     {
         "id": "images.aibmm_batch",
         "module": "generate_images_aibmm.py",
-        "gates": [{"kind": "generation", "function": "main"}],
+        "gates": [{"kind": "generation", "function": "main_legacy_v2"}],
         "provider": "openai",
         "operation": "episode image batch via gpt-image-2",
         "retry_paths": ["--overwrite", "--test"],
         "implemented": True,
-        "note": "--test has no episode and runs the character gate instead",
+        "note": "--test has no episode and runs the character gate instead. "
+                "Task 2B-B2b-2b: main() is now a refusal shim for "
+                "PROJECT-mode only — it still delegates --test straight to "
+                "main_legacy_v2(), which is where both gate calls (this "
+                "one and the character-scope one --test uses) actually "
+                "live.",
     },
     {
         "id": "images.pexels",
         "module": "search_pexels.py",
-        "gates": [{"kind": "generation", "function": "main"}],
+        "gates": [{"kind": "generation", "function": "main_legacy_v2"}],
         "provider": "pexels (free tier, rate limited)",
         "operation": "stock photo download",
         "retry_paths": [],
         "implemented": True,
         "note": "free of charge but writes approved episode artwork, so it is "
-                "approval-gated like any other route that produces a shot",
+                "approval-gated like any other route that produces a shot. "
+                "Task 2B-B2b-2b: main() is now a refusal shim for the "
+                "obsolete project BATCH mode only (--project with no "
+                "--query) — every other invocation shape, including the "
+                "single-shot --query (+--project) fetch route_images.py's "
+                "legacy v2 dispatch still calls, delegates straight to "
+                "main_legacy_v2(), where the gate call actually lives.",
     },
     {
         "id": "images.host_composite",

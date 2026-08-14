@@ -278,7 +278,7 @@ def generate_images(project_dir: Path, scene_type_filter: str | None,
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
 
-def main():
+def main_legacy_v2():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -353,5 +353,38 @@ def main():
                     force_general=args.force_general)
 
 
+def main() -> int:
+    """Refusal shim (Task 2B-B2b-2b), PROJECT-mode only. `--test` remains
+    fully functional and unmodified below: it is channel/character-scope
+    work with no project involved at all — never the "obsolete project-mode
+    execution" this task targets — and it is gated by
+    require_character_ready() (inside main_legacy_v2()), not the legacy v2
+    project approval this shim exists to stop bypassing.
+
+    `--project <episode>` (with or without any other flag) is obsolete:
+    canonical image generation is dispatched in-process through
+    route_images.py's canonical dispatcher, itself still universally
+    refused pending Task 2B-B2b-3. This shim never constructs a provider
+    client and never reads a credential for the project-mode case — it
+    only re-parses enough of argv to tell --test apart from everything
+    else, using parse_known_args() so this file's full flag set (defined
+    once, in main_legacy_v2()) is never duplicated here and cannot drift
+    out of sync with it.
+    """
+    probe = argparse.ArgumentParser(add_help=False)
+    probe.add_argument("--test", action="store_true")
+    probed, _ = probe.parse_known_args()
+    if probed.test:
+        return main_legacy_v2()
+    print("generate_images_aibmm.py's project-mode CLI is obsolete.")
+    print("Canonical image generation is dispatched through the canonical")
+    print("route_images.py workflow:")
+    print("  python route_images.py --project <project>")
+    print("(currently refused everywhere until canonical execution is")
+    print(" activated — Task 2B-B2b-3). --test remains available for")
+    print("character/channel-scope setup verification.")
+    return 1
+
+
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

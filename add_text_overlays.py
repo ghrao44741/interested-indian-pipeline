@@ -37,9 +37,12 @@ Writes: {project}/images/SCENE-XXX.png  (in-place, adds _orig backup first time)
 """
 
 import argparse
+import os
 import re
 import shutil
 import sys
+import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 
 PIPELINE_DIR = Path(__file__).parent
@@ -307,6 +310,346 @@ def load_manifest_group_map(project_dir: Path) -> dict[str, str]:
     }
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# CANONICAL OVERLAYS (Task 2B-B2b-2b) — structurally separate from the
+# legacy path above (parse_overlay_map/build_scene_overlay_map/
+# process_project, which globs images/ and reads the mutable prompts
+# markdown). No shared state, no call in either direction.
+#
+# Overlay instructions come exclusively from route['overlay_text'] on a
+# sealed DispatchSnapshot's routes — never from image_prompts_one_line_per_
+# prompt.md, never from globbing images/. A route with no overlay_text is
+# not a failure — it simply has nothing to overlay, matching the legacy
+# path's own "no overlay text found, skipping" as a non-fatal outcome.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@dataclass(frozen=True)
+class _OverlayContextSeal:
+    """Module-private proof an OverlayContext was produced by
+    build_overlay_context() — same architectural principle as
+    renderer_adapters._ContextSeal (Task 2B-B2b-2a corrective): embeds its
+    own frozen copy of project_dir/route/target/snapshot_seal, so
+    _verify_overlay_context() can detect either a directly-constructed
+    OverlayContext (no seal at all) or a legitimately-sealed one whose
+    visible fields were changed via object.__setattr__ after construction.
+    """
+    project_dir: Path
+    route: object
+    target: Path
+    snapshot_seal: object
+
+
+@dataclass(frozen=True)
+class OverlayContext:
+    """The sealed, exact-target-bound context one canonical overlay
+    operation runs against — the overlay-stage counterpart to
+    renderer_adapters.DispatchContext, built only by
+    build_overlay_context(). A directly-constructed instance carries no
+    `_seal` and is refused by _verify_overlay_context()."""
+    project_dir: Path
+    route: object = None
+    target: "Path | None" = None
+    _seal: "_OverlayContextSeal | None" = None
+
+
+def build_overlay_context(snapshot, route, *, target) -> "OverlayContext":
+    """THE only factory that produces a trustworthy OverlayContext. Requires
+    a genuinely sealed DispatchSnapshot and a `route` that is an exact
+    member (by identity) of `snapshot.routes` — a mutable dict, an equal
+    copy, an independently frozen mapping, or a route from another
+    snapshot/project all fail this, exactly like
+    renderer_adapters.build_dispatch_context()."""
+    import visual_routes as _visual_routes
+
+    if not isinstance(snapshot, _visual_routes.DispatchSnapshot):
+        raise RuntimeError(
+            f"build_overlay_context() requires a visual_routes.DispatchSnapshot, "
+            f"got {type(snapshot).__name__}")
+    if not isinstance(snapshot._seal, _visual_routes._SnapshotSeal):
+        raise RuntimeError(
+            "snapshot carries no genuine seal — a directly-constructed or "
+            "hand-copied DispatchSnapshot is never trusted")
+    if not any(route is r for r in snapshot.routes):
+        raise RuntimeError(
+            "route is not a member (by identity) of snapshot.routes — a "
+            "mutable dict, an equal copy, an independently frozen mapping, "
+            "or a route from another snapshot/project is never trusted")
+
+    target = Path(target)
+    ctx = OverlayContext(project_dir=snapshot.project_dir, route=route, target=target)
+    seal = _OverlayContextSeal(project_dir=ctx.project_dir, route=ctx.route,
+                               target=ctx.target, snapshot_seal=snapshot._seal)
+    object.__setattr__(ctx, "_seal", seal)
+    return ctx
+
+
+def _verify_overlay_context(route, target, ctx: "OverlayContext") -> None:
+    """The overlay-stage counterpart to
+    renderer_adapters._verify_dispatch_entry() — every check by identity or
+    exact equality: context seal genuine, chains back to a genuine snapshot
+    seal, every visible field agrees with the seal's own frozen copy (catches
+    post-construction tampering), route identity, and target equality.
+    Raises RuntimeError on any failure."""
+    import visual_routes as _visual_routes
+
+    if not isinstance(ctx, OverlayContext):
+        raise RuntimeError(f"ctx is not an OverlayContext (got {type(ctx).__name__})")
+    seal = ctx._seal
+    if not isinstance(seal, _OverlayContextSeal):
+        raise RuntimeError(
+            "ctx carries no genuine overlay context seal — a directly-"
+            "constructed OverlayContext (bypassing build_overlay_context()) "
+            "is never trusted")
+    if not isinstance(seal.snapshot_seal, _visual_routes._SnapshotSeal):
+        raise RuntimeError(
+            "ctx's context seal does not chain back to a genuine "
+            "DispatchSnapshot seal")
+    if ctx.project_dir != seal.project_dir or Path(ctx.target) != Path(seal.target):
+        raise RuntimeError(
+            "ctx's visible fields disagree with its own context seal — the "
+            "context was mutated after sealing, or was never genuinely "
+            "sealed to begin with")
+    if ctx.route is not seal.route:
+        raise RuntimeError("ctx.route disagrees with its own context seal")
+    if route is not ctx.route:
+        raise RuntimeError(
+            "route argument is not the exact object ctx.route governs "
+            "(identity check failed) — a mutable dict, an equal copy, an "
+            "independently frozen mapping, another route from the same "
+            "snapshot, or a route from another snapshot/project is never "
+            "trusted")
+    if Path(target) != Path(ctx.target):
+        raise RuntimeError(
+            f"target argument {target} does not equal ctx.target {ctx.target} "
+            f"— this stage is authorized to write to exactly one path")
+
+
+def _atomic_overlay_commit(target: Path, producer) -> None:
+    """The overlay stage's own atomic-output transaction — same contract as
+    renderer_adapters.atomic_commit(): never creates a directory (the
+    target's parent must already exist — the canonical dispatcher already
+    created images/ before this stage ever runs); `producer(tmp_path)`
+    writes its entire output to a unique tempfile.mkstemp() path in the
+    SAME directory as `target`, never to `target` directly; on success,
+    os.replace() commits it; on ANY failure the temp file is removed and
+    `target` is left byte-for-byte untouched. A cleanup failure raises
+    RuntimeError naming the leftover path rather than being swallowed —
+    cleanup is never claimed to have succeeded when it did not."""
+    target = Path(target)
+    if not target.parent.is_dir():
+        raise RuntimeError(
+            f"{target.parent} does not exist — the overlay stage never "
+            f"creates it; it must already exist from canonical dispatch")
+    if target.is_symlink():
+        raise RuntimeError(f"{target} is a symlink — refusing to write through it")
+    if not target.exists():
+        raise RuntimeError(
+            f"{target} does not exist — an overlay can only be applied to "
+            f"an already-dispatched final asset")
+    if target.is_dir():
+        raise RuntimeError(f"{target} is a directory — refusing to overwrite it as a file")
+
+    fd, tmp_name = tempfile.mkstemp(dir=str(target.parent), suffix=target.suffix or ".png")
+    os.close(fd)
+    tmp_path = Path(tmp_name)
+    try:
+        producer(tmp_path)
+        import renderer_adapters
+        renderer_adapters._validate_canonical_png(tmp_path)
+        os.replace(str(tmp_path), str(target))
+    except Exception as original_exc:
+        import renderer_adapters
+        try:
+            if tmp_path.exists():
+                tmp_path.unlink()
+        except OSError as cleanup_exc:
+            # A cleanup failure is a dispatch-integrity violation, not an
+            # ordinary overlay failure — raised as
+            # renderer_adapters.DispatchIntegrityError specifically so
+            # overlay_snapshot_canonical() (which catches ordinary overlay
+            # failures per route) does not swallow it into a False/1
+            # return; it must propagate, exactly like a
+            # DispatchIntegrityError from the canonical dispatch path does.
+            raise renderer_adapters.DispatchIntegrityError(
+                f"transaction-integrity failure: temporary file {tmp_path} "
+                f"could not be cleaned up after a failure ({original_exc}); "
+                f"cleanup itself failed: {cleanup_exc}") from cleanup_exc
+        raise
+
+
+def _render_overlay_to(source: Path, overlay_text: str, dest: Path) -> None:
+    """Renders `source`'s image with `overlay_text` burned on, writing the
+    result to `dest` — never mutates `source`. Pure rendering: no gate
+    check, no route/context verification (the caller already did both);
+    this is the same visual treatment as the legacy add_overlay()'s banner/
+    text/badge composition, minus the in-place backup-and-overwrite
+    machinery that only makes sense for the legacy path's repeated-run
+    model."""
+    from PIL import Image, ImageDraw
+
+    img = Image.open(source).convert("RGBA")
+    W, H = img.size
+    banner_h = max(70, int(BANNER_HEIGHT * H / 720))
+    banner = Image.new("RGBA", (W, banner_h), (*BANNER_COLOR, BANNER_OPACITY))
+    for y in range(min(8, banner_h)):
+        alpha = int(BANNER_OPACITY * y / 8)
+        for x in range(W):
+            r, g, b, _ = banner.getpixel((x, y))
+            banner.putpixel((x, y), (r, g, b, alpha))
+    img.paste(banner, (0, H - banner_h), banner)
+
+    draw = ImageDraw.Draw(img)
+    font_size = max(24, int(32 * H / 720))
+    font = _get_font(font_size, bold=True)
+    try:
+        bbox = draw.textbbox((0, 0), overlay_text, font=font)
+        tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    except AttributeError:
+        tw, th = draw.textsize(overlay_text, font=font)
+    text_x = (W - tw) // 2
+    text_y = H - banner_h + (banner_h - th) // 2 - 4
+    shadow_offset = max(1, int(2 * H / 720))
+    draw.text((text_x + shadow_offset, text_y + shadow_offset),
+             overlay_text, font=font, fill=(0, 0, 0, 160))
+    draw.text((text_x, text_y), overlay_text, font=font, fill=(*TEXT_COLOR, 255))
+
+    badge_size = max(11, int(13 * H / 720))
+    badge_font = _get_font(badge_size, bold=False)
+    try:
+        bbbox = draw.textbbox((0, 0), BADGE_TEXT, font=badge_font)
+        bw = bbbox[2] - bbbox[0]
+    except AttributeError:
+        bw, _ = draw.textsize(BADGE_TEXT, font=badge_font)
+    draw.text((W - bw - PADDING_X // 2, H - int(banner_h * 0.28)),
+             BADGE_TEXT, font=badge_font, fill=(*BADGE_COLOR, 200))
+
+    img.convert("RGB").save(str(dest), "PNG", optimize=True)
+
+
+def _preflight_overlay_targets(snapshot: "visual_routes.DispatchSnapshot",
+                               images_dir: Path) -> dict:
+    """Validates the COMPLETE overlay target set before any overlay is
+    applied — every route needing an overlay must resolve to a contained,
+    existing, non-duplicate, non-directory, non-symlink target, or the
+    whole pass refuses before any work begins. Returns
+    {visual_asset_id: target_path} for exactly the routes that carry
+    non-blank overlay_text; a route with no overlay_text is not included
+    and is not a failure."""
+    import visual_routes as _visual_routes
+
+    problems: list = []
+    targets: dict = {}
+    seen_targets: dict = {}
+    for route in snapshot.routes:
+        overlay_text = route.get("overlay_text")
+        if not isinstance(overlay_text, str) or not overlay_text.strip():
+            continue
+        vid = route.get("visual_asset_id")
+        output_file = route.get("output_file")
+        try:
+            target = _visual_routes.resolve_output_target(images_dir, output_file)
+        except _visual_routes.VisualRoutesError as e:
+            problems.append(f"{vid}: {e}")
+            continue
+        if target in seen_targets:
+            problems.append(
+                f"{vid} and {seen_targets[target]} both resolve to the same "
+                f"overlay target {target} — duplicate/colliding output")
+        else:
+            seen_targets[target] = vid
+        try:
+            exists = target.exists()
+            is_symlink = target.is_symlink()
+            is_dir = target.is_dir() if exists else False
+        except OSError as e:
+            problems.append(f"{vid}: could not inspect target {target}: {e}")
+            continue
+        if is_symlink:
+            problems.append(f"{vid}: target {target} is a symlink — refused")
+        elif is_dir:
+            problems.append(f"{vid}: target {target} is a directory — refused")
+        elif not exists:
+            problems.append(
+                f"{vid}: target {target} does not exist — nothing was "
+                f"dispatched for this route yet")
+        targets[vid] = target
+    if problems:
+        detail = "\n".join(f"  - {p}" for p in problems)
+        raise RuntimeError(
+            f"overlay preflight failed for {len(problems)} issue(s):\n{detail}")
+    return targets
+
+
+def overlay_snapshot_canonical(snapshot: "visual_routes.DispatchSnapshot") -> int:
+    """The narrow, trusted internal overlay stage (Task 2B-B2b-2b) —
+    processes an ALREADY-SEALED DispatchSnapshot the caller obtained
+    itself, so in-process orchestration stays bound to the SAME snapshot it
+    dispatched against.
+
+    Performs its own universal canonical-execution gate check first. All
+    routes/targets are preflighted (contained, existing, non-duplicate,
+    non-symlink/directory) before any overlay is applied. Stops immediately
+    on the first route's overlay failure — a failed overlay preserves the
+    prior final byte-for-byte (`_atomic_overlay_commit`'s own guarantee),
+    and no later route is attempted."""
+    import generation_gate
+    import renderer_adapters
+    import visual_routes as _visual_routes
+    if not isinstance(snapshot, _visual_routes.DispatchSnapshot):
+        raise RuntimeError(
+            f"overlay_snapshot_canonical() requires a visual_routes.DispatchSnapshot, "
+            f"got {type(snapshot).__name__}")
+    generation_gate.require_canonical_visual_execution_ready(
+        snapshot.project_dir, operation="text overlay (canonical visual execution)")
+
+    images_dir = snapshot.project_dir / "images"
+    targets = _preflight_overlay_targets(snapshot, images_dir)
+
+    processed = 0
+    for route in snapshot.routes:
+        vid = route.get("visual_asset_id")
+        if vid not in targets:
+            continue
+        target = targets[vid]
+        overlay_text = route.get("overlay_text")
+        ctx = build_overlay_context(snapshot, route, target=target)
+        _verify_overlay_context(route, target, ctx)
+
+        def _producer(tmp_path: Path, _target=target, _text=overlay_text) -> None:
+            _render_overlay_to(_target, _text, tmp_path)
+
+        try:
+            _atomic_overlay_commit(target, _producer)
+        except renderer_adapters.DispatchIntegrityError:
+            # A transaction-integrity violation (e.g. a temp-file cleanup
+            # failure) — never disguised as an ordinary overlay failure;
+            # propagates immediately, exactly like the canonical dispatch
+            # path's own DispatchIntegrityError handling.
+            raise
+        except Exception as e:
+            print(f"  overlay FAILED for {vid} ({target.name}): {e}")
+            return 1
+        print(f"  overlay ok  {vid}  {target.name}")
+        processed += 1
+
+    print(f"  {processed} overlay(s) applied")
+    return 0
+
+
+def apply_overlays_canonical(project_dir) -> int:
+    """The public canonical overlay entry point. Performs its own gate
+    check and loads its own sealed snapshot, then delegates to
+    `overlay_snapshot_canonical()`."""
+    import generation_gate
+    import visual_routes as _visual_routes
+
+    generation_gate.require_canonical_visual_execution_ready(
+        project_dir, operation="text overlay (canonical visual execution)")
+    result = _visual_routes.require_executable_routes(project_dir, operation="overlay")
+    snapshot = _visual_routes.build_dispatch_snapshot(result)
+    return overlay_snapshot_canonical(snapshot)
+
+
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def process_project(
@@ -410,6 +753,11 @@ def main():
     )
     parser.add_argument("--project",    required=True,
                         help="Episode folder (e.g. ep01)")
+    parser.add_argument("--canonical", action="store_true",
+                        help="Canonical overlay stage (Task 2B-B2b-2b): overlay_text comes "
+                             "only from a sealed visual_routes.json dispatch snapshot — no "
+                             "prompts-markdown parsing, no globbing. Structurally separate "
+                             "from every other flag below, which drives the legacy path.")
     parser.add_argument("--scene",      default=None,
                         help="Process only this scene (e.g. SCENE-001 or SCENE-001.png)")
     parser.add_argument("--dry-run",    action="store_true",
@@ -426,6 +774,16 @@ def main():
     if not project_dir.exists():
         print(f"❌ Project folder not found: {project_dir}")
         sys.exit(1)
+
+    if args.canonical:
+        from generation_gate import GateBlocked as _GateBlocked
+        try:
+            code = apply_overlays_canonical(project_dir)
+        except _GateBlocked as e:
+            print(f"\n{e}")
+            print("\nNothing was overlaid.")
+            sys.exit(1)
+        sys.exit(code)
 
     try:
         from PIL import Image, ImageDraw, ImageFont

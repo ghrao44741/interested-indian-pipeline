@@ -283,7 +283,7 @@ def ensure_png(path: Path) -> Path:
 # MAIN
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def main():
+def main_legacy_v2():
     parser = argparse.ArgumentParser(
         description="Batch image generation via Flux (Replicate) or Grok (xAI)"
     )
@@ -510,5 +510,32 @@ def main():
     print(f"{'═' * 55}\n")
 
 
+def main() -> int:
+    """Refusal shim (Task 2B-B2b-2b). generate_images_flux.py's project-mode
+    CLI (`--project` is required for every invocation — there is no
+    non-project mode in this file) is obsolete: canonical image generation
+    is dispatched in-process through route_images.py's canonical dispatcher
+    (dispatch_routes()/dispatch_snapshot_routes()), which is itself still
+    universally refused pending Task 2B-B2b-3's separately authorized
+    activation.
+
+    This shim calls no provider/API/GPU/downloader/adapter and constructs
+    no client — it does not even reach generation_gate, since there is
+    nothing left to gate once every path here refuses unconditionally. The
+    real implementation (--backend/--model/--shot/--from-report/--overwrite/
+    --prompt-override, all still fully defined above) is preserved as
+    main_legacy_v2() — reachable only by calling it directly, never through
+    this CLI's default entry point, so there is no ambiguous default that
+    could bypass the canonical gate.
+    """
+    print("generate_images_flux.py's project-mode CLI is obsolete.")
+    print("Canonical image generation is dispatched through the canonical")
+    print("route_images.py workflow:")
+    print("  python route_images.py --project <project>")
+    print("(currently refused everywhere until canonical execution is")
+    print(" activated — Task 2B-B2b-3).")
+    return 1
+
+
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

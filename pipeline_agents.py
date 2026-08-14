@@ -1417,6 +1417,93 @@ class ResearchAgent:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# CANONICAL VISUAL WORKFLOW (Task 2B-B2b-2b)
+#
+# In-process orchestration only — never a subprocess into route_images.py,
+# review_images.py, add_text_overlays.py, or any provider CLI. A module-
+# level function, not an OrchestratorAgent method, because it needs no
+# agent state (self.client, self.state, human checkpoints) — it is a
+# narrow, self-contained pass bound to one project directory and one
+# sealed DispatchSnapshot for its whole duration.
+# ══════════════════════════════════════════════════════════════════════════════
+
+def run_canonical_visual_workflow(project_dir, *, overwrite: bool = False) -> dict:
+    """Canonical visual workflow: gate -> route snapshot -> dispatch ->
+    review -> overlays -> final review. Every stage after the snapshot is
+    loaded operates on the SAME sealed DispatchSnapshot — no stage reloads
+    or re-derives canonical route authority, and no stage can substitute an
+    equal-but-untrusted route or snapshot, because dispatch_snapshot_routes()/
+    review_snapshot_canonical()/overlay_snapshot_canonical() each
+    independently verify (via renderer_adapters.build_dispatch_context()/
+    add_text_overlays.build_overlay_context()) that every route they touch
+    is an exact member, by identity, of THIS snapshot's own `routes` tuple.
+
+    Its own first operational boundary is
+    generation_gate.require_canonical_visual_execution_ready() — before any
+    route loading, dispatch, review, or overlay work. Currently always
+    refuses (Task 2B-B2a/B2b-1's universal guard); this function's body is
+    exercised only in tests with that guard explicitly patched.
+
+    Stops immediately on the first stage's failure: dispatch, pre-overlay
+    review, overlays, or final review. GateBlocked (from the initial gate
+    check) and renderer_adapters.DispatchIntegrityError (from any stage)
+    are never caught here and never converted into an ordinary RuntimeError
+    stage failure — they propagate as themselves, exactly as they would
+    from a caller invoking any one stage directly. An ordinary stage
+    failure (dispatch/overlay returning nonzero, or a review producing a
+    non-PASS verdict) raises RuntimeError naming which stage failed and
+    stops the workflow; it does not record a second failure on top of
+    whatever route_failures record the failing stage itself already wrote
+    (dispatch/overlay's own internal failure recording is untouched by this
+    function — it neither duplicates nor suppresses it).
+    """
+    import generation_gate
+    import visual_routes
+    import route_images
+    import review_images
+    import add_text_overlays
+
+    generation_gate.require_canonical_visual_execution_ready(
+        project_dir, operation="canonical visual workflow")
+
+    result = visual_routes.require_executable_routes(
+        project_dir, operation="canonical visual workflow")
+    snapshot = visual_routes.build_dispatch_snapshot(result)
+
+    dispatch_code = route_images.dispatch_snapshot_routes(snapshot, overwrite=overwrite)
+    if dispatch_code != 0:
+        raise RuntimeError(
+            "canonical visual workflow: dispatch stage failed; stopping — no "
+            "review, overlay, or later stage was attempted")
+
+    pre_overlay_review = review_images.review_snapshot_canonical(snapshot)
+    pre_overlay_fails = [r for r in pre_overlay_review if r.verdict != "PASS"]
+    if pre_overlay_fails:
+        raise RuntimeError(
+            f"canonical visual workflow: post-dispatch review failed for "
+            f"{len(pre_overlay_fails)} route(s); stopping before overlays")
+
+    overlay_code = add_text_overlays.overlay_snapshot_canonical(snapshot)
+    if overlay_code != 0:
+        raise RuntimeError(
+            "canonical visual workflow: overlay stage failed; stopping")
+
+    final_review = review_images.review_snapshot_canonical(snapshot)
+    final_fails = [r for r in final_review if r.verdict != "PASS"]
+    if final_fails:
+        raise RuntimeError(
+            f"canonical visual workflow: post-overlay review failed for "
+            f"{len(final_fails)} route(s)")
+
+    return {
+        "dispatch_code": dispatch_code,
+        "pre_overlay_review": pre_overlay_review,
+        "overlay_code": overlay_code,
+        "final_review": final_review,
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # ORCHESTRATOR AGENT
 # ══════════════════════════════════════════════════════════════════════════════
 

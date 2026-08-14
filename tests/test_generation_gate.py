@@ -597,13 +597,44 @@ try:
          mock.patch.object(sys, "argv",
                            ["generate_images_flux.py", "--project",
                             str(ROOT / "pilot_neet_scandal")]):
+        # Task 2B-B2b-2b: generate_images_flux.py's main() is now a refusal
+        # shim for the obsolete project-mode CLI — it returns 1 directly,
+        # never raising SystemExit itself (the module's own __main__ block
+        # does `sys.exit(main())`). The prior assumption that calling
+        # main() directly would surface a SystemExit was itself testing
+        # the now-obsolete pre-shim behavior; checking the return value
+        # (falling back to SystemExit.code for compatibility with any
+        # future main() that still exits directly) is the adjusted, not
+        # weakened, contract — main() must refuse nonzero either way.
         try:
-            flux.main()
-            code = 0
+            result = flux.main()
+            code = result if isinstance(result, int) else 0
         except SystemExit as e:
             code = e.code
     check("generate_images_flux exits nonzero on the blocked pilot", code == 1, f"exit={code}")
     check("no API key was read, no client built, nothing generated", not calls, str(calls))
+
+    # The shim never even reaches the gate — reconfirm the real, still-gated
+    # implementation underneath it (main_legacy_v2()) is unaffected and
+    # still blocks on the same project.
+    calls2 = []
+    with mock.patch.object(flux, "_OpenAI",
+                           lambda **kw: calls2.append("client") or types.SimpleNamespace()), \
+        mock.patch.object(flux, "load_env_key",
+                          lambda *a, **k: calls2.append("key") or "sk-test"), \
+        mock.patch.object(flux, "generate_image_grok",
+                          lambda *a, **k: calls2.append("generate")), \
+        mock.patch.object(sys, "argv",
+                          ["generate_images_flux.py", "--project",
+                           str(ROOT / "pilot_neet_scandal")]):
+        try:
+            flux.main_legacy_v2()
+            code2 = 0
+        except SystemExit as e:
+            code2 = e.code
+    check("main_legacy_v2() (the real, still-gated implementation) also "
+         "blocks on the pilot", code2 == 1, f"exit={code2}")
+    check("...and it too made zero paid calls", not calls2, str(calls2))
 
     before = {p.name for p in (ROOT / "pilot_neet_scandal" / "images").glob("*")}
     r = subprocess.run([sys.executable, str(ROOT / "route_images.py"),

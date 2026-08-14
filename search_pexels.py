@@ -221,7 +221,7 @@ def fetch_photo(
 
 # ── CLI ────────────────────────────────────────────────────────────────────────
 
-def main():
+def main_legacy_v2():
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -307,5 +307,48 @@ def main():
     print(f"\n  Done: {done}  Skipped: {skipped}  Failed: {failed}")
 
 
+def main() -> int:
+    """Refusal shim (Task 2B-B2b-2b) for the OBSOLETE "project batch mode"
+    only — `--project <episode>` with no `--query`, which auto-discovers
+    every photo-type scene in the project and downloads all of them. That
+    whole-project-as-one-unit behavior is exactly what canonical
+    route_images.py's dispatcher replaces (still universally refused
+    pending Task 2B-B2b-3).
+
+    Every other invocation shape is preserved and unmodified, delegated
+    straight to main_legacy_v2():
+      - `--query ... [--project ...] [--out ...]` — the single-shot fetch
+        primitive route_images.py's LEGACY v2 dispatch (dispatch_routes_
+        legacy_v2()) still legitimately calls once per PHOTO shot, with
+        `--project` present only so the episode's Checkpoint 3 approval can
+        be checked for that one fetch — never a "run the whole project"
+        request, so it is not the obsolete mode this shim targets.
+      - `--query ... --preview` (no --project) — preview only, no download.
+      - no `--query` and no `--project` — main_legacy_v2()'s own usage
+        error.
+
+    This shim calls no provider/API/downloader and reads no credential for
+    the refused case — it only re-parses enough of argv (via
+    parse_known_args(), so the full flag set stays defined once, in
+    main_legacy_v2()) to tell "project batch mode" apart from every
+    preserved shape above.
+    """
+    probe = argparse.ArgumentParser(add_help=False)
+    probe.add_argument("--query", default=None)
+    probe.add_argument("--project", default=None)
+    probed, _ = probe.parse_known_args()
+    if probed.query or not probed.project:
+        return main_legacy_v2()
+    print("search_pexels.py's project BATCH mode (--project with no --query, "
+         "auto-discovering every photo scene) is obsolete.")
+    print("Canonical image generation is dispatched through the canonical")
+    print("route_images.py workflow:")
+    print("  python route_images.py --project <project>")
+    print("(currently refused everywhere until canonical execution is")
+    print(" activated — Task 2B-B2b-3). A single --query fetch (with")
+    print("--project for the approval check) remains available.")
+    return 1
+
+
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
