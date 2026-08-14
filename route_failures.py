@@ -42,6 +42,15 @@ RESOLVED = "resolved"
 ROUTE_CHANGED = "route_changed"
 TRANSIENT_RETRY = "transient_retry"
 
+# Two digests, two meanings, never compared to one another (Task 2B-B2b-2a
+# corrective, item 8). A failure record's "digest_version" field says which
+# one produced its route_args_sha256 — record_failure() writes it,
+# auto_resolve_changed() only ever recomputes and compares against records
+# carrying LEGACY_DIGEST_VERSION (or no digest_version at all, which every
+# record written before this field existed implicitly is).
+CANONICAL_DIGEST_VERSION = "canonical-v1"
+LEGACY_DIGEST_VERSION = "legacy-v2"
+
 
 class FailureError(RuntimeError):
     """A failure record could not be read or resolved."""
@@ -63,45 +72,42 @@ def _thaw_for_digest(obj):
 
 
 def route_args_digest(route) -> str:
-    """Stable digest of the complete canonical execution input a route will
-    produce (Task 2B-B2b-2a): visual_type, renderer_id, host_renderer_id,
-    route_args, prompt, output_file, host_present, host_method,
-    host_pose_id, host_scene_bound, host_reference_asset_ids, and
-    host_placement. Changing any one of these changes the digest.
+    """CANONICAL ONLY (Task 2B-B2b-2a corrective, item 8). Stable digest of
+    exactly: visual_type, renderer_id, host_renderer_id, route_args, prompt,
+    output_file, host_present, host_method, host_pose_id, host_scene_bound,
+    host_reference_asset_ids, and host_placement. Changing any one of these
+    changes the digest.
 
     Deliberately excludes display-only fields — scene_id, shot number,
     narration text used only for legacy classification/display — so
     re-splitting the narration or reordering shots never changes this value
-    on its own. There is no map_args/chart_args/pose_id fallback: those are
-    legacy visual_plan.json fields, not canonical execution inputs, and
-    mixing them into this digest would let a legacy-shaped shot and a
-    canonical route that execute completely differently hash identically (or
-    vice versa) purely by coincidence of which fields happen to be set.
+    on its own.
 
-    `route` may be a plain dict or an immutable MappingProxyType (a
-    DispatchSnapshot route) — both work identically; this function never
-    mutates its input. A caller passing a legacy visual_plan.json shot (which
-    carries none of the canonical field names above except a route-type
-    label) still gets a deterministic digest — every canonical field reads
-    as absent except the route type — it is simply not a meaningful one for
-    detecting a legacy route's own change; auto_resolve_changed() is not
-    wired against canonical routes by this task.
+    Raises FailureError if `route.get("visual_type")` is missing or not a
+    non-blank string. There is NO fallback of any kind here — not to
+    `type`/`planned_type` (a legacy shot's own field names for the same
+    concept), and not to map_args/chart_args/pose_id/scene_bound/narration/
+    shot/file (legacy visual_plan.json fields, never canonical execution
+    inputs). Silently hashing a legacy-shaped shot as though it were a
+    canonical route — or vice versa — would let two routes that execute
+    completely differently hash identically, or two identical ones hash
+    differently, purely by coincidence of which fields happen to be set.
+    Use `legacy_route_args_digest_v2()` for a legacy visual_plan.json shot;
+    the two are never comparable to one another (see CANONICAL_DIGEST_
+    VERSION/LEGACY_DIGEST_VERSION and record_failure()'s `digest_version`).
 
-    `visual_type` alone reads `route.get("visual_type") or route.get("type")`
-    — not a route_args/pose_id-style legacy fallback (there is deliberately
-    none of those), but plain compatibility with the two different dict
-    shapes this module's own EXISTING callers already pass for the identical
-    concept: a plan_visuals.py-built shot names it `visual_type`, while a
-    freshly parse_shots()-parsed shot (route_images.py's legacy classifier,
-    which auto_resolve_changed() is called against) names the same thing
-    `type`. Reading only `visual_type` would make every fresh legacy shot
-    hash as though it had no route at all, causing auto_resolve_changed() to
-    treat an UNCHANGED legacy route as if it had changed — the opposite of
-    what that function exists to detect. A canonical route always carries
-    `visual_type`, never `type`, so this reads identically for it either
-    way."""
+    `route` may be a plain dict or a genuinely immutable
+    collections.abc.Mapping (a MappingProxyType route from a sealed
+    DispatchSnapshot, Task 2B-B2b-2a corrective) — both work identically;
+    this function never mutates its input."""
+    vt = route.get("visual_type")
+    if not isinstance(vt, str) or not vt.strip():
+        raise FailureError(
+            f"route_args_digest() requires a canonical route with a non-blank "
+            f"visual_type; got {vt!r}. This is the canonical-only digest — use "
+            f"legacy_route_args_digest_v2() for a legacy visual_plan.json shot.")
     payload = json.dumps({
-        "visual_type": route.get("visual_type") or route.get("type"),
+        "visual_type": vt,
         "renderer_id": route.get("renderer_id"),
         "host_renderer_id": route.get("host_renderer_id"),
         "route_args": _thaw_for_digest(route.get("route_args")),
@@ -113,6 +119,28 @@ def route_args_digest(route) -> str:
         "host_scene_bound": route.get("host_scene_bound"),
         "host_reference_asset_ids": _thaw_for_digest(route.get("host_reference_asset_ids")),
         "host_placement": _thaw_for_digest(route.get("host_placement")),
+    }, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def legacy_route_args_digest_v2(shot) -> str:
+    """LEGACY ONLY (Task 2B-B2b-2a corrective, item 8) — the exact
+    pre-canonical digest, preserved under its own name for
+    auto_resolve_changed() and dispatch_routes_legacy_v2()'s own failure
+    recording, which still need it: map_args, chart_args, pose_id,
+    scene_bound, and narration, keyed on whichever of `visual_type`/`type`/
+    `planned_type` the caller's shot shape happens to carry (a
+    plan_visuals.py-built shot uses `visual_type`; a freshly
+    parse_shots()-parsed shot uses `type`). Never used for a canonical
+    route, and never compared against a digest route_args_digest() produced
+    — see CANONICAL_DIGEST_VERSION/LEGACY_DIGEST_VERSION."""
+    payload = json.dumps({
+        "route": shot.get("visual_type") or shot.get("type") or shot.get("planned_type"),
+        "map_args": shot.get("map_args", ""),
+        "chart_args": shot.get("chart_args", ""),
+        "pose_id": shot.get("pose_id", ""),
+        "scene_bound": bool(shot.get("scene_bound", False)),
+        "narration": shot.get("narration", ""),
     }, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
@@ -170,25 +198,43 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def record_failure(project, shot: dict, reason: str) -> dict:
+def record_failure(project, shot: dict, reason: str, *,
+                   digest_version: str = CANONICAL_DIGEST_VERSION) -> dict:
     """Persist one failed route. Returns the record written.
 
     An existing unresolved failure for the same artwork is updated rather than
     duplicated — the same shot failing twice is one outstanding problem, and a
     growing pile of identical records would obscure that.
-    """
+
+    `digest_version` selects which digest computes `route_args_sha256` — and
+    is itself stored on the record (Task 2B-B2b-2a corrective, item 8), so a
+    canonical digest can never later be compared against a legacy one, or
+    vice versa: CANONICAL_DIGEST_VERSION (default) for a route coming from
+    renderer_adapters.py/route_images.py's canonical dispatch;
+    LEGACY_DIGEST_VERSION for dispatch_routes_legacy_v2()'s plan-shaped
+    shots. Callers must pass the one matching what `shot` actually is —
+    there is no auto-detection, because guessing wrong here is exactly the
+    kind of silent cross-version confusion this split exists to prevent."""
     vid = shot.get("visual_asset_id")
     if not vid:
         raise FailureError(
             f"cannot record a failure for shot {shot.get('shot')!r}: no "
             f"visual_asset_id. Route failures key on persistent artwork identity.")
+    if digest_version == CANONICAL_DIGEST_VERSION:
+        digest = route_args_digest(shot)
+    elif digest_version == LEGACY_DIGEST_VERSION:
+        digest = legacy_route_args_digest_v2(shot)
+    else:
+        raise FailureError(
+            f"digest_version must be {CANONICAL_DIGEST_VERSION!r} or "
+            f"{LEGACY_DIGEST_VERSION!r}, got {digest_version!r}")
     data = load(project)
-    digest = route_args_digest(shot)
     rec = {
         "visual_asset_id": vid,
         "status": UNRESOLVED,
-        "planned_route": shot.get("visual_type") or shot.get("planned_type"),
+        "planned_route": shot.get("visual_type") or shot.get("planned_type") or shot.get("type"),
         "route_args_sha256": digest,
+        "digest_version": digest_version,
         "reason": reason,
         "failed_at": _now(),
         # readability only — these move when the narration is re-split
@@ -243,9 +289,19 @@ def resolve(project, visual_asset_id: str, approver: str, reason: str,
 def auto_resolve_changed(project, plan_shots: list[dict]) -> list[dict]:
     """Resolve failures whose route arguments have actually changed.
 
-    Called by the planner. Changing a route is itself the evidence that someone
-    addressed the problem, so it needs no separate confirmation — but the record
-    is kept, the revision moves, and a new approval is therefore required.
+    Called by the planner (legacy, plan-shaped shots only — Task 2B-B2b-2a
+    corrective, item 8: this function is not wired against canonical
+    routes). Changing a route is itself the evidence that someone
+    addressed the problem, so it needs no separate confirmation — but the
+    record is kept, the revision moves, and a new approval is therefore
+    required.
+
+    Only ever recomputes and compares legacy_route_args_digest_v2() against
+    failure records whose own `digest_version` is LEGACY_DIGEST_VERSION (or
+    absent — every record written before this field existed is implicitly
+    legacy, since canonical dispatch did not exist yet). A canonical-digest
+    failure record is never touched here: comparing a legacy digest against
+    one is not a "did the route change" answer, it is a category error.
     """
     data = load(project)
     by_id = {s["visual_asset_id"]: s for s in plan_shots if s.get("visual_asset_id")}
@@ -253,10 +309,12 @@ def auto_resolve_changed(project, plan_shots: list[dict]) -> list[dict]:
     for f in data["failures"]:
         if f["status"] != UNRESOLVED:
             continue
+        if f.get("digest_version", LEGACY_DIGEST_VERSION) != LEGACY_DIGEST_VERSION:
+            continue
         shot = by_id.get(f["visual_asset_id"])
         if shot is None:
             continue
-        digest = route_args_digest(shot)
+        digest = legacy_route_args_digest_v2(shot)
         if digest != f["route_args_sha256"]:
             f.update({
                 "status": RESOLVED,

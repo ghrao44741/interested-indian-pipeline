@@ -36,6 +36,7 @@ import re
 import shlex
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import channel_context
@@ -540,7 +541,9 @@ def dispatch_routes_legacy_v2(project_dir: Path, script_dir: Path, plan: dict,
                                "not be replaced by a generated image"}[route]
         if not ok:
             print("FAILED")
-            rec = route_failures.record_failure(project_dir, s, reason)
+            rec = route_failures.record_failure(
+                project_dir, s, reason,
+                digest_version=route_failures.LEGACY_DIGEST_VERSION)
             print(f"\n  Dispatch stopped at {rec['visual_asset_id']} ({route}).")
             print(f"  {reason}")
             print(f"\n  Recorded in {route_failures.FAILURES_NAME}. Nothing further "
@@ -564,8 +567,9 @@ def dispatch_routes_legacy_v2(project_dir: Path, script_dir: Path, plan: dict,
             print(f"\n  AI batch: {len(pending)} shot(s) via generate_images_flux.py\n")
             if not run_ai_batch(project_dir, script_dir, overwrite):
                 for s in pending:
-                    route_failures.record_failure(project_dir, s,
-                                                  "AI image batch did not complete")
+                    route_failures.record_failure(
+                        project_dir, s, "AI image batch did not complete",
+                        digest_version=route_failures.LEGACY_DIGEST_VERSION)
                 print(f"\n  AI batch failed; recorded in "
                       f"{route_failures.FAILURES_NAME}. Re-plan and re-approve.")
                 return 1
@@ -593,12 +597,52 @@ def dispatch_routes_legacy_v2(project_dir: Path, script_dir: Path, plan: dict,
 # runtime (Task 2B-B2a/B2b-1's guard always refuses). It is exercised only
 # in tests with that guard explicitly patched.
 
-def _working_target_for(final_target: Path) -> Path:
-    """The route-level working target for one route's final asset — same
-    directory as `final_target` (so its own os.replace() commit stays on
-    the same filesystem), a dotfile so it never collides with, or is
-    mistaken for, any route's own final target."""
-    return final_target.with_name(f".{final_target.name}.working")
+def _create_working_target(images_dir: Path, final_target: Path, taken: set) -> Path:
+    """Creates the route-level working target via tempfile.mkstemp() — a
+    unique, collision-safe path in `images_dir`, using `final_target`'s own
+    suffix (corrective follow-up, item 5). Never the predictable
+    `.{name}.working` scheme this replaces: that name is itself a route's
+    own future output_file candidate, or a leftover from an interrupted
+    prior run, in a way a fresh mkstemp() name structurally cannot be.
+
+    Verifies the created path is a regular, non-symlink file, and that it
+    is not already present in `taken` (every final target already known
+    from preflight, plus every working target created so far this
+    dispatch) — a check that mkstemp's own uniqueness guarantee makes
+    unreachable in practice, asserted explicitly rather than assumed away.
+    """
+    fd, tmp_name = tempfile.mkstemp(dir=str(images_dir),
+                                    suffix=final_target.suffix or ".png",
+                                    prefix=".route-work-")
+    os.close(fd)
+    working_target = Path(tmp_name)
+    if working_target.is_symlink():
+        raise RouteError(f"working target {working_target} was created as a symlink — refused")
+    if not working_target.is_file():
+        raise RouteError(f"working target {working_target} is not a regular file — refused")
+    if working_target in taken:
+        raise RouteError(
+            f"working target {working_target} collides with an existing final or "
+            f"working target — refused")
+    taken.add(working_target)
+    return working_target
+
+
+def _cleanup_working(p: Path) -> None:
+    """Removes a route-level working target after a stage failure. If
+    removal itself fails, raises a DispatchIntegrityError naming the
+    leftover path rather than silently swallowing the failure (corrective
+    follow-up, item 6) — cleanup is never claimed to have succeeded when it
+    did not, and this must propagate: it is never converted into an
+    ordinary route_failures record, and dispatch must not continue past it.
+    """
+    try:
+        if p.exists():
+            p.unlink()
+    except OSError as e:
+        raise renderer_adapters.DispatchIntegrityError(
+            f"transaction-integrity failure: working target {p} could not be "
+            f"removed after a stage failure: {e}") from e
 
 
 def _preflight_targets(snapshot: "visual_routes.DispatchSnapshot",
@@ -719,32 +763,35 @@ def _preflight_targets(snapshot: "visual_routes.DispatchSnapshot",
 
 
 def _dispatch_one(route, final_target: Path,
-                  snapshot: "visual_routes.DispatchSnapshot", images_dir: Path) -> bool:
-    """Runs one route's complete stage sequence against a route-level
-    working target, committing it onto `final_target` only once every
-    required stage has succeeded (Task 2B-B2b-2a item 6). Each adapter's own
-    atomic_commit() only ever protects a SINGLE file replacement — this
-    layers the base+host two-stage transaction on top of that, so a route
-    requiring a host composite can never expose a base-only or half-
-    composited image as the successful final asset.
+                  snapshot: "visual_routes.DispatchSnapshot", images_dir: Path,
+                  taken_targets: set) -> bool:
+    """Runs one route's complete stage sequence against a fresh, unique
+    route-level working target, committing it onto `final_target` only once
+    every required stage has succeeded (Task 2B-B2b-2a item 6, corrective
+    follow-up item 5). Each adapter's own atomic_commit() only ever protects
+    a SINGLE file replacement — this layers the base+host two-stage
+    transaction on top of that, so a route requiring a host composite can
+    never expose a base-only or half-composited image as the successful
+    final asset.
 
     On any stage failure the working target is removed and `final_target`
     (if it pre-existed) is left byte-for-byte untouched — os.replace() onto
     `final_target` happens exactly once, only on total success.
 
-    A DispatchIntegrityError (route/renderer-entry/context mismatch, or any
-    other structural violation) propagates immediately rather than being
-    converted into a route_failures record — it is a bug in the dispatcher
-    or its inputs, never an ordinary provider failure, and must never be
-    disguised as one.
+    A DispatchIntegrityError (route/renderer-entry/context mismatch, a
+    working-target cleanup failure, or any other structural violation)
+    propagates immediately rather than being converted into a
+    route_failures record — it is a bug in the dispatcher or its inputs,
+    never an ordinary provider failure, and must never be disguised as one.
     """
-    working_target = _working_target_for(final_target)
+    working_target = _create_working_target(images_dir, final_target, taken_targets)
 
-    def _run_stage(renderer_field: str, fn, target: Path) -> bool:
+    def _run_stage(renderer_field: str, fn) -> bool:
         ctx = renderer_adapters.build_dispatch_context(
-            snapshot, route, output_root=images_dir, renderer_field=renderer_field)
+            snapshot, route, target=working_target, output_root=images_dir,
+            renderer_field=renderer_field)
         try:
-            return bool(fn(route, target, ctx))
+            return bool(fn(route, working_target, ctx))
         except renderer_adapters.DispatchIntegrityError:
             raise
         except Exception as e:
@@ -752,20 +799,23 @@ def _dispatch_one(route, final_target: Path,
             # route_failures record; reaching this branch means it raised
             # instead of returning False, so it never got the chance to
             # record one itself — this is the one case the dispatcher
-            # records on the adapter's behalf.
-            route_failures.record_failure(snapshot.project_dir, route,
-                                          reason=f"{renderer_field} adapter raised: {e}")
+            # records on the adapter's behalf. Canonical digest: this is
+            # always a canonical route (never a legacy plan shot).
+            route_failures.record_failure(
+                snapshot.project_dir, route,
+                reason=f"{renderer_field} adapter raised: {e}",
+                digest_version=route_failures.CANONICAL_DIGEST_VERSION)
             return False
 
     primary_fn = renderers.dispatch_adapter(route.get("renderer_id"))
-    if not _run_stage("renderer_id", primary_fn, working_target):
-        _remove_if_exists(working_target)
+    if not _run_stage("renderer_id", primary_fn):
+        _cleanup_working(working_target)
         return False
 
     if bool(route.get("host_present")) and route.get("host_method") == "approved_pose_composite":
         host_fn = renderers.dispatch_adapter(route.get("host_renderer_id"))
-        if not _run_stage("host_renderer_id", host_fn, working_target):
-            _remove_if_exists(working_target)
+        if not _run_stage("host_renderer_id", host_fn):
+            _cleanup_working(working_target)
             return False
     # reference_anchored_generation: the primary renderer already performed
     # the anchored generation above — no second host stage runs, ever.
@@ -773,20 +823,16 @@ def _dispatch_one(route, final_target: Path,
     try:
         os.replace(str(working_target), str(final_target))
     except OSError as e:
+        # This is the dispatcher's OWN final-commit operation, not an
+        # adapter's — recording it here (rather than expecting an adapter
+        # to) is correct per corrective follow-up item 7.
         route_failures.record_failure(
             snapshot.project_dir, route,
-            reason=f"could not commit the final asset (working target -> final): {e}")
-        _remove_if_exists(working_target)
+            reason=f"could not commit the final asset (working target -> final): {e}",
+            digest_version=route_failures.CANONICAL_DIGEST_VERSION)
+        _cleanup_working(working_target)
         return False
     return True
-
-
-def _remove_if_exists(p: Path) -> None:
-    try:
-        if p.exists():
-            p.unlink()
-    except OSError:
-        pass
 
 
 def dispatch_routes(project_dir: Path, *, overwrite: bool = False) -> int:
@@ -818,16 +864,20 @@ def dispatch_routes(project_dir: Path, *, overwrite: bool = False) -> int:
     targets = _preflight_targets(snapshot, images_dir, overwrite)
 
     # Only now, after the WHOLE target set has passed preflight, may
-    # anything be created.
+    # anything be created — this mkdir is the ONLY place in the entire
+    # canonical dispatch path a directory is ever created; atomic_commit()
+    # itself refuses if this directory is not already present (corrective
+    # follow-up, item 4).
     images_dir.mkdir(parents=True, exist_ok=True)
 
+    taken_targets = set(targets.values())
     produced = 0
     for route in snapshot.routes:
         vid = route.get("visual_asset_id")
         final_target = targets[vid]
         print(f"  {route.get('visual_type', '?'):12s} {vid}  {final_target.name}",
               end="  ", flush=True)
-        ok = _dispatch_one(route, final_target, snapshot, images_dir)
+        ok = _dispatch_one(route, final_target, snapshot, images_dir, taken_targets)
         if not ok:
             print("FAILED")
             print(f"\n  Dispatch stopped at {vid}. Nothing further was generated.")

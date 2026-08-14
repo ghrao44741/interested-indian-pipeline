@@ -63,39 +63,86 @@ class DispatchIntegrityError(RuntimeError):
     RuntimeError` boundary in this module and in callers still catches it."""
 
 
-def _verify_dispatch_entry(route, ctx: "DispatchContext", expected_adapter, *,
+def _verify_dispatch_entry(route, target: Path, ctx: "DispatchContext", expected_adapter, *,
                            renderer_field: str = "renderer_id") -> None:
     """Every adapter calls this immediately after the universal refusal
     guard, before any other meaningful operation (final boundary micro-fix,
-    item 1; extended for Task 2B-B2b-2a's snapshot-binding requirement).
+    item 1; extended for Task 2B-B2b-2a and its corrective follow-up).
 
-    Proves two things, both by object identity, never by equal-looking
-    content:
+    Every check below is by object identity or exact equality, never by
+    equal-looking content:
 
-      1. `route` IS `ctx.route` — the exact route object the dispatcher
+      1. `ctx` is genuinely sealed: `ctx._seal` is a real `_ContextSeal`
+         (built only by `build_dispatch_context()`), and that seal's own
+         `snapshot_seal` is a real `visual_routes._SnapshotSeal` — proving
+         this context traces back to an actually-sealed DispatchSnapshot,
+         not a directly-constructed DispatchContext with a forged or
+         missing `_seal`.
+      2. Every field on `ctx` visible to this adapter — project_dir,
+         channel, output_root, target, route, renderer_entry — agrees with
+         the SAME field embedded inside `ctx._seal`'s own frozen copy. A
+         frozen dataclass does not stop `object.__setattr__` from mutating
+         a field after construction; this catches exactly that, because
+         the seal's copy was captured once, at construction, and cannot
+         itself be reached by mutating the outer object.
+      3. `route` IS `ctx.route` — the exact route object the dispatcher
          built this context for. A mutable dict, an equal copied dict, an
          independently frozen mapping, another route from the same
-         snapshot, or a route from another snapshot/project all fail this —
-         copying or re-freezing a route would only prove the *values* match
-         at one instant, never that this call is still operating on the one
-         route object the dispatcher's preflight and snapshot validation
-         actually covered.
-      2. `ctx.renderer_entry` IS the canonical, deeply-frozen entry
+         snapshot, or a route from another snapshot/project all fail this.
+      4. `target` (this call's actual output path) equals `ctx.target` —
+         the ONE path this context authorizes this stage to write to. A
+         caller passing a different path — another route's target, an
+         arbitrary path, a path outside the approved images root — fails
+         this before any I/O.
+      5. The resolved `target` is contained within the resolved
+         `ctx.output_root` (the canonical project's images directory) —
+         independent of whether it equals `ctx.target`, since `ctx.target`
+         itself could in principle have been sealed with an out-of-root
+         value by a sufficiently determined direct construction; this is a
+         second, independent containment check on the actual path used.
+      6. `ctx.renderer_entry` IS the canonical, deeply-frozen entry
          `renderers.get(route[renderer_field])` returns for THIS route, and
          that entry's registered `adapter` is the function currently
          executing. `renderer_field` is `"renderer_id"` for every primary
-         adapter and `"host_renderer_id"` for `adapt_host_composite` —
-         binding against the wrong field (a host adapter reading
-         `renderer_id`, or vice versa) is exactly the "primary/host
-         renderer-field confusion" this parameter exists to prevent.
+         adapter and `"host_renderer_id"` for `adapt_host_composite`.
 
-    Raises DispatchIntegrityError (a RuntimeError) on either failure — this
-    is a dispatch-integrity violation, not an ordinary per-route failure.
+    Raises DispatchIntegrityError (a RuntimeError) on any failure — this is
+    a dispatch-integrity violation, not an ordinary per-route failure.
 
-    `renderers` is imported locally: renderers.py imports this module for
-    its adapter callables, so a module-level `import renderers` here would
-    close the same import cycle documented for `generation_gate` above."""
+    `renderers`/`visual_routes` are imported locally: renderers.py imports
+    this module for its adapter callables, and visual_routes.py is imported
+    by channel_context.py, which renderers.py also imports — a module-level
+    import here would close the same import cycle documented for
+    `generation_gate` above."""
     import renderers
+    import visual_routes as _visual_routes
+
+    if not isinstance(ctx, DispatchContext):
+        raise DispatchIntegrityError(
+            f"ctx is not a DispatchContext (got {type(ctx).__name__})")
+    seal = ctx._seal
+    if not isinstance(seal, _ContextSeal):
+        raise DispatchIntegrityError(
+            "ctx carries no genuine context seal — a directly-constructed "
+            "DispatchContext (bypassing build_dispatch_context()) is never "
+            "trusted")
+    if not isinstance(seal.snapshot_seal, _visual_routes._SnapshotSeal):
+        raise DispatchIntegrityError(
+            "ctx's context seal does not chain back to a genuine "
+            "DispatchSnapshot seal — a snapshot that was not itself "
+            "produced by build_dispatch_snapshot() is never trusted")
+
+    for field_name in ("project_dir", "channel", "output_root", "target",
+                      "route", "renderer_entry"):
+        live = getattr(ctx, field_name)
+        sealed = getattr(seal, field_name)
+        ok = live is sealed if field_name in ("channel", "route", "renderer_entry") \
+            else live == sealed
+        if not ok:
+            raise DispatchIntegrityError(
+                f"ctx.{field_name} disagrees with the value its own context "
+                f"seal was built with — the context was mutated after "
+                f"sealing, or was never genuinely sealed to begin with")
 
     if route is not ctx.route:
         raise DispatchIntegrityError(
@@ -104,6 +151,22 @@ def _verify_dispatch_entry(route, ctx: "DispatchContext", expected_adapter, *,
             "independently frozen mapping, another route from the same "
             "snapshot, or a route from another snapshot/project is never "
             "trusted")
+
+    target = Path(target)
+    if target != Path(ctx.target):
+        raise DispatchIntegrityError(
+            f"target argument {target} does not equal ctx.target "
+            f"{ctx.target} — this stage is authorized to write to exactly "
+            f"one path, and this is not it")
+    try:
+        resolved_target = target.resolve()
+        resolved_root = Path(ctx.output_root).resolve()
+    except OSError as e:
+        raise DispatchIntegrityError(f"could not resolve target/output_root: {e}") from e
+    if not resolved_target.is_relative_to(resolved_root):
+        raise DispatchIntegrityError(
+            f"target {target} resolves to {resolved_target}, outside the "
+            f"canonical project's images root {resolved_root} — refused")
 
     renderer_id = route.get(renderer_field)
     if not isinstance(renderer_id, str) or not renderer_id.strip():
@@ -200,9 +263,30 @@ def _deep_freeze(obj):
 
 
 @dataclass(frozen=True)
+class _ContextSeal:
+    """Module-private proof that a DispatchContext was produced by
+    build_dispatch_context() (corrective follow-up, item 3). Embeds its OWN
+    frozen copy of every field that must never have been substituted or
+    mutated after sealing — project_dir, channel, output_root, target,
+    route, renderer_entry — plus the DispatchSnapshot's own seal, so
+    `_verify_dispatch_entry()` can detect a DispatchContext whose visible
+    fields were changed via `object.__setattr__` after construction (which
+    the frozen-dataclass contract alone does not prevent): the tampered
+    visible field would then disagree with this seal's own untouched copy.
+    Same non-cryptographic caveat as visual_routes._LoadSeal/_SnapshotSeal."""
+    project_dir: Path
+    channel: object
+    output_root: Path
+    target: Path
+    route: object
+    renderer_entry: object
+    snapshot_seal: object
+
+
+@dataclass(frozen=True)
 class DispatchContext:
-    """Assembled once per project by the canonical dispatcher (B2b), from an
-    already-validated ProjectRoutesLoad. Every field here is already-verified
+    """Assembled once per route-stage by the canonical dispatcher, from an
+    already-sealed DispatchSnapshot. Every field here is already-verified
     state — an adapter never re-derives or re-resolves any of it itself.
 
     `approved_poses` and `approved_references` are deep-frozen in
@@ -213,7 +297,11 @@ class DispatchContext:
     not a live, caller-owned dict a concurrent or later caller could still
     change. `object.__setattr__` is required here because the dataclass
     itself is frozen — this is the standard, narrow escape hatch for a
-    frozen dataclass's own `__post_init__`, not a bypass of immutability."""
+    frozen dataclass's own `__post_init__`, not a bypass of immutability.
+
+    `_seal` (last field, defaults to None) is set only by
+    build_dispatch_context() — never by direct construction — and is what
+    `_verify_dispatch_entry()` actually trusts; see `_ContextSeal` above."""
     project_dir: Path
     channel: object                       # channel_context.ChannelContext
     approved_poses: dict
@@ -231,6 +319,11 @@ class DispatchContext:
     # one can never pass that check, which is correct: there is no dispatch
     # without a bound route.
     route: object = None
+    # The single path this context authorizes THIS stage to write to
+    # (corrective follow-up, item 3) — the working target for a primary
+    # stage, or the same working target again for a required host stage.
+    target: "Path | None" = None
+    _seal: "_ContextSeal | None" = None
 
     def __post_init__(self):
         object.__setattr__(self, "approved_poses", _deep_freeze(dict(self.approved_poses or {})))
@@ -238,20 +331,29 @@ class DispatchContext:
                           _deep_freeze(dict(self.approved_references or {})))
 
 
-def build_dispatch_context(snapshot, route, *, output_root: Path,
+def build_dispatch_context(snapshot, route, *, target: Path, output_root: Path,
                            renderer_field: str = "renderer_id") -> "DispatchContext":
-    """THE only factory that produces a trustworthy DispatchContext (Task
-    2B-B2b-2a) — the canonical dispatcher (route_images.py) must build every
-    context through this function, never through `DispatchContext(...)`
-    directly with caller-assembled pieces.
+    """THE only factory that produces a trustworthy, sealed DispatchContext
+    (Task 2B-B2b-2a, corrective follow-up) — the canonical dispatcher
+    (route_images.py) must build every context through this function, never
+    through `DispatchContext(...)` directly with caller-assembled pieces;
+    a directly-constructed instance has no `_seal` and fails
+    `_verify_dispatch_entry()` unconditionally.
 
-    `route` must be the exact object (by identity) already present in
-    `snapshot.routes` — not merely equal to one — or this raises
-    DispatchIntegrityError before anything else. `approved_poses`/
-    `approved_references` and their asset roots are read from `snapshot`
-    itself, never accepted as separate parameters here: a caller cannot
-    substitute its own registry dict by calling this factory with different
-    arguments, because there is no argument that would let it.
+    `snapshot` must carry a genuine `visual_routes._SnapshotSeal` (checked
+    by identity of type, not merely `isinstance(snapshot,
+    visual_routes.DispatchSnapshot)` plus looking valid) — a directly-
+    constructed or hand-copied DispatchSnapshot is refused before anything
+    else. `route` must be the exact object (by identity) already present in
+    `snapshot.routes`. `approved_poses`/`approved_references` and their
+    asset roots are read from `snapshot` itself, never accepted as separate
+    parameters here: a caller cannot substitute its own registry dict by
+    calling this factory with different arguments, because there is no
+    argument that would let it.
+
+    `target` is the exact path this context authorizes this stage to write
+    to — bound into the seal, and re-checked against the adapter's own
+    `target` parameter by `_verify_dispatch_entry()`.
 
     `renderer_field` selects which of the route's two renderer-id fields the
     resolved `renderer_entry` is bound against — `"renderer_id"` for every
@@ -273,6 +375,10 @@ def build_dispatch_context(snapshot, route, *, output_root: Path,
         raise DispatchIntegrityError(
             f"build_dispatch_context() requires a visual_routes.DispatchSnapshot, "
             f"got {type(snapshot).__name__}")
+    if not isinstance(snapshot._seal, _visual_routes._SnapshotSeal):
+        raise DispatchIntegrityError(
+            "snapshot carries no genuine seal — a directly-constructed or "
+            "hand-copied DispatchSnapshot is never trusted")
     if not any(route is r for r in snapshot.routes):
         raise DispatchIntegrityError(
             "route is not a member (by identity) of snapshot.routes — a "
@@ -289,7 +395,9 @@ def build_dispatch_context(snapshot, route, *, output_root: Path,
         raise DispatchIntegrityError(
             f"route names an unregistered {renderer_field}: {e}") from e
 
-    return DispatchContext(
+    target = Path(target)
+    output_root = Path(output_root)
+    ctx = DispatchContext(
         project_dir=snapshot.project_dir,
         channel=snapshot.channel,
         approved_poses=snapshot.approved_poses,
@@ -301,7 +409,15 @@ def build_dispatch_context(snapshot, route, *, output_root: Path,
         output_root=output_root,
         renderer_entry=renderer_entry,
         route=route,
+        target=target,
     )
+    seal = _ContextSeal(
+        project_dir=ctx.project_dir, channel=ctx.channel, output_root=ctx.output_root,
+        target=ctx.target, route=ctx.route, renderer_entry=ctx.renderer_entry,
+        snapshot_seal=snapshot._seal,
+    )
+    object.__setattr__(ctx, "_seal", seal)
+    return ctx
 
 
 # ── atomic output — every adapter's sole write path ─────────────────────────
@@ -342,16 +458,24 @@ def _validate_canonical_png(path: Path) -> None:
             f"{CANONICAL_WIDTH}x{CANONICAL_HEIGHT}")
 
 
-def atomic_commit(target: Path, producer) -> None:
+def atomic_commit(ctx: "DispatchContext", target: Path, producer) -> None:
     """THE shared atomic-output transaction every adapter uses — including
     the two subprocess-driven ones (map/chart), which pass the temporary
     path to their subprocess rather than `target` directly.
 
-    `producer(tmp_path)` is called with a unique temporary path inside
-    `target`'s own directory, created via tempfile.mkstemp() with `target`'s
-    own suffix preserved (some subprocess/library callees infer format from
-    the extension). `producer` must write/render/download its ENTIRE output
-    to `tmp_path` and ONLY `tmp_path` — never `target` directly, and never
+    Never creates a directory (corrective follow-up, item 4). `target`'s
+    parent must already be exactly `ctx.output_root` — the preflight-
+    approved output directory route_images.py's dispatcher creates once,
+    after complete target preflight and the canonical gate, and never
+    before. If that directory does not exist, or `target`'s parent is not
+    exactly it, this refuses before any temp file is created. `target`
+    itself must not already be a directory or a symlink.
+
+    `producer(tmp_path)` is called with a unique temporary path inside that
+    same directory, created via tempfile.mkstemp() with `target`'s own
+    suffix preserved (some subprocess/library callees infer format from the
+    extension). `producer` must write/render/download its ENTIRE output to
+    `tmp_path` and ONLY `tmp_path` — never `target` directly, and never
     partial bytes anywhere `target` could later be mistaken for.
 
     On return, `tmp_path` is validated as a genuine canonical PNG
@@ -362,27 +486,48 @@ def atomic_commit(target: Path, producer) -> None:
 
     On ANY failure — `producer` raising, validation failing, or
     `os.replace()` itself failing — the temporary file is removed and
-    `target` (if it already existed) is left byte-for-byte untouched. The
-    original exception (or the RuntimeError from validation) propagates;
-    callers convert that into a route_failures record themselves — this
-    function has no `route`/`project_dir` to record against.
+    `target` (if it already existed) is left byte-for-byte untouched. If
+    that cleanup itself fails, this raises DispatchIntegrityError naming
+    the leftover path rather than silently swallowing the cleanup failure
+    (corrective follow-up, item 6) — cleanup is never claimed to have
+    succeeded when it did not. Otherwise the original exception (or the
+    RuntimeError from validation) propagates; callers convert that into a
+    route_failures record themselves — this function has no
+    `route`/`project_dir` to record against.
     """
     target = Path(target)
-    target.parent.mkdir(parents=True, exist_ok=True)
+    output_root = Path(ctx.output_root)
+    if not output_root.is_dir():
+        raise RuntimeError(
+            f"the preflight-approved output directory {output_root} does not "
+            f"exist — atomic_commit() never creates it; only route_images.py's "
+            f"dispatcher may, after complete preflight and the canonical gate")
+    if target.parent.resolve() != output_root.resolve():
+        raise RuntimeError(
+            f"target's parent {target.parent} is not the preflight-approved "
+            f"output directory {output_root} — refusing to write anywhere else")
+    if target.is_symlink():
+        raise RuntimeError(f"{target} is a symlink — refusing to write through it")
+    if target.exists() and target.is_dir():
+        raise RuntimeError(f"{target} is a directory — refusing to overwrite it as a file")
+
     import tempfile
-    fd, tmp_name = tempfile.mkstemp(dir=str(target.parent), suffix=target.suffix or ".png")
+    fd, tmp_name = tempfile.mkstemp(dir=str(output_root), suffix=target.suffix or ".png")
     os.close(fd)
     tmp_path = Path(tmp_name)
     try:
         producer(tmp_path)
         _validate_canonical_png(tmp_path)
         os.replace(str(tmp_path), str(target))
-    except Exception:
+    except Exception as original_exc:
         try:
             if tmp_path.exists():
                 tmp_path.unlink()
-        except OSError:
-            pass
+        except OSError as cleanup_exc:
+            raise DispatchIntegrityError(
+                f"transaction-integrity failure: temporary file {tmp_path} "
+                f"could not be cleaned up after a failure ({original_exc}); "
+                f"cleanup itself failed: {cleanup_exc}") from cleanup_exc
         raise
 
 
@@ -399,7 +544,7 @@ def adapt_map(route, target: Path, ctx: DispatchContext) -> bool:
     import generation_gate
     generation_gate.require_canonical_visual_execution_ready(
         ctx.project_dir, operation="adapt_map (canonical visual execution)")
-    _verify_dispatch_entry(route, ctx, adapt_map)
+    _verify_dispatch_entry(route, target, ctx, adapt_map)
     args = (route.get("route_args") or {}).get("map") or {}
     map_script = Path(__file__).parent / "generate_india_map.py"
 
@@ -419,7 +564,7 @@ def adapt_map(route, target: Path, ctx: DispatchContext) -> bool:
             raise RuntimeError(f"map render failed: {result.stderr[-500:]}")
 
     try:
-        atomic_commit(target, _producer)
+        atomic_commit(ctx, target, _producer)
     except Exception as e:
         route_failures.record_failure(ctx.project_dir, route,
                                        reason=f"map render failed: {e}")
@@ -435,7 +580,7 @@ def adapt_chart(route, target: Path, ctx: DispatchContext) -> bool:
     import generation_gate
     generation_gate.require_canonical_visual_execution_ready(
         ctx.project_dir, operation="adapt_chart (canonical visual execution)")
-    _verify_dispatch_entry(route, ctx, adapt_chart)
+    _verify_dispatch_entry(route, target, ctx, adapt_chart)
     import json as _json
     args = (route.get("route_args") or {}).get("chart") or {}
     chart_script = Path(__file__).parent / "generate_chart.py"
@@ -452,7 +597,7 @@ def adapt_chart(route, target: Path, ctx: DispatchContext) -> bool:
             raise RuntimeError(f"chart render failed: {result.stderr[-500:]}")
 
     try:
-        atomic_commit(target, _producer)
+        atomic_commit(ctx, target, _producer)
     except Exception as e:
         route_failures.record_failure(ctx.project_dir, route,
                                        reason=f"chart render failed: {e}")
@@ -489,7 +634,8 @@ def adapt_host_composite(route, target: Path, ctx: DispatchContext) -> bool:
     import generation_gate
     generation_gate.require_canonical_visual_execution_ready(
         ctx.project_dir, operation="adapt_host_composite (canonical visual execution)")
-    _verify_dispatch_entry(route, ctx, adapt_host_composite, renderer_field="host_renderer_id")
+    _verify_dispatch_entry(route, target, ctx, adapt_host_composite,
+                          renderer_field="host_renderer_id")
 
     pose_id = route.get("host_pose_id")
     if not isinstance(pose_id, str) or not pose_id.strip():
@@ -512,7 +658,7 @@ def adapt_host_composite(route, target: Path, ctx: DispatchContext) -> bool:
             scene_bound=bool(route.get("host_scene_bound")), context=ctx.channel)
 
     try:
-        atomic_commit(target, _producer)
+        atomic_commit(ctx, target, _producer)
     except Exception as e:
         route_failures.record_failure(ctx.project_dir, route,
                                        reason=f"host composite failed: {e}")
@@ -530,7 +676,7 @@ def adapt_photo(route, target: Path, ctx: DispatchContext) -> bool:
     import generation_gate
     generation_gate.require_canonical_visual_execution_ready(
         ctx.project_dir, operation="adapt_photo (canonical visual execution)")
-    _verify_dispatch_entry(route, ctx, adapt_photo)
+    _verify_dispatch_entry(route, target, ctx, adapt_photo)
     import search_pexels
     args = (route.get("route_args") or {}).get("photo") or {}
     query = args.get("query")
@@ -553,7 +699,7 @@ def adapt_photo(route, target: Path, ctx: DispatchContext) -> bool:
             raise RuntimeError(f"pexels fetch failed for query {query!r}")
 
     try:
-        atomic_commit(target, _producer)
+        atomic_commit(ctx, target, _producer)
     except Exception as e:
         route_failures.record_failure(ctx.project_dir, route,
                                        reason=f"pexels fetch failed: {e}")
@@ -686,7 +832,7 @@ def adapt_flux(route: dict, target: Path, ctx: DispatchContext) -> bool:
     import generation_gate
     generation_gate.require_canonical_visual_execution_ready(
         ctx.project_dir, operation="adapt_flux (canonical visual execution)")
-    _verify_dispatch_entry(route, ctx, adapt_flux)
+    _verify_dispatch_entry(route, target, ctx, adapt_flux)
     entry = ctx.renderer_entry
     if entry.get("provider") != "xai":
         raise RuntimeError(f"adapt_flux only supports provider 'xai', got "
@@ -739,7 +885,7 @@ def adapt_flux(route: dict, target: Path, ctx: DispatchContext) -> bool:
         return False
 
     try:
-        atomic_commit(target, lambda tmp_path: tmp_path.write_bytes(final_bytes))
+        atomic_commit(ctx, target, lambda tmp_path: tmp_path.write_bytes(final_bytes))
     except Exception as e:
         # The transformed bytes are already the registered-transform's own
         # output; a failure here is atomic_commit's own validation or
@@ -761,14 +907,22 @@ REFERENCE_ORDER = ("body_master", "face_master")
 
 
 def _exactly_body_then_face(ref_ids) -> bool:
-    """True only for a list of exactly two strings that are, in some order,
-    body_master and face_master once each — never for a wrong count, a
-    duplicate (["body_master", "body_master"] has length 2 but is not this),
-    a non-list, or a non-string element. `set()` equality alone cannot tell
+    """True only for a list OR tuple of exactly two strings that are, in
+    some order, body_master and face_master once each — never for a wrong
+    count, a duplicate (["body_master", "body_master"] has length 2 but is
+    not this), a non-list/tuple, or a non-string element. `list` and
+    `tuple` are both accepted — never a bare `str` (which Python also
+    considers a sequence, and which must never satisfy this check just
+    because iterating its characters happens to produce two entries) —
+    because host_reference_asset_ids arrives as a `list` for a plain-dict
+    route and as an immutable `tuple` for a route from a sealed
+    DispatchSnapshot (corrective follow-up, item 2); accepting exactly
+    those two container types, and no other iterable, is intentional, not
+    an accidental widening. `set()` equality alone cannot tell
     ["body_master", "face_master", "body_master"] apart from the correct
     pair (both produce the same 2-element set) — this checks length AND
     element identity, not set membership alone."""
-    return (isinstance(ref_ids, list) and len(ref_ids) == 2
+    return (isinstance(ref_ids, (list, tuple)) and len(ref_ids) == 2
             and all(isinstance(r, str) for r in ref_ids)
             and sorted(ref_ids) == sorted(REFERENCE_ORDER))
 
@@ -793,7 +947,7 @@ def adapt_flux_reference_anchor(route: dict, target: Path, ctx: DispatchContext)
     generation_gate.require_canonical_visual_execution_ready(
         ctx.project_dir,
         operation="adapt_flux_reference_anchor (canonical visual execution)")
-    _verify_dispatch_entry(route, ctx, adapt_flux_reference_anchor)
+    _verify_dispatch_entry(route, target, ctx, adapt_flux_reference_anchor)
     entry = ctx.renderer_entry
     if entry.get("provider") != "openai":
         raise RuntimeError(f"adapt_flux_reference_anchor only supports provider "
@@ -873,7 +1027,7 @@ def adapt_flux_reference_anchor(route: dict, target: Path, ctx: DispatchContext)
         return False
 
     try:
-        atomic_commit(target, lambda tmp_path: tmp_path.write_bytes(final_bytes))
+        atomic_commit(ctx, target, lambda tmp_path: tmp_path.write_bytes(final_bytes))
     except Exception as e:
         route_failures.record_failure(ctx.project_dir, route,
                                        reason=f"could not commit the final asset: {e}")

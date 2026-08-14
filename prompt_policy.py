@@ -28,6 +28,7 @@ violation to schema/validate_contract, which already reject it independently.
 """
 
 import hashlib
+from collections.abc import Mapping
 
 STYLE_POLICY = (
     "Flat digital cartoon illustration for an educational, friendly, "
@@ -90,7 +91,7 @@ class PromptPolicyError(RuntimeError):
     has no typed-prompt slot at all for its visual_type."""
 
 
-def typed_prompt(route: dict) -> str:
+def typed_prompt(route) -> str:
     """The typed route_args prompt — the SOLE execution authority for
     ILLUSTRATION/REENACTMENT (Task 2B-B2a amendment, corrective follow-up
     item 5). Raises PromptPolicyError for anything other than a genuine,
@@ -101,16 +102,24 @@ def typed_prompt(route: dict) -> str:
     (visual_routes.prompt_authority_problems, still required by canonical
     contract validation), it is never itself trusted as content here. A
     silent fallback here would mean a route could execute against text no
-    typed-prompt check ever verified."""
+    typed-prompt check ever verified.
+
+    `route` may be a plain dict or a genuinely immutable
+    collections.abc.Mapping (a MappingProxyType route from a sealed
+    DispatchSnapshot, Task 2B-B2b-2a corrective) — object-shape checks below
+    use `Mapping`, not `dict`, specifically so a validated snapshot's route
+    is accepted on EXACTLY the same terms as a plain dict would be; nothing
+    here is weakened or widened to accept anything else. `route['prompt']`
+    is never read as a fallback either way."""
     vt = route.get("visual_type")
     key = _TYPE_ROUTE_ARGS_KEY.get(vt)
     if key is None:
         raise PromptPolicyError(f"visual_type {vt!r} has no typed prompt slot")
     route_args = route.get("route_args")
-    if not isinstance(route_args, dict):
+    if not isinstance(route_args, Mapping):
         raise PromptPolicyError("route has no route_args object at all")
     args = route_args.get(key)
-    if not isinstance(args, dict):
+    if not isinstance(args, Mapping):
         raise PromptPolicyError(f"route_args.{key} is missing or not an object")
     value = args.get("prompt")
     if not isinstance(value, str) or not value.strip():

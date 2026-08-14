@@ -903,7 +903,8 @@ try:
 
     try:
         renderer_adapters.build_dispatch_context(
-            snapshot_a, snapshot_b.routes[0], output_root=proj_a / "images")
+            snapshot_a, snapshot_b.routes[0],
+            target=proj_a / "images" / "SCENE-001.png", output_root=proj_a / "images")
         check("a route from project B's snapshot is refused against project A's "
              "snapshot", False, "did not raise")
     except renderer_adapters.DispatchIntegrityError:

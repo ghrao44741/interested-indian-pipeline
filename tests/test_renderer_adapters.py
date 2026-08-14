@@ -51,6 +51,48 @@ def temp_dir() -> Path:
     return Path(tempfile.mkdtemp())
 
 
+def _build_test_snapshot(routes: tuple, root: Path, channel=None) -> "vr.DispatchSnapshot":
+    """Builds a genuinely sealed DispatchSnapshot for adapter tests, through
+    the SAME `visual_routes._LoadSeal` -> `build_dispatch_snapshot()` path
+    production code uses — not a bypass, just fed directly-constructed
+    inputs instead of a real project.json/manifest.json on disk (these
+    adapter-focused tests intentionally stay decoupled from the full
+    project/channel/manifest fixture machinery test_route_binding.py uses
+    for its own, project-level tests). `_LoadSeal` is module-private by
+    convention, not by real access control — constructing one directly in
+    a test, to build a fixture through the real factory, is exactly the
+    kind of use its own docstring describes."""
+    import visual_routes as vr
+    frozen_doc = MappingProxyType({"routes_id": "r1", "routes": tuple(routes)})
+    seal = vr._LoadSeal(
+        project_dir=root, doc=frozen_doc, routes_bytes=b"{}",
+        routes_file_sha256="a" * 64, routes_content_sha256="b" * 64,
+        context=channel, manifest=None, manifest_sha256=None,
+        routes_path=root / "visual_routes.json", routes_md_path=root / "visual_routes.md",
+        approved_poses=MappingProxyType({}), poses_asset_base=None, poses_root=None,
+        approved_references=MappingProxyType({}), references_asset_base=None,
+        references_root=None,
+    )
+    result = vr.ProjectRoutesLoad(
+        project_dir=root, operation="test", doc=dict(frozen_doc), context=channel,
+        manifest=None, manifest_sha256=None,
+        routes_path=seal.routes_path, routes_md_path=seal.routes_md_path)
+    result._seal = seal
+    return vr.build_dispatch_snapshot(result)
+
+
+def _build_test_context(route, root: Path, *, target: Path, renderer_field="renderer_id",
+                        channel=None, output_root=None):
+    """Builds a genuinely sealed DispatchContext for one route, through a
+    freshly-built single-route sealed snapshot and the real
+    build_dispatch_context() factory — the only path that produces a
+    context `_verify_dispatch_entry()` will accept."""
+    snapshot = _build_test_snapshot((route,), root, channel=channel)
+    return ra.build_dispatch_context(
+        snapshot, route, target=target, output_root=output_root or root,
+        renderer_field=renderer_field)
+
+
 def _base_route(**kw) -> dict:
     base = {
         "visual_asset_id": "VIS-001-A", "source_ids": ["SRC-001"],
@@ -342,11 +384,7 @@ def s5_reference_anchored_passes_both_exact_master_bytes_body_then_face():
     route = _base_route(host_present=True, host_method="reference_anchored_generation",
                         host_reference_asset_ids=["body_master", "face_master"],
                         renderer_id="flux_reference_anchor")
-    ctx = ra.DispatchContext(
-        project_dir=root, channel=channel, approved_poses={}, approved_references={},
-        poses_asset_base=None, poses_root=None,
-        references_asset_base=None, references_root=None,
-        output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"], route=route)
+    ctx = _build_test_context(route, root, target=root / "out.png", channel=channel)
 
     captured = {}
 
@@ -390,11 +428,7 @@ def s5_reference_anchored_edit_failure_never_calls_images_generate():
     route = _base_route(host_present=True, host_method="reference_anchored_generation",
                         host_reference_asset_ids=["body_master", "face_master"],
                         renderer_id="flux_reference_anchor")
-    ctx = ra.DispatchContext(
-        project_dir=root, channel=channel, approved_poses={}, approved_references={},
-        poses_asset_base=None, poses_root=None,
-        references_asset_base=None, references_root=None,
-        output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"], route=route)
+    ctx = _build_test_context(route, root, target=root / "out.png", channel=channel)
 
     class _FakeImages:
         edit_calls = []
@@ -442,11 +476,7 @@ def s5_reference_anchored_refuses_before_provider_call_when_a_reference_is_missi
     route = _base_route(host_present=True, host_method="reference_anchored_generation",
                         host_reference_asset_ids=["body_master", "face_master"],
                         renderer_id="flux_reference_anchor")
-    ctx = ra.DispatchContext(
-        project_dir=root, channel=channel, approved_poses={}, approved_references={},
-        poses_asset_base=None, poses_root=None,
-        references_asset_base=None, references_root=None,
-        output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"], route=route)
+    ctx = _build_test_context(route, root, target=root / "out.png", channel=channel)
 
     with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
                           return_value=None), \
@@ -470,11 +500,7 @@ def s5_reference_anchored_rejects_a_stale_hash_before_any_provider_call():
     route = _base_route(host_present=True, host_method="reference_anchored_generation",
                         host_reference_asset_ids=["body_master", "face_master"],
                         renderer_id="flux_reference_anchor")
-    ctx = ra.DispatchContext(
-        project_dir=root, channel=channel, approved_poses={}, approved_references={},
-        poses_asset_base=None, poses_root=None,
-        references_asset_base=None, references_root=None,
-        output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"], route=route)
+    ctx = _build_test_context(route, root, target=root / "out.png", channel=channel)
 
     with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
                           return_value=None), \
@@ -496,11 +522,7 @@ def s5_reference_anchored_rejects_a_non_approved_status_before_any_provider_call
     route = _base_route(host_present=True, host_method="reference_anchored_generation",
                         host_reference_asset_ids=["body_master", "face_master"],
                         renderer_id="flux_reference_anchor")
-    ctx = ra.DispatchContext(
-        project_dir=root, channel=channel, approved_poses={}, approved_references={},
-        poses_asset_base=None, poses_root=None,
-        references_asset_base=None, references_root=None,
-        output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"], route=route)
+    ctx = _build_test_context(route, root, target=root / "out.png", channel=channel)
 
     with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
                           return_value=None), \
@@ -521,11 +543,7 @@ def s5_reference_anchored_rejects_top_level_master_disagreement_before_any_provi
     route = _base_route(host_present=True, host_method="reference_anchored_generation",
                         host_reference_asset_ids=["body_master", "face_master"],
                         renderer_id="flux_reference_anchor")
-    ctx = ra.DispatchContext(
-        project_dir=root, channel=channel, approved_poses={}, approved_references={},
-        poses_asset_base=None, poses_root=None,
-        references_asset_base=None, references_root=None,
-        output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"], route=route)
+    ctx = _build_test_context(route, root, target=root / "out.png", channel=channel)
 
     with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
                           return_value=None), \
@@ -565,11 +583,7 @@ def s5_reference_anchored_rejects_traversal_and_archive_paths_before_any_provide
         route = _base_route(host_present=True, host_method="reference_anchored_generation",
                             host_reference_asset_ids=["body_master", "face_master"],
                             renderer_id="flux_reference_anchor")
-        ctx = ra.DispatchContext(
-            project_dir=root, channel=channel, approved_poses={}, approved_references={},
-            poses_asset_base=None, poses_root=None,
-            references_asset_base=None, references_root=None,
-            output_root=root, renderer_entry=renderers.RENDERERS["flux_reference_anchor"], route=route)
+        ctx = _build_test_context(route, root, target=root / "out.png", channel=channel)
 
         with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
                               return_value=None), \
@@ -714,10 +728,8 @@ def s8_adapt_flux_applies_the_registered_transform_to_a_non_16x9_response():
     route = _base_route(renderer_id="flux_illustration")
     real_entry = renderers.RENDERERS["flux_illustration"]
 
-    ctx = ra.DispatchContext(
-        project_dir=root, channel=None, approved_poses={}, approved_references={},
-        poses_asset_base=None, poses_root=None, references_asset_base=None,
-        references_root=None, output_root=root, renderer_entry=real_entry, route=route)
+    ctx = _build_test_context(route, root, target=root / "out.png",
+                          channel=None)
 
     non_16x9 = _non_16x9_png_bytes((1536, 1024))
     b64 = __import__("base64").b64encode(non_16x9).decode()
@@ -764,10 +776,8 @@ def s8_adapt_flux_reference_anchor_applies_the_registered_transform():
                         renderer_id="flux_reference_anchor")
     real_entry = renderers.RENDERERS["flux_reference_anchor"]
 
-    ctx = ra.DispatchContext(
-        project_dir=root, channel=channel, approved_poses={}, approved_references={},
-        poses_asset_base=None, poses_root=None, references_asset_base=None,
-        references_root=None, output_root=root, renderer_entry=real_entry, route=route)
+    ctx = _build_test_context(route, root, target=root / "out.png",
+                          channel=channel)
 
     non_16x9 = _non_16x9_png_bytes((1536, 1024))
     b64 = __import__("base64").b64encode(non_16x9).decode()
@@ -804,11 +814,8 @@ def s8_adapt_flux_reference_anchor_applies_the_registered_transform():
 def s8_transform_failure_leaves_no_successful_looking_final_file():
     root = temp_dir()
     route = _base_route(renderer_id="flux_illustration")
-    ctx = ra.DispatchContext(
-        project_dir=root, channel=None, approved_poses={}, approved_references={},
-        poses_asset_base=None, poses_root=None, references_asset_base=None,
-        references_root=None, output_root=root,
-        renderer_entry=renderers.RENDERERS["flux_illustration"], route=route)
+    ctx = _build_test_context(route, root, target=root / "out.png",
+                          channel=None)
 
     b64 = __import__("base64").b64encode(b"not-a-real-image").decode()
 
@@ -1014,8 +1021,8 @@ def s9_credential_lookup_refuses_before_client_construction_when_unavailable():
         mock.patch("openai.OpenAI") as mock_openai, \
         mock.patch.object(ra, "route_failures") as mock_rf, \
         mock.patch.object(Path, "exists", return_value=False):
-        ctx = _flux_ctx(root, real_entry, route=route)
         target = root / "out.png"
+        ctx = _build_test_context(route, root, target=target)
         ok = ra.adapt_flux(route, target, ctx)
     check("adapt_flux refuses (records a failure) rather than raising when the "
           "declared credential is unavailable", ok is False)
@@ -1048,8 +1055,8 @@ def s9_reference_anchored_requires_exactly_two_distinct_reference_ids():
         route = _base_route(host_present=True, host_method="reference_anchored_generation",
                             host_reference_asset_ids=bad_ids,
                             renderer_id="flux_reference_anchor")
-        ctx = _flux_ctx(root, real_entry, channel=channel, route=route)
         target = root / f"out_refids_{hash(label) & 0xffff}.png"
+        ctx = _build_test_context(route, root, target=target, channel=channel)
         with mock.patch.object(generation_gate, "require_canonical_visual_execution_ready",
                               return_value=None), \
             mock.patch("openai.OpenAI") as mock_openai, \
@@ -1081,9 +1088,21 @@ def _canonical_png_bytes() -> bytes:
     return out.getvalue()
 
 
+def _minimal_output_ctx(root: Path) -> "ra.DispatchContext":
+    """A bare, UNSEALED DispatchContext carrying only output_root — the one
+    field atomic_commit() itself reads. atomic_commit() does not call
+    _verify_dispatch_entry() (that happens inside each adapter, before it
+    calls atomic_commit()), so no seal is required to exercise it directly."""
+    return ra.DispatchContext(
+        project_dir=root, channel=None, approved_poses={}, approved_references={},
+        poses_asset_base=None, poses_root=None, references_asset_base=None,
+        references_root=None, output_root=root, renderer_entry=None)
+
+
 def s10_atomic_commit_success_writes_via_temp_file_then_replace():
     root = temp_dir()
     target = root / "out.png"
+    ctx = _minimal_output_ctx(root)
     seen_tmp_paths = []
 
     def producer(tmp_path: Path):
@@ -1093,7 +1112,7 @@ def s10_atomic_commit_success_writes_via_temp_file_then_replace():
         check("the temp path is not target itself", tmp_path != target)
         tmp_path.write_bytes(_canonical_png_bytes())
 
-    ra.atomic_commit(target, producer)
+    ra.atomic_commit(ctx, target, producer)
     check("atomic_commit produced the final target", target.exists())
     check("the temp file no longer exists after a successful commit",
           not seen_tmp_paths[0].exists())
@@ -1106,6 +1125,7 @@ def s10_atomic_commit_success_writes_via_temp_file_then_replace():
 def s10_atomic_commit_failure_removes_temp_and_preserves_existing_final():
     root = temp_dir()
     target = root / "out.png"
+    ctx = _minimal_output_ctx(root)
     target.write_bytes(b"PRE-EXISTING FINAL BYTES")
     before = target.read_bytes()
 
@@ -1116,7 +1136,7 @@ def s10_atomic_commit_failure_removes_temp_and_preserves_existing_final():
         tmp_path.write_bytes(b"not a real png")
 
     try:
-        ra.atomic_commit(target, bad_producer)
+        ra.atomic_commit(ctx, target, bad_producer)
         check("atomic_commit raises when the producer's output is invalid",
               False, "did not raise")
     except RuntimeError:
@@ -1129,6 +1149,7 @@ def s10_atomic_commit_failure_removes_temp_and_preserves_existing_final():
 def s10_atomic_commit_wrong_size_is_rejected():
     root = temp_dir()
     target = root / "out.png"
+    ctx = _minimal_output_ctx(root)
 
     def producer(tmp_path: Path):
         from PIL import Image
@@ -1136,7 +1157,7 @@ def s10_atomic_commit_wrong_size_is_rejected():
         img.save(tmp_path, format="PNG")
 
     try:
-        ra.atomic_commit(target, producer)
+        ra.atomic_commit(ctx, target, producer)
         check("a wrong-size PNG is rejected", False, "did not raise")
     except RuntimeError as e:
         check("a wrong-size PNG is rejected", "640x480" in str(e) or "1280" in str(e), str(e))
@@ -1146,12 +1167,13 @@ def s10_atomic_commit_wrong_size_is_rejected():
 def s10_atomic_commit_empty_output_is_rejected():
     root = temp_dir()
     target = root / "out.png"
+    ctx = _minimal_output_ctx(root)
 
     def producer(tmp_path: Path):
         pass  # leaves the mkstemp-created file empty
 
     try:
-        ra.atomic_commit(target, producer)
+        ra.atomic_commit(ctx, target, producer)
         check("empty producer output is rejected", False, "did not raise")
     except RuntimeError as e:
         check("empty producer output is rejected", "empty" in str(e), str(e))
@@ -1160,6 +1182,7 @@ def s10_atomic_commit_empty_output_is_rejected():
 def s10_atomic_commit_producer_exception_removes_temp_preserves_final():
     root = temp_dir()
     target = root / "out.png"
+    ctx = _minimal_output_ctx(root)
     target.write_bytes(b"OLD FINAL")
 
     captured = {}
@@ -1170,7 +1193,7 @@ def s10_atomic_commit_producer_exception_removes_temp_preserves_final():
         raise RuntimeError("simulated producer failure")
 
     try:
-        ra.atomic_commit(target, raising_producer)
+        ra.atomic_commit(ctx, target, raising_producer)
         check("a producer exception propagates", False, "did not raise")
     except RuntimeError as e:
         check("a producer exception propagates", "simulated producer failure" in str(e), str(e))
@@ -1181,6 +1204,7 @@ def s10_atomic_commit_producer_exception_removes_temp_preserves_final():
 def s10_atomic_commit_replace_failure_preserves_final():
     root = temp_dir()
     target = root / "out.png"
+    ctx = _minimal_output_ctx(root)
     target.write_bytes(b"OLD FINAL")
 
     def producer(tmp_path: Path):
@@ -1188,7 +1212,7 @@ def s10_atomic_commit_replace_failure_preserves_final():
 
     with mock.patch("os.replace", side_effect=OSError("simulated replace failure")):
         try:
-            ra.atomic_commit(target, producer)
+            ra.atomic_commit(ctx, target, producer)
             check("an os.replace() failure propagates", False, "did not raise")
         except OSError:
             check("an os.replace() failure propagates", True)
@@ -1197,11 +1221,11 @@ def s10_atomic_commit_replace_failure_preserves_final():
 
 
 def s10_build_dispatch_context_requires_a_real_snapshot():
-    import visual_routes as vr
     route = _base_route()
     for bad_snapshot in (None, {"routes": (route,)}, "not a snapshot"):
         try:
-            ra.build_dispatch_context(bad_snapshot, route, output_root=temp_dir())
+            ra.build_dispatch_context(bad_snapshot, route,
+                                      target=temp_dir() / "out.png", output_root=temp_dir())
             check(f"build_dispatch_context rejects a {type(bad_snapshot).__name__} "
                  f"snapshot", False, "did not raise")
         except ra.DispatchIntegrityError:
@@ -1209,7 +1233,13 @@ def s10_build_dispatch_context_requires_a_real_snapshot():
                  f"snapshot", True)
 
 
-def _fake_snapshot(routes: tuple, root: Path, channel=None):
+def _unsealed_snapshot(routes: tuple, root: Path, channel=None):
+    """A DIRECTLY-constructed DispatchSnapshot — no `_seal` — exactly what a
+    caller bypassing build_dispatch_snapshot() would produce. Used only to
+    prove build_dispatch_context() refuses it (corrective follow-up, item
+    3); every test that needs a context to actually succeed uses
+    _build_test_snapshot() instead, which goes through the real seal
+    chain."""
     import visual_routes as vr
     return vr.DispatchSnapshot(
         project_dir=root, routes_id="r1", routes_file_sha256="a" * 64,
@@ -1219,10 +1249,24 @@ def _fake_snapshot(routes: tuple, root: Path, channel=None):
         references_root=None)
 
 
+def s10_build_dispatch_context_rejects_a_directly_constructed_snapshot():
+    root = temp_dir()
+    route = _base_route(renderer_id="pexels", visual_type="PHOTO")
+    unsealed = _unsealed_snapshot((route,), root)
+    try:
+        ra.build_dispatch_context(unsealed, route, target=root / "out.png", output_root=root)
+        check("build_dispatch_context rejects a directly-constructed "
+             "(unsealed) DispatchSnapshot", False, "did not raise")
+    except ra.DispatchIntegrityError:
+        check("build_dispatch_context rejects a directly-constructed "
+             "(unsealed) DispatchSnapshot", True)
+
+
 def s10_build_dispatch_context_requires_route_membership_by_identity():
     root = temp_dir()
     real_route = _base_route(renderer_id="pexels", visual_type="PHOTO")
-    snapshot = _fake_snapshot((real_route,), root)
+    snapshot = _build_test_snapshot((real_route,), root)
+    target = root / "out.png"
 
     equal_copy = dict(real_route)
     for label, candidate in (
@@ -1231,26 +1275,27 @@ def s10_build_dispatch_context_requires_route_membership_by_identity():
          MappingProxyType(dict(real_route))),
     ):
         try:
-            ra.build_dispatch_context(snapshot, candidate, output_root=root)
+            ra.build_dispatch_context(snapshot, candidate, target=target, output_root=root)
             check(f"build_dispatch_context rejects {label}", False, "did not raise")
         except ra.DispatchIntegrityError:
             check(f"build_dispatch_context rejects {label}", True)
 
     other_route = _base_route(renderer_id="pexels", visual_type="PHOTO",
                               visual_asset_id="VIS-002-A")
-    other_snapshot = _fake_snapshot((other_route,), root)
+    other_snapshot = _build_test_snapshot((other_route,), root)
     try:
-        ra.build_dispatch_context(other_snapshot, real_route, output_root=root)
+        ra.build_dispatch_context(other_snapshot, real_route, target=target, output_root=root)
         check("build_dispatch_context rejects a route from another snapshot",
               False, "did not raise")
     except ra.DispatchIntegrityError:
         check("build_dispatch_context rejects a route from another snapshot", True)
 
-    ctx = ra.build_dispatch_context(snapshot, real_route, output_root=root)
+    ctx = ra.build_dispatch_context(snapshot, real_route, target=target, output_root=root)
     check("build_dispatch_context accepts the genuine member route",
           ctx.route is real_route)
     check("ctx.renderer_entry is the canonical entry for the route's renderer_id",
           ctx.renderer_entry is renderers.get("pexels"))
+    check("ctx.target is the requested target", ctx.target == target)
 
 
 def s10_build_dispatch_context_binds_the_requested_renderer_field():
@@ -1259,14 +1304,15 @@ def s10_build_dispatch_context_binds_the_requested_renderer_field():
                         host_method="approved_pose_composite",
                         host_renderer_id="approved_pose_compositor",
                         visual_type="PHOTO")
-    snapshot = _fake_snapshot((route,), root)
+    snapshot = _build_test_snapshot((route,), root)
+    target = root / "out.png"
 
-    primary_ctx = ra.build_dispatch_context(snapshot, route, output_root=root,
+    primary_ctx = ra.build_dispatch_context(snapshot, route, target=target, output_root=root,
                                             renderer_field="renderer_id")
     check("renderer_field='renderer_id' binds the primary renderer's entry",
           primary_ctx.renderer_entry is renderers.get("pexels"))
 
-    host_ctx = ra.build_dispatch_context(snapshot, route, output_root=root,
+    host_ctx = ra.build_dispatch_context(snapshot, route, target=target, output_root=root,
                                          renderer_field="host_renderer_id")
     check("renderer_field='host_renderer_id' binds the host renderer's entry",
           host_ctx.renderer_entry is renderers.get("approved_pose_compositor"))
@@ -1356,6 +1402,8 @@ for title, fn in (
      s10_atomic_commit_replace_failure_preserves_final),
     ("10g. build_dispatch_context requires a real DispatchSnapshot",
      s10_build_dispatch_context_requires_a_real_snapshot),
+    ("10g2. build_dispatch_context rejects a directly-constructed (unsealed) snapshot",
+     s10_build_dispatch_context_rejects_a_directly_constructed_snapshot),
     ("10h. build_dispatch_context requires route membership by identity",
      s10_build_dispatch_context_requires_route_membership_by_identity),
     ("10i. build_dispatch_context binds the requested renderer_field",

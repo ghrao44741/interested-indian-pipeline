@@ -1037,6 +1037,50 @@ def prompt_authority_problems_for_doc(doc: dict) -> list[str]:
 # raised. Nothing in the live pipeline calls either function yet (Task 2B-B2b
 # wires that in); both are exercised directly by tests in this task.
 
+@dataclass(frozen=True)
+class _LoadSeal:
+    """Module-private proof that a ProjectRoutesLoad was produced by
+    inspect_project_routes() and passed every validation bucket (Task
+    2B-B2b-2a corrective). Constructed ONLY inside inspect_project_routes(),
+    on the single success path, after schema/integrity/status are all
+    confirmed clean.
+
+    Captures its OWN frozen copy of everything build_dispatch_snapshot()
+    needs — routes_bytes, the parsed doc, both hashes, the channel, the
+    manifest, and the pose/reference registry state. This is the whole
+    point: build_dispatch_snapshot() reads exclusively from this sealed
+    copy, never from the ProjectRoutesLoad's own public, mutable fields —
+    so mutating `result.doc`, `result.routes_path`, or any other field on
+    an already-sealed load AFTER validation has no effect on what a
+    snapshot built from it actually contains.
+
+    Not a cryptographic capability. Nothing in Python's object model makes
+    an object truly unforgeable to code already running in the same
+    process — a caller willing to `import visual_routes` and construct
+    `visual_routes._LoadSeal(...)` directly can still do so. What this
+    provides is a structural boundary against the realistic failure modes
+    this task exists to close: a caller assembling a ProjectRoutesLoad by
+    hand, copying one, or mutating a genuinely-validated one after the
+    fact — none of those produce a `_LoadSeal` merely by looking right.
+    """
+    project_dir: Path
+    doc: "MappingProxyType"
+    routes_bytes: bytes
+    routes_file_sha256: str
+    routes_content_sha256: str
+    context: object
+    manifest: "MappingProxyType | None"
+    manifest_sha256: str | None
+    routes_path: Path
+    routes_md_path: Path
+    approved_poses: "MappingProxyType"
+    poses_asset_base: Path | None
+    poses_root: Path | None
+    approved_references: "MappingProxyType"
+    references_asset_base: Path | None
+    references_root: Path | None
+
+
 @dataclass
 class ProjectRoutesLoad:
     project_dir: Path
@@ -1063,6 +1107,13 @@ class ProjectRoutesLoad:
     approved_references: dict = field(default_factory=dict)
     references_asset_base: Path | None = None
     references_root: Path | None = None
+    # The dispatch-authority seal (corrective follow-up). None on every
+    # load that inspect_project_routes() itself did not carry all the way
+    # to a clean pass — including one that is merely reporting
+    # execution_blockers == [] because a caller built it that way by hand.
+    # Leading underscore: module-private by convention, deliberately not
+    # part of this dataclass's ordinary public field set.
+    _seal: "_LoadSeal | None" = None
 
     @property
     def execution_blockers(self) -> list:
@@ -1152,10 +1203,22 @@ def inspect_project_routes(project, *, operation: str = "inspect") -> "ProjectRo
             f"are required before this project can be dispatched.")
         return result
 
+    # Single read: routes_file_sha256 is computed over the EXACT bytes that
+    # get decoded and parsed below — never a second, later read of the same
+    # path (corrective follow-up, item 1). A file that changes between two
+    # separate reads is exactly the TOCTOU gap this closes; hashing and
+    # parsing the same in-memory bytes object makes that gap impossible for
+    # this artifact.
     try:
-        doc = json.loads(routes_path.read_text(encoding="utf-8"))
+        routes_bytes = routes_path.read_bytes()
     except Exception as e:
-        result.load_problems.append(f"could not read/parse {ROUTES_NAME}: {e}")
+        result.load_problems.append(f"could not read {ROUTES_NAME}: {e}")
+        return result
+    routes_file_sha256 = hashlib.sha256(routes_bytes).hexdigest()
+    try:
+        doc = json.loads(routes_bytes.decode("utf-8"))
+    except Exception as e:
+        result.load_problems.append(f"could not parse {ROUTES_NAME}: {e}")
         return result
     result.doc = doc
 
@@ -1176,6 +1239,7 @@ def inspect_project_routes(project, *, operation: str = "inspect") -> "ProjectRo
 
     manifest_path = project_dir / "manifest.json"
     manifest = None
+    manifest_sha256 = None
     try:
         manifest_exists = manifest_path.is_file()
     except Exception as e:
@@ -1185,11 +1249,17 @@ def inspect_project_routes(project, *, operation: str = "inspect") -> "ProjectRo
         result.load_problems.append(f"manifest.json missing at {project_dir}")
     else:
         try:
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            result.manifest = manifest
-            result.manifest_sha256 = file_sha256(manifest_path)
+            manifest_bytes = manifest_path.read_bytes()
         except Exception as e:
-            result.load_problems.append(f"could not read/parse manifest.json: {e}")
+            result.load_problems.append(f"could not read manifest.json: {e}")
+        else:
+            manifest_sha256 = hashlib.sha256(manifest_bytes).hexdigest()
+            try:
+                manifest = json.loads(manifest_bytes.decode("utf-8"))
+                result.manifest = manifest
+                result.manifest_sha256 = manifest_sha256
+            except Exception as e:
+                result.load_problems.append(f"could not parse manifest.json: {e}")
 
     if result.load_problems:
         return result
@@ -1256,6 +1326,37 @@ def inspect_project_routes(project, *, operation: str = "inspect") -> "ProjectRo
         result.status_problems = _status_only_blockers(doc)
     except Exception as e:
         result.integrity_problems.append(f"status evaluation itself failed: {e}")
+        return result
+    if result.status_problems:
+        return result
+
+    # Every one of the four buckets is genuinely clean — seal the load.
+    # Everything the seal captures is deep-frozen HERE, from THIS validated
+    # doc/manifest/registries, over the SAME routes_bytes hashed above —
+    # never re-read from disk and never re-derived from result's own
+    # (still mutable, still public) fields afterward. build_dispatch_
+    # snapshot() reads exclusively from this seal.
+    try:
+        result._seal = _LoadSeal(
+            project_dir=project_dir,
+            doc=_deep_freeze_json(doc),
+            routes_bytes=routes_bytes,
+            routes_file_sha256=routes_file_sha256,
+            routes_content_sha256=compute_routes_content_sha256(doc),
+            context=context,
+            manifest=_deep_freeze_json(manifest) if manifest is not None else None,
+            manifest_sha256=manifest_sha256,
+            routes_path=routes_path,
+            routes_md_path=routes_md_path,
+            approved_poses=_deep_freeze_json(approved_poses),
+            poses_asset_base=poses_asset_base,
+            poses_root=poses_root,
+            approved_references=_deep_freeze_json(approved_references),
+            references_asset_base=references_asset_base,
+            references_root=references_root,
+        )
+    except Exception as e:
+        result.integrity_problems.append(f"could not seal the validated load: {e}")
     return result
 
 
@@ -1275,130 +1376,122 @@ def require_executable_routes(project, *, operation: str = "dispatch") -> "Proje
     return result
 
 
-# ── the immutable dispatch snapshot (Task 2B-B2b-2a) ────────────────────────
+# ── the immutable dispatch snapshot (Task 2B-B2b-2a, corrective follow-up) ──
 #
 # A mutable dict copied from visual_routes.json is never sufficient dispatch
 # authority — nothing stops a caller from mutating it after validation, or
 # handing a route from one project's snapshot to another project's dispatch.
-# DispatchSnapshot is the one immutable, fully-bound object a canonical
-# dispatcher (route_images.py) is allowed to iterate; it is built only by
-# build_dispatch_snapshot(), only from a ProjectRoutesLoad that has already
-# proven is_executable — there is no other constructor.
+# DispatchSnapshot is the one immutable, fully-bound, SEALED object a
+# canonical dispatcher (route_images.py) is allowed to iterate; it is built
+# only by build_dispatch_snapshot(), and only from a ProjectRoutesLoad
+# carrying a genuine _LoadSeal — never merely one reporting an empty
+# execution_blockers list, which a caller can produce by hand.
 
-class _FrozenDict(dict):
-    """A dict SUBCLASS whose mutating methods all raise TypeError — genuinely
-    immutable, while `isinstance(x, dict)` still holds. That matters because
-    an existing consumer's own type check must not be weakened just because
-    its input now comes from a validated dispatch snapshot instead of a
-    freshly-parsed JSON document: prompt_policy.typed_prompt() checks
-    `isinstance(route_args, dict)` / `isinstance(args, dict)`, and a
-    MappingProxyType (not a dict subclass) would fail that check and turn
-    every canonical illustration/reenactment route into a false
-    PromptPolicyError. A dict subclass satisfies both goals at once."""
+def _deep_freeze_json(obj):
+    """dict -> MappingProxyType (recursively), list -> tuple (recursively) —
+    genuinely immutable structures, not dict/list SUBCLASSES (corrective
+    follow-up, item 2). MappingProxyType has no mutating method at all;
+    tuple is immutable by construction — dict.__setitem__/list.append and
+    every other base-class mutator is simply absent from the result's type,
+    not merely overridden to raise.
 
-    def _refuse(self, *a, **kw):
-        raise TypeError(
-            "this mapping is part of an immutable, validated dispatch-"
-            "snapshot route and cannot be mutated")
+    Because the result is NOT a dict/list subclass, isinstance(x, dict) and
+    isinstance(x, list) do not hold for it. Every consumer that needs to
+    check shape checks collections.abc.Mapping instead — see
+    prompt_policy.py's narrow update, the one place in this codebase that
+    used to check isinstance(..., dict) on a route-derived value.
 
-    __setitem__ = __delitem__ = clear = pop = popitem = update = setdefault = _refuse
-
-
-class _FrozenList(list):
-    """The list-shaped counterpart to _FrozenDict, for the same reason —
-    e.g. renderer_adapters._exactly_body_then_face()'s
-    `isinstance(ref_ids, list)` on route['host_reference_asset_ids']."""
-
-    def _refuse(self, *a, **kw):
-        raise TypeError(
-            "this list is part of an immutable, validated dispatch-snapshot "
-            "route and cannot be mutated")
-
-    __setitem__ = __delitem__ = __iadd__ = __imul__ = _refuse
-    append = extend = insert = remove = pop = clear = sort = reverse = _refuse
-
-
-def _freeze_route(obj):
-    """Recursively converts a validated route (or anything nested inside
-    one — route_args, host_reference_asset_ids, host_placement, and so on)
-    into an immutable but type-compatible form: a dict becomes a
-    _FrozenDict, a list becomes a _FrozenList. Both remain real
-    dict/list instances for isinstance purposes; both raise on every
-    mutating method. Anything else (str, int, float, bool, None) is
-    returned unchanged — already immutable."""
+    Anything else (str, int, float, bool, None) is returned unchanged —
+    already immutable."""
     if isinstance(obj, dict):
-        return _FrozenDict({k: _freeze_route(v) for k, v in obj.items()})
+        return MappingProxyType({k: _deep_freeze_json(v) for k, v in obj.items()})
     if isinstance(obj, list):
-        return _FrozenList(_freeze_route(v) for v in obj)
+        return tuple(_deep_freeze_json(v) for v in obj)
     return obj
+
+
+@dataclass(frozen=True)
+class _SnapshotSeal:
+    """Module-private proof that a DispatchSnapshot was produced by
+    build_dispatch_snapshot() from a genuinely sealed ProjectRoutesLoad.
+    Carries the _LoadSeal it was built from, so a caller cannot construct a
+    DispatchSnapshot and merely poke a truthy value into `_seal` without
+    also having a real _LoadSeal to reference — which itself is only ever
+    produced by inspect_project_routes()'s own success path. Same non-
+    cryptographic caveat as _LoadSeal: this is a structural boundary
+    against realistic misuse, not a guarantee against a determined caller
+    willing to import and call this module's private names directly."""
+    load_seal: _LoadSeal
 
 
 @dataclass(frozen=True)
 class DispatchSnapshot:
     """The complete, immutable dispatch authority for one project's
     canonical visual_routes.json — the only thing a canonical dispatcher may
-    execute against. Built only by build_dispatch_snapshot()."""
+    execute against. Built only by build_dispatch_snapshot(). `_seal` is
+    None for anything else, including a directly-constructed instance —
+    build_dispatch_context() (renderer_adapters.py) refuses any snapshot
+    whose `_seal` is not a genuine _SnapshotSeal."""
     project_dir: Path
     routes_id: str
     routes_file_sha256: str
     routes_content_sha256: str
     channel: object                      # channel_context.ChannelContext
-    routes: tuple                        # tuple of _FrozenDict, canonical document order
+    routes: tuple                        # tuple of MappingProxyType, canonical document order
     approved_poses: MappingProxyType
     poses_asset_base: Path | None
     poses_root: Path | None
     approved_references: MappingProxyType
     references_asset_base: Path | None
     references_root: Path | None
+    _seal: "_SnapshotSeal | None" = None
 
 
 def build_dispatch_snapshot(result: "ProjectRoutesLoad") -> DispatchSnapshot:
     """THE only way to obtain a DispatchSnapshot.
 
-    Raises VisualRoutesError unless `result` is genuinely a ProjectRoutesLoad
-    that has already proven is_executable — a caller cannot build one from a
-    hand-assembled ProjectRoutesLoad-shaped object, a dict, or any other
-    caller-supplied structure standing in for one; the check is
-    `isinstance(result, ProjectRoutesLoad)` plus `result.execution_blockers`
-    being genuinely empty, not merely "looks executable."
-
-    Every route in the returned snapshot is deep-frozen via _freeze_route();
-    the routes/poses/references registries are hashed/copied from `result`
-    exactly as inspect_project_routes() already validated them — nothing
-    here re-reads the filesystem or re-derives anything validate_contract()
-    did not already check.
+    Requires `result` to carry a genuine `_LoadSeal` — installed only by
+    inspect_project_routes(), only on its single clean-pass success path,
+    after schema/integrity/status are all confirmed empty (corrective
+    follow-up, item 1). This is deliberately NOT `isinstance(result,
+    ProjectRoutesLoad)` plus `execution_blockers == []`: a caller-built
+    ProjectRoutesLoad, a copy of a genuinely sealed one, or a genuinely
+    sealed one whose fields were mutated after the fact all fail this check
+    — none of them carry a real seal, and even one that still does has
+    every value below read from the SEAL's own frozen copy, never from
+    `result`'s own (still mutable, still public) fields. A route or the
+    routes file changing after validation, or being swapped out from under
+    an already-sealed load, has no way to reach this function's output at
+    all.
     """
     if not isinstance(result, ProjectRoutesLoad):
         raise VisualRoutesError(
             f"build_dispatch_snapshot() requires a ProjectRoutesLoad, got "
             f"{type(result).__name__}")
-    if result.execution_blockers:
-        detail = "\n".join(f"  - {b}" for b in result.execution_blockers)
+    seal = result._seal
+    if not isinstance(seal, _LoadSeal):
+        detail = ("\n".join(f"  - {b}" for b in result.execution_blockers)
+                  if result.execution_blockers
+                  else "no seal present — this load was never sealed by "
+                       "inspect_project_routes()'s own clean-pass success path")
         raise VisualRoutesError(
-            f"cannot build a dispatch snapshot: the routing artifact is not "
-            f"executable:\n{detail}")
-    doc = result.doc
-    if not isinstance(doc, dict):
-        raise VisualRoutesError(
-            f"cannot build a dispatch snapshot: result.doc is not a JSON "
-            f"object ({type(doc).__name__}) despite reporting no execution "
-            f"blockers — this should be unreachable")
+            f"cannot build a dispatch snapshot: this ProjectRoutesLoad is "
+            f"not genuinely sealed dispatch authority:\n{detail}")
 
-    routes = tuple(_freeze_route(r) for r in doc.get("routes", []))
-    from renderer_adapters import _deep_freeze as _freeze_registry
     return DispatchSnapshot(
-        project_dir=result.project_dir,
-        routes_id=doc.get("routes_id"),
-        routes_file_sha256=file_sha256(result.routes_path),
-        routes_content_sha256=compute_routes_content_sha256(doc),
-        channel=result.context,
-        routes=routes,
-        approved_poses=_freeze_registry(dict(result.approved_poses or {})),
-        poses_asset_base=result.poses_asset_base,
-        poses_root=result.poses_root,
-        approved_references=_freeze_registry(dict(result.approved_references or {})),
-        references_asset_base=result.references_asset_base,
-        references_root=result.references_root,
+        project_dir=seal.project_dir,
+        routes_id=seal.doc.get("routes_id"),
+        routes_file_sha256=seal.routes_file_sha256,
+        routes_content_sha256=seal.routes_content_sha256,
+        channel=seal.context,
+        routes=tuple(seal.doc.get("routes") or ()),
+        approved_poses=seal.approved_poses,
+        poses_asset_base=seal.poses_asset_base,
+        poses_root=seal.poses_root,
+        approved_references=seal.approved_references,
+        references_asset_base=seal.references_asset_base,
+        references_root=seal.references_root,
+        _seal=_SnapshotSeal(load_seal=seal),
     )
 
 

@@ -42,6 +42,7 @@ Fixtures and mocks only. No paid calls, no synthesis, no live-project writes.
     python tests/test_visual_routes.py
 """
 
+import collections.abc as cabc
 import hashlib
 import json
 import os
@@ -2450,8 +2451,13 @@ def s8_inspect_malformed_json_is_a_load_problem():
     (proj / vr.ROUTES_NAME).write_text("{not valid json", encoding="utf-8")
     (proj / vr.ROUTES_MD_NAME).write_text("whatever", encoding="utf-8")
     result = vr.inspect_project_routes(proj, operation="test")
+    # Task 2B-B2b-2a corrective, item 1: routes bytes are read once and
+    # hashed/parsed from that SAME read, so "could not read" (the read
+    # itself failing) and "could not parse" (the bytes not being valid
+    # JSON) are now two distinct messages rather than one combined
+    # "could not read/parse".
     check("malformed JSON is a load_problem, not a raise",
-          any("could not read/parse" in p for p in result.load_problems),
+          any("could not parse" in p for p in result.load_problems),
           str(result.load_problems))
     check("is_executable is False", result.is_executable is False)
 
@@ -2661,39 +2667,108 @@ def s10_snapshot_binds_exact_project_routes_id_and_hashes():
               snap.channel is not None and snap.channel.channel_id == "loaderchan")
 
 
+def s10_mutating_the_sealed_load_afterward_never_reaches_the_snapshot():
+    """Corrective follow-up, item 1: a genuinely-validated ProjectRoutesLoad
+    whose PUBLIC fields (doc, routes_path, context, ...) are mutated AFTER
+    inspect_project_routes() already sealed it must still produce a
+    snapshot bound to the ORIGINAL validated bytes — because
+    build_dispatch_snapshot() reads exclusively from the seal's own frozen
+    copy, never from the load's own (still mutable) public fields."""
+    root = temp_root()
+    with World(root):
+        proj, doc, _ = _loader_project(root)
+        result = vr.require_executable_routes(proj, operation="test")
+        original_routes_id = result.doc["routes_id"]
+
+        # Mutate the load's own PUBLIC fields after it was already sealed.
+        result.doc = {"routes_id": "TAMPERED-AFTER-SEAL", "routes": []}
+        result.project_dir = root / "somewhere-else"
+        result.routes_path = root / "not-the-real-file.json"
+
+        snap = vr.build_dispatch_snapshot(result)
+        check("the snapshot's routes_id is the ORIGINAL sealed value, not "
+             "the post-mutation one", snap.routes_id == original_routes_id,
+              snap.routes_id)
+        check("the snapshot's project_dir is the ORIGINAL sealed value",
+              snap.project_dir == proj, snap.project_dir)
+        check("the snapshot carries the original route, not the tampered "
+             "empty list", len(snap.routes) == 1)
+
+
+def s10_mutating_the_source_doc_after_sealing_never_reaches_the_snapshot():
+    """A route/file bytes change between the moment of validation and any
+    LATER read is exactly the TOCTOU gap item 1 closes for the file itself
+    (single read_bytes(), hash and parse the same bytes) — this proves the
+    equivalent in-memory property: mutating the raw `doc` dict that was fed
+    into sealing (the same object inspect_project_routes() itself built,
+    before this test ever sees it) cannot reach an already-built snapshot,
+    because the seal deep-froze an independent copy at seal time."""
+    root = temp_root()
+    with World(root):
+        proj, doc, _ = _loader_project(root)
+        result = vr.require_executable_routes(proj, operation="test")
+        snap_before = vr.build_dispatch_snapshot(result)
+        original_renderer_id = snap_before.routes[0]["renderer_id"]
+
+        # Mutate the ORIGINAL doc dict result.doc still (transiently)
+        # referenced when it was sealed — this is the exact dict
+        # inspect_project_routes() parsed, before any freezing happened.
+        result.doc["routes"][0]["renderer_id"] = "MUTATED-AFTER-SEAL"
+
+        snap_after = vr.build_dispatch_snapshot(result)
+        check("a second snapshot built from the same sealed load is "
+             "unaffected by mutating the original doc dict",
+              snap_after.routes[0]["renderer_id"] == original_renderer_id,
+              snap_after.routes[0]["renderer_id"])
+
+
 def s10_snapshot_routes_are_deeply_immutable_but_dict_list_compatible():
+    """Task 2B-B2b-2a corrective, item 2: genuinely immutable structures
+    (MappingProxyType/tuple), not a dict/list subclass. MappingProxyType
+    simply does not HAVE mutating methods — attempting one raises
+    AttributeError (the method does not exist), and `x[k] = v` raises
+    TypeError (item assignment is not supported at all) — both are
+    "mutation is impossible", just via two different, equally conclusive
+    error types. `isinstance(x, dict)` correctly does NOT hold for it;
+    `isinstance(x, Mapping)` does — see prompt_policy.py's own narrow
+    update for the one real consumer that used to check `dict`."""
     root = temp_root()
     with World(root):
         proj, doc, _ = _loader_project(root)
         result = vr.require_executable_routes(proj, operation="test")
         snap = vr.build_dispatch_snapshot(result)
     r0 = snap.routes[0]
-    check("a snapshot route is a dict subclass (isinstance(x, dict) holds)",
-          isinstance(r0, dict))
-    check("a nested route_args value is also a dict subclass",
-          isinstance(r0["route_args"], dict))
-    check("a nested route_args.map value is also a dict subclass",
-          isinstance(r0["route_args"]["map"], dict))
+    check("a snapshot route is genuinely immutable (isinstance(x, dict) does "
+         "NOT hold for it)", not isinstance(r0, dict))
+    check("a snapshot route IS a collections.abc.Mapping",
+          isinstance(r0, cabc.Mapping))
+    check("a nested route_args value is also a Mapping, not a dict",
+          isinstance(r0["route_args"], cabc.Mapping)
+          and not isinstance(r0["route_args"], dict))
+    check("a nested route_args.map value is also a Mapping, not a dict",
+          isinstance(r0["route_args"]["map"], cabc.Mapping)
+          and not isinstance(r0["route_args"]["map"], dict))
     for label, mutate in (
-        ("top-level __setitem__", lambda: r0.__setitem__("renderer_id", "hacked")),
+        ("top-level item assignment", lambda: r0.__setitem__("renderer_id", "hacked")),
         ("top-level pop", lambda: r0.pop("renderer_id")),
         ("top-level update", lambda: r0.update(renderer_id="hacked")),
-        ("nested route_args __setitem__",
+        ("nested route_args item assignment",
          lambda: r0["route_args"].__setitem__("map", "hacked")),
     ):
         try:
             mutate()
             check(f"mutating a snapshot route ({label}) is refused", False,
                   "mutation succeeded")
-        except TypeError:
+        except (TypeError, AttributeError):
             check(f"mutating a snapshot route ({label}) is refused", True)
     lst = r0["route_args"]["map"].get("regions")
-    if isinstance(lst, list):
-        check("a nested list value is also a list subclass", isinstance(lst, list))
+    if lst is not None:
+        check("a nested list value is a tuple, not a list",
+              isinstance(lst, tuple) and not isinstance(lst, list))
         try:
             lst.append("hacked")
             check("mutating a nested list is refused", False, "mutation succeeded")
-        except TypeError:
+        except (TypeError, AttributeError):
             check("mutating a nested list is refused", True)
 
 
@@ -2906,6 +2981,10 @@ def main() -> int:
             s10_build_dispatch_snapshot_raises_for_an_unexecutable_load)
         run("10c. snapshot binds exact project/routes_id/hashes",
             s10_snapshot_binds_exact_project_routes_id_and_hashes)
+        run("10c2. mutating the sealed load's public fields afterward never "
+            "reaches the snapshot", s10_mutating_the_sealed_load_afterward_never_reaches_the_snapshot)
+        run("10c3. mutating the source doc after sealing never reaches the snapshot",
+            s10_mutating_the_source_doc_after_sealing_never_reaches_the_snapshot)
         run("10d. snapshot routes are deeply immutable but dict/list-compatible",
             s10_snapshot_routes_are_deeply_immutable_but_dict_list_compatible)
         run("10e. snapshot pose/reference registries come from the validated load",
