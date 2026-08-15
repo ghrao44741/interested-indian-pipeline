@@ -205,8 +205,8 @@ def approve(root, proj, approver="Reviewer"):
     plan_id = json.loads(
         (proj / plan_visuals.PLAN_JSON).read_text(encoding="utf-8"))["plan_id"]
     with World(root):
-        return ac.write_approval(proj, approver,
-                                 ac.confirmation_phrase(proj.name, plan_id))
+        return _write_v2_approval(proj, approver,
+                                  _v2_confirmation_phrase(proj.name, plan_id))
 
 
 def verdict(root, proj, kind="generation", **kw):
@@ -218,6 +218,137 @@ def verdict(root, proj, kind="generation", **kw):
 
 def blocked_on(rep, fragment):
     return any(fragment in b for b in rep.blockers)
+
+
+def _v2_confirmation_phrase(project: str, plan_id: str = "") -> str:
+    return f"I approve paid generation for {project} plan {(plan_id or '')[:8]}".strip()
+
+
+def _write_v2_approval(project_dir: Path, approver: str, confirmation: str) -> Path:
+    """Local replica of approve_checkpoint.py's former legacy-v2 writer,
+    which Task 2B-B2b-3 removed when it converted approve_checkpoint.py into
+    the schema-v3 canonical writer (it may no longer call
+    plan_visuals.render_md() or otherwise use plan_visuals.py as an
+    authority producer, in any form, v2 included). Kept here, not in
+    production code, only so this file can still build genuine, fully
+    validated legacy-v2 approval fixtures — exercising exactly the same
+    checks the old writer ran — to regression-test
+    generation_gate._check_approval_v2() / require_generation_ready(), which
+    remain unchanged and structurally isolated from the v3 cutover."""
+    import datetime as _dt
+    import route_failures as _route_failures
+
+    if not (approver or "").strip():
+        raise ac.ApprovalRefused("--approver must name the person approving")
+
+    rep = gate.require_identity_ready(project_dir, "Checkpoint 3 approval",
+                                      raise_on_block=False)
+    if rep.blockers:
+        raise ac.ApprovalRefused("identity is not ready:\n"
+                                 + "\n".join(f"  - {b}" for b in rep.blockers))
+
+    plan_path = project_dir / gate.VISUAL_PLAN_NAME
+    md_path = project_dir / gate.VISUAL_PLAN_MD_NAME
+    manifest_path = project_dir / "manifest.json"
+    prompts_path = project_dir / gate.PROMPTS_NAME
+    if not plan_path.exists():
+        raise ac.ApprovalRefused(f"no {gate.VISUAL_PLAN_NAME}")
+    p = json.loads(plan_path.read_text(encoding="utf-8"))
+
+    if p.get("schema_version") != gate.PLAN_SCHEMA_VERSION:
+        raise ac.ApprovalRefused("stale plan schema_version")
+
+    try:
+        context = cc.load_channel_for_project(project_dir)
+    except cc.ChannelError as e:
+        raise ac.ApprovalRefused(f"the channel could not be resolved: {e}")
+
+    binding = p.get("channel")
+    if not isinstance(binding, dict) or not binding:
+        raise ac.ApprovalRefused("the plan records no channel")
+    expected_binding = context.plan_binding()
+    if binding != expected_binding:
+        raise ac.ApprovalRefused("the plan was built against a different channel state")
+
+    if not context.voice_approved:
+        raise ac.ApprovalRefused("no approved voice profile")
+
+    early_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    narration_problems = gate.narration_binding_problems(project_dir, early_manifest, context)
+    if narration_problems:
+        raise ac.ApprovalRefused(
+            "the narration binding is not verified:\n" + "\n".join(narration_problems))
+
+    plan_id = p.get("plan_id")
+    if not plan_id:
+        raise ac.ApprovalRefused("the plan has no plan_id")
+    expected = _v2_confirmation_phrase(project_dir.name, plan_id)
+    if (confirmation or "").strip() != expected:
+        raise ac.ApprovalRefused(
+            f"confirmation phrase does not match. Expected exactly:\n  {expected}")
+
+    if not md_path.exists():
+        raise ac.ApprovalRefused(f"no {gate.VISUAL_PLAN_MD_NAME}")
+    fresh = plan_visuals.render_md(p)
+    if md_path.read_text(encoding="utf-8") != fresh:
+        raise ac.ApprovalRefused(f"{gate.VISUAL_PLAN_MD_NAME} does not match a fresh render")
+
+    if not prompts_path.exists():
+        raise ac.ApprovalRefused(f"no {gate.PROMPTS_NAME}")
+    if p.get("inputs", {}).get("prompts_sha256") != sha(prompts_path):
+        raise ac.ApprovalRefused(f"{gate.PROMPTS_NAME} has changed")
+
+    review = p.get("needs_review", [])
+    if review:
+        raise ac.ApprovalRefused(f"the plan still has {len(review)} unresolved review item(s)")
+
+    outstanding = _route_failures.unresolved(project_dir)
+    if outstanding:
+        raise ac.ApprovalRefused(f"{len(outstanding)} unresolved route failure(s)")
+
+    current_rev = _route_failures.revision(project_dir)
+    if p.get("failure_revision") != current_rev:
+        raise ac.ApprovalRefused("the plan was built at a stale failure revision")
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    known = {s.get("visual_asset_id") for s in manifest.get("scenes", [])}
+    ids = [s.get("visual_asset_id") for s in p.get("shots", [])]
+    if not ids or not all(ids):
+        raise ac.ApprovalRefused("plan entries missing visual_asset_id")
+    dupes = sorted({i for i in ids if ids.count(i) > 1})
+    if dupes:
+        raise ac.ApprovalRefused(f"duplicate visual_asset_id: {dupes}")
+    orphans = [i for i in ids if i not in known]
+    if orphans:
+        raise ac.ApprovalRefused(f"plan entries do not reconcile with the manifest: {orphans}")
+
+    planned = p.get("manifest_identity", {})
+    want_ids = sorted(s.get("shot_instance_id") for s in manifest.get("scenes", []))
+    if (planned.get("scenes") != len(manifest.get("scenes", []))
+            or planned.get("shot_instance_ids") != want_ids):
+        raise ac.ApprovalRefused("the plan was built against a different split")
+
+    record = {
+        "schema_version": 2,
+        "project": project_dir.name,
+        "plan_id": plan_id,
+        "channel": expected_binding,
+        "manifest_sha256": sha(manifest_path),
+        "visual_plan_sha256": sha(plan_path),
+        "visual_plan_md_sha256": sha(md_path),
+        "prompts_sha256": sha(prompts_path),
+        "failure_revision": current_rev,
+        "approved_at": _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="seconds"),
+        "approved_by": approver.strip(),
+        "confirmation": expected,
+        "paid_generation": p.get("paid_generation", {}),
+        "approved_mix": p.get("mix", {}),
+        "host_presence_pct": p.get("host_presence_pct"),
+        "approved_visual_asset_ids": sorted(ids),
+    }
+    out = project_dir / gate.APPROVAL_NAME
+    out.write_text(json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8")
+    return out
 
 
 REPO_BEFORE = census(ROOT)
@@ -388,10 +519,10 @@ try:
     root, proj = build_fixture()
     plan(root, proj)
     for bad, why in ((("Reviewer", "yes"), "wrong phrase"),
-                     (("", ac.confirmation_phrase("demo_project")), "no approver")):
+                     (("", _v2_confirmation_phrase("demo_project")), "no approver")):
         try:
             with World(root):
-                ac.write_approval(proj, bad[0], bad[1])
+                _write_v2_approval(proj, bad[0], bad[1])
             check(f"{why} is refused", False, "it approved")
         except ac.ApprovalRefused:
             check(f"{why} is refused", True)
@@ -413,20 +544,21 @@ try:
                 "generate_image_prompts.py"):
         check(f"{mod} does not import approve_checkpoint",
               "approve_checkpoint" not in imports_of(mod), str(imports_of(mod)))
-    check("write_approval is called nowhere outside its own module",
+    check("write_approval_v3 is called nowhere outside its own module",
           not [f.name for f in ROOT.glob("*.py")
                if f.name != "approve_checkpoint.py"
-               and "write_approval" in f.read_text(encoding="utf-8")])
+               and "write_approval_v3" in f.read_text(encoding="utf-8")])
 
     # ...and the runtime half, which catches an indirect call: the check reads
     # the calling frame's module name, so the call is made from a namespace that
     # really is named plan_visuals rather than from a function merely labelled so.
+    # write_approval_v3() (Task 2B-B2b-3's canonical writer) checks this before
+    # anything else — even before resolving the project path — so a bogus
+    # project argument still exercises exactly this refusal.
     root, proj = build_fixture()
-    plan(root, proj)
     ns = {"__name__": "plan_visuals", "ac": ac, "proj": proj}
     exec(compile("def sneak():\n"
-                 "    return ac.write_approval(proj, 'Reviewer',\n"
-                 "                             ac.confirmation_phrase(proj.name))\n",
+                 "    return ac.write_approval_v3(proj, 'Reviewer', 'whatever')\n",
                  "plan_visuals.py", "exec"), ns)
     try:
         with World(root):
@@ -436,6 +568,15 @@ try:
         check("a call from plan_visuals is refused at runtime",
               "human decision" in str(e), str(e))
     check("nothing was written", not (proj / gate.APPROVAL_NAME).exists())
+
+    print("\n9a. approve_checkpoint.py no longer imports or calls plan_visuals.render_md()")
+    ac_src = (ROOT / "approve_checkpoint.py").read_text(encoding="utf-8")
+    check("approve_checkpoint.py does not import plan_visuals",
+          "plan_visuals" not in imports_of("approve_checkpoint.py"), ac_src[:0])
+    check("approve_checkpoint.py's source never mentions plan_visuals.render_md",
+          "plan_visuals.render_md" not in ac_src)
+    check("approve_checkpoint.py has no legacy-v2 write_approval() left",
+          not hasattr(ac, "write_approval"))
 
     # ── 10 to 12: no silent reroutes ─────────────────────────────────────────
     print("\n10. invalid MAP and CHART routes become NEEDS_REVIEW, never CARTOON")

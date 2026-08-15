@@ -354,6 +354,13 @@ class GateReport:
     scope: str
     checks: list[tuple[str, bool, str]] = field(default_factory=list)
     blockers: list[str] = field(default_factory=list)
+    # Populated only by _canonical_execution_problems() (Task 2B-B2b-3): the
+    # exact visual_routes.ProjectRoutesLoad this report's canonical-routing
+    # checks were run against, so require_canonical_visual_execution_ready()
+    # can build its DispatchSnapshot from the SAME sealed load its own
+    # blockers describe, rather than re-reading visual_routes.json a second
+    # time. None for every other gate's report.
+    routes_load: "visual_routes.ProjectRoutesLoad | None" = None
 
     def add(self, name: str, ok: bool, detail: str = "") -> bool:
         self.checks.append((name, ok, detail))
@@ -1024,17 +1031,16 @@ def _check_approval_v2(rep: GateReport, project_dir: Path, manifest: dict | None
 
 # ── the v3 approval (canonical visual_routes.json execution) ───────────────────
 #
-# Task 2B-B2b-1: foundation only. Neither `canonical_confirmation_phrase()`,
-# `canonical_paid_generation_summary()`, `_check_approval_v3()`, nor
-# `_canonical_execution_problems()` below is called by anything live yet.
-# `require_canonical_visual_execution_ready()` — the function every canonical
-# adapter actually calls — still unconditionally refuses (Task 2B-B2a) and is
-# untouched by this task. This section exists so that composition can be built
-# and unit-tested in isolation now, and so a later, separately authorized
-# checkpoint (Task 2B-B2b-3) can activate it with a single, reviewable line —
-# swapping require_canonical_visual_execution_ready()'s body from "always
-# raise" to "raise iff _canonical_execution_problems(...).blockers" — rather
-# than writing and activating this logic in the same change.
+# Task 2B-B2b-1 built this composition without wiring it up.
+# `require_canonical_visual_execution_ready()` now calls
+# `_canonical_execution_problems()` directly (Task 2B-B2b-3 activation) — the
+# unconditional refusal is gone. Every adapter, dispatcher, reviewer and
+# overlay writer that calls the gate now gets the real v3 canonical-execution
+# validation: valid executable routes, a valid schema-v3 approval bound to
+# exact bytes, live content/registry hash recomputation, channel binding,
+# narration binding, failure-revision currency, and the strict paid-generation
+# summary — see `_canonical_execution_problems()` below for the exact
+# composition, unchanged from Task 2B-B2b-1 except that it is now reachable.
 
 def canonical_confirmation_phrase(project: str, routes_id: str) -> str:
     """Names the project AND the exact routes document being approved.
@@ -1433,6 +1439,7 @@ def _canonical_execution_problems(project, operation: str = "canonical visual ex
     _check_route_failures(rep, project_dir)
 
     routes_load = visual_routes.inspect_project_routes(project_dir, operation=operation)
+    rep.routes_load = routes_load
     blockers = routes_load.execution_blockers
     if blockers:
         for i, b in enumerate(blockers, 1):
@@ -1556,45 +1563,83 @@ def require_generation_ready(project,
     return rep
 
 
-def require_canonical_visual_execution_ready(project=None,
-                                             operation: str = "canonical visual execution"
-                                             ) -> GateReport:
-    """Temporary, unconditional refusal (Task 2B-B2a).
+def require_canonical_visual_execution_ready(
+        project=None,
+        operation: str = "canonical visual execution",
+        *,
+        expected_snapshot: "visual_routes.DispatchSnapshot | None" = None,
+        ) -> "visual_routes.DispatchSnapshot":
+    """The real v3 canonical-execution gate (Task 2B-B2b-3 activation).
 
-    Every adapter in renderer_adapters.py calls this, as its first executable
-    operation, before any credential read, client construction, reference
-    open, subprocess, download, directory creation, or write. It always
-    raises GateBlocked. There is no parameter, environment variable, or
-    branch anywhere in this function that can make it return successfully —
-    the only way past it is to replace it, in a later, separately authorized
-    B2b checkpoint, with the complete current-v3 approval/artifact binding
-    validator.
+    Every adapter in renderer_adapters.py, and every canonical dispatch/
+    review/overlay/orchestration entry point in route_images.py,
+    review_images.py, add_text_overlays.py and pipeline_agents.py, calls
+    this as its first executable operation, before any credential read,
+    client construction, reference open, subprocess, download, directory
+    creation, or write. It raises GateBlocked with every named blocker
+    unless `_canonical_execution_problems()` — valid executable canonical
+    routes, a valid schema-v3 approval bound to exact bytes, live content/
+    registry hash recomputation, exact manifest and Channel Pack binding,
+    current failure_revision, current narration binding, and a strict
+    paid-generation summary — comes back completely clean.
 
-    Deliberately does none of the following:
-      - accept an approval of any schema version (v2 or otherwise) — no
-        approval file is read at all;
-      - consult or reinterpret a legacy visual plan — none is read;
-      - consult visual_routes.json's validity at all — an artifact being
-        internally honest is not the same question as an execution being
-        approved to run, and this function does not conflate them even
-        provisionally;
-      - perform any I/O — no file is opened, no directory is created, no
-        client is constructed, no credential is read.
+    On success this BUILDS and RETURNS the DispatchSnapshot the check just
+    validated (via `visual_routes.build_dispatch_snapshot()` on the exact,
+    already-sealed `ProjectRoutesLoad` `_canonical_execution_problems()`
+    produced) — never a second, independent read of visual_routes.json.
+    This closes the TOCTOU gap a caller re-loading routes itself, after the
+    gate already validated a different read, would otherwise open.
 
-    `project` is accepted only so a caller can label the blocked operation
-    with the project it was attempted against; it is never resolved,
-    inspected, or used to decide anything.
+    `expected_snapshot`, when given, must be the exact DispatchSnapshot a
+    caller already holds (typically from an earlier call to this same
+    function, earlier in one orchestrated pass). After this call revalidates
+    everything fresh, the freshly-built snapshot's `project_dir`,
+    `routes_id`, `routes_file_sha256` and `routes_content_sha256` must match
+    `expected_snapshot`'s exactly, or this raises GateBlocked — the routes
+    document changed, or a different project's/pass's snapshot was
+    substituted, between when the caller's snapshot was built and this
+    revalidation. On a match, `expected_snapshot` itself is returned (not
+    the freshly-built one) so identity-based checks downstream (a route
+    being IN `snapshot.routes` by identity, for instance) keep working
+    against the object the caller has already bound contexts to.
+
+    `project` is resolved and inspected — unlike the prior unconditional
+    refusal, this function now reads visual_routes.json, the v3 approval
+    record, the manifest, and the live renderer registry.
     """
-    rep = GateReport(operation=operation,
-                     project=str(project) if project is not None else None,
-                     scope="canonical_visual_execution")
-    rep.add(
-        "canonical visual execution is enabled", False,
-        "canonical visual execution remains disabled until the Task 2B-B2b "
-        "approval-v3 cutover lands and replaces this guard — this is an "
-        "intentional, temporary, universal refusal, not a partial or "
-        "artifact-dependent check")
-    raise GateBlocked(operation, rep.blockers)
+    rep = _canonical_execution_problems(project, operation)
+    if rep.blockers:
+        raise GateBlocked(operation, rep.blockers)
+
+    routes_load = rep.routes_load
+    try:
+        snapshot = visual_routes.build_dispatch_snapshot(routes_load)
+    except visual_routes.VisualRoutesError as e:
+        # Every check passed, yet the load somehow was not genuinely sealed —
+        # an internal inconsistency, not an ordinary artifact problem. Refuse
+        # rather than executing against anything.
+        raise GateBlocked(operation, [
+            f"canonical routes could not be sealed into dispatch authority "
+            f"even though every check passed: {e}"])
+
+    if expected_snapshot is not None:
+        mismatch = (
+            not isinstance(expected_snapshot, visual_routes.DispatchSnapshot)
+            or expected_snapshot.project_dir != snapshot.project_dir
+            or expected_snapshot.routes_id != snapshot.routes_id
+            or expected_snapshot.routes_file_sha256 != snapshot.routes_file_sha256
+            or expected_snapshot.routes_content_sha256 != snapshot.routes_content_sha256
+        )
+        if mismatch:
+            raise GateBlocked(operation, [
+                "the canonical routes document changed, or a different "
+                "project's/pass's snapshot was substituted, between when "
+                "the caller's snapshot was built and this gate's own "
+                "revalidation just now — refusing to dispatch, review, or "
+                "overlay against a snapshot the gate did not itself just "
+                "confirm"])
+        return expected_snapshot
+    return snapshot
 
 
 # ── CLI ──────────────────────────────────────────────────────────────────────

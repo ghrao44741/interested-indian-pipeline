@@ -1440,9 +1440,10 @@ def run_canonical_visual_workflow(project_dir, *, overwrite: bool = False) -> di
 
     Its own first operational boundary is
     generation_gate.require_canonical_visual_execution_ready() — before any
-    route loading, dispatch, review, or overlay work. Currently always
-    refuses (Task 2B-B2a/B2b-1's universal guard); this function's body is
-    exercised only in tests with that guard explicitly patched.
+    route loading, dispatch, review, or overlay work. Raises GateBlocked
+    with every named blocker unless canonical routes, the v3 approval, the
+    channel binding, the narration binding and the failure record are all
+    current (Task 2B-B2b-3 activation).
 
     Stops immediately on the first stage's failure: dispatch, pre-overlay
     review, overlays, or final review. GateBlocked (from the initial gate
@@ -1458,17 +1459,18 @@ def run_canonical_visual_workflow(project_dir, *, overwrite: bool = False) -> di
     function — it neither duplicates nor suppresses it).
     """
     import generation_gate
-    import visual_routes
     import route_images
     import review_images
     import add_text_overlays
 
-    generation_gate.require_canonical_visual_execution_ready(
+    # The gate itself both validates and builds the snapshot (Task
+    # 2B-B2b-3) — never an independent second read of visual_routes.json
+    # after the gate already validated one. Every stage below re-passes
+    # this exact snapshot as `expected_snapshot` on its own internal gate
+    # call, so a mutation mid-pass is caught before that stage does
+    # anything, rather than only at the very start.
+    snapshot = generation_gate.require_canonical_visual_execution_ready(
         project_dir, operation="canonical visual workflow")
-
-    result = visual_routes.require_executable_routes(
-        project_dir, operation="canonical visual workflow")
-    snapshot = visual_routes.build_dispatch_snapshot(result)
 
     dispatch_code = route_images.dispatch_snapshot_routes(snapshot, overwrite=overwrite)
     if dispatch_code != 0:

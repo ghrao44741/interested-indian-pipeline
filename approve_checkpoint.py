@@ -1,31 +1,42 @@
-"""
-approve_checkpoint.py — the only way to grant Checkpoint 3 approval.
+"""approve_checkpoint.py — the only way to grant Checkpoint 3 approval.
 
-Approval is a human act, so it lives in its own command with its own confirmation
-phrase. It writes `{project}/checkpoint_3_approval.json`, binding four artifacts
-as they stood when a person read them:
+Task 2B-B2b-3: this is now the schema-v3 canonical approval writer. It writes
+`{project}/checkpoint_3_approval.json`, binding the exact bytes of the
+canonical routing artifact a person reviewed:
 
-    manifest.json     the scene identity being generated against
-    visual_plan.json  what the gate will execute
-    visual_plan.md    what the human actually read
-    the prompts file  the routing input the plan was derived from
+    visual_routes.json   the canonical routes document the gate executes
+    visual_routes.md     what a human reads before authorising spend
+    manifest.json        the scene identity being generated against
 
-Plus the plan's id and the route-failure revision. Binding all six is the whole
-point. An earlier version checked only that "a visual plan exists, has no review
-items and matches the manifest" — but plan_visuals.py writes that file itself, so
-the check only proved a program agreed with itself. A later version bound two
-hashes, which still left the prompts file free to change underneath a valid
-approval, and left the human reading a document nobody had verified against the
-plan.
+plus the routes_id, a freshly-recomputed routes_content_sha256 and
+renderer_registry_sha256 (never trusted from any stored or self-reported
+value), the current failure_revision, the current Channel Pack binding, the
+current narration binding, and a strict paid-generation summary derived
+directly from the routes document's own renderer_id fields against the live
+renderer registry — never approximated, never independently authored.
 
-Editing any bound file, or any route failing or being resolved, invalidates the
-approval. Re-running the planner cannot restore it — every plan carries a fresh
-id, and the confirmation phrase names it.
+Every one of those is (re)validated or (re)computed fresh, right here, before
+anything is written: canonical routes are loaded and required to be fully
+executable (schema, contract-integrity, manifest-coverage and status all
+clean — visual_routes.require_executable_routes() raises, naming every
+blocker, otherwise), manifest identity must be clean, the Channel Pack
+binding and narration binding must both be current, and there must be no
+unresolved route failure. Any of those failing is a named ApprovalRefused —
+never an uncaught exception, and nothing is written.
+
+Approval writing is atomic: a unique same-directory temporary file, complete
+serialization before replacement, os.replace() for the final commit, and the
+prior approval preserved byte-for-byte if anything fails first.
+
+This module no longer authors or depends on plan_visuals.py in any way —
+plan_visuals.py's project-authoring CLI is retired (see plan_visuals.py's own
+module docstring); this writer reads only the canonical visual_routes.json /
+visual_routes.md pair, never a legacy visual_plan.json/.md.
 
     python approve_checkpoint.py --project ep02 --show
     python approve_checkpoint.py --project ep02 \\
         --approver "Giri" \\
-        --confirm "I approve paid generation for ep02 plan a1b2c3d4"
+        --confirm "I approve canonical visual execution for ep02 routes a1b2c3d4"
 
     python approve_checkpoint.py --project ep02 --revoke
 
@@ -34,7 +45,6 @@ command approves, shows and revokes; nothing else.
 """
 
 import argparse
-import hashlib
 import json
 import os
 import sys
@@ -44,37 +54,22 @@ from pathlib import Path
 
 import channel_context
 import generation_gate as gg
-import plan_visuals
+import renderers
 import route_failures
+import source_ids
+import visual_routes
 
 PIPELINE_DIR = Path(__file__).parent
-# 2: every approval records the Channel Pack, character specification and voice
-# profile it was granted under. A v1 record bound none of them.
-SCHEMA_VERSION = 2
 
-# Modules that must never be able to grant approval, even indirectly. The planner
-# writes the very artifact being approved, and the orchestrator runs unattended —
-# either one calling this would turn a human checkpoint back into a formality.
+# Modules that must never be able to grant approval, even indirectly. The
+# planner (legacy or canonical) and the orchestrator run unattended — either
+# one calling this would turn a human checkpoint back into a formality.
 FORBIDDEN_CALLERS = ("plan_visuals", "pipeline_agents", "route_images",
                      "generate_image_prompts")
 
 
 class ApprovalRefused(RuntimeError):
     """Approval could not be granted. Nothing was written."""
-
-
-def _sha(path: Path) -> str:
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
-
-
-def confirmation_phrase(project: str, plan_id: str = "") -> str:
-    """Names the project AND the plan being approved.
-
-    Project-specific so a phrase cannot be pasted from one episode into another
-    by habit; plan-specific so a confirmation typed against the plan a human read
-    cannot approve a plan that was regenerated in the meantime.
-    """
-    return f"I approve paid generation for {project} plan {(plan_id or '')[:8]}".strip()
 
 
 def _reject_automated_caller() -> None:
@@ -105,11 +100,14 @@ def _write_atomic(path: Path, payload: dict) -> None:
         raise
 
 
-def write_approval(project, approver: str, confirmation: str) -> Path:
-    """Validate, then record approval. Raises ApprovalRefused without writing.
+def write_approval_v3(project, approver: str, confirmation: str) -> Path:
+    """Validate every canonical blocker, then record the v3 approval.
 
-    Everything is checked before the file is created: an approval that exists but
-    is invalid is worse than none, because it looks like a decision was made.
+    Everything is checked before the file is created: an approval that
+    exists but is invalid is worse than none, because it looks like a
+    decision was made. Never rebuilds, regenerates or authors
+    visual_routes.json/visual_routes.md — both must already exist and
+    already be internally honest; this only reads and binds them.
     """
     _reject_automated_caller()
 
@@ -122,168 +120,143 @@ def write_approval(project, approver: str, confirmation: str) -> Path:
     if not (approver or "").strip():
         raise ApprovalRefused("--approver must name the person approving")
 
-    # Identity must be sound, or approval would authorise spending against
-    # artwork that may be attached to the wrong words.
-    rep = gg.require_identity_ready(project_dir, "Checkpoint 3 approval",
-                                    raise_on_block=False)
-    if rep.blockers:
-        raise ApprovalRefused("identity is not ready:\n"
-                              + "\n".join(f"  - {b}" for b in rep.blockers))
+    # 1. Load and fully validate canonical routes. 2. Require executable
+    # route state. 3. Validate manifest coverage. All three come from one
+    # call: require_executable_routes() raises, naming every blocker, unless
+    # schema, contract-integrity, manifest-coverage AND status are all clean.
+    try:
+        routes_load = visual_routes.require_executable_routes(
+            project_dir, operation="Checkpoint 3 v3 approval")
+    except visual_routes.VisualRoutesError as e:
+        raise ApprovalRefused(f"canonical routes are not executable:\n{e}")
 
-    plan_path = project_dir / gg.VISUAL_PLAN_NAME
-    md_path = project_dir / gg.VISUAL_PLAN_MD_NAME
+    doc = routes_load.doc
+    manifest = routes_load.manifest
     manifest_path = project_dir / "manifest.json"
-    prompts_path = project_dir / gg.PROMPTS_NAME
-    if not plan_path.exists():
-        raise ApprovalRefused(f"no {gg.VISUAL_PLAN_NAME} — run plan_visuals.py and "
-                              f"read it before approving")
-    plan = json.loads(plan_path.read_text(encoding="utf-8"))
 
-    if plan.get("schema_version") != gg.PLAN_SCHEMA_VERSION:
-        raise ApprovalRefused(
-            f"the plan's schema_version is {plan.get('schema_version')!r}, this "
-            f"code expects {gg.PLAN_SCHEMA_VERSION} — re-run plan_visuals.py")
+    # Refuse unresolved identities before anything else is checked against a
+    # manifest whose own identity state cannot be trusted.
+    try:
+        source_ids.require_clean_identity(manifest_path, "Checkpoint 3 v3 approval")
+    except source_ids.IdentityError as e:
+        raise ApprovalRefused(f"manifest identity is not clean: {e}")
 
-    # The channel decides what the artwork is supposed to be, so approval is
-    # granted against a specific pack, character specification and voice — not
-    # against a plan that merely happens to sit in this folder.
+    # 4. Validate current Channel Pack binding.
     try:
         context = channel_context.load_channel_for_project(project_dir)
     except channel_context.ChannelError as e:
         raise ApprovalRefused(f"the channel could not be resolved: {e}")
 
-    binding = plan.get("channel")
-    if not isinstance(binding, dict) or not binding:
-        raise ApprovalRefused("the plan records no channel — re-run plan_visuals.py")
-    expected_binding = context.plan_binding()
-    if binding != expected_binding:
-        differing = sorted(k for k in expected_binding
-                           if binding.get(k) != expected_binding[k])
-        raise ApprovalRefused(
-            f"the plan was built against a different channel state ({', '.join(differing)} "
-            f"changed). Re-run plan_visuals.py and read the new plan before approving.")
-
-    # Defense in depth is the gate's job; refusing here is what makes the voice
-    # decision a recorded act rather than a config edit nobody has to make.
     if not context.voice_approved:
         raise ApprovalRefused(
             f"{context.channel_id} has no approved voice profile "
-            f"(selection_status={context.voice_selection_status!r}). Paid generation "
-            f"cannot be approved against narration produced by an unapproved voice. "
-            f"Record the decision as voice.approved_profile in "
-            f"{context.pack_dir / channel_context.PACK_NAME}, re-render, re-narrate, "
-            f"then re-plan.")
+            f"(selection_status={context.voice_selection_status!r}). Canonical "
+            f"visual execution cannot be approved against narration produced "
+            f"by an unapproved voice.")
 
-    # A human should not be able to grant Checkpoint 3 over audio nobody can
-    # verify and have that only surface later, at dispatch. Same shared
-    # validator the generation gate uses — one place decides what "verified
-    # narration" means, not two that could quietly drift apart.
-    early_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    narration_problems = gg.narration_binding_problems(project_dir, early_manifest,
-                                                       context)
+    expected_binding = context.plan_binding()
+    if doc.get("channel") != expected_binding:
+        raise ApprovalRefused(
+            "visual_routes.json's recorded channel binding does not match "
+            "the channel currently in force — a canonical rebuild is "
+            "required before this project can be approved (automatic "
+            "canonical route rebuilding is not yet available)")
+
+    # 5. Run narration_binding_problems() — the same shared validator the
+    # runtime gate calls, so approval cannot be granted over audio the gate
+    # will refuse moments later.
+    narration_problems = gg.narration_binding_problems(project_dir, manifest, context)
     if narration_problems:
         raise ApprovalRefused(
             "the narration binding is not verified:\n"
             + "\n".join(f"  - {p}" for p in narration_problems))
 
-    plan_id = plan.get("plan_id")
-    if not plan_id:
-        raise ApprovalRefused("the plan has no plan_id — re-run plan_visuals.py")
-    expected = confirmation_phrase(project_dir.name, plan_id)
-    if (confirmation or "").strip() != expected:
-        raise ApprovalRefused(
-            f"confirmation phrase does not match. Expected exactly:\n  {expected}\n"
-            f"(if you typed the phrase for an earlier plan, re-read the current "
-            f"plan first — it has changed)")
-
-    # The human reads the markdown; the gate executes the JSON. Refuse unless the
-    # document on disk is exactly what this plan renders to, so the two cannot
-    # describe different work.
-    if not md_path.exists():
-        raise ApprovalRefused(f"no {gg.VISUAL_PLAN_MD_NAME} — the reviewed document "
-                              f"is missing; re-run plan_visuals.py")
-    fresh = plan_visuals.render_md(plan)
-    if md_path.read_text(encoding="utf-8") != fresh:
-        raise ApprovalRefused(
-            f"{gg.VISUAL_PLAN_MD_NAME} does not match a fresh render of "
-            f"{gg.VISUAL_PLAN_NAME}. The document you reviewed is not the plan that "
-            f"would be executed. Re-run plan_visuals.py and read it again.")
-
-    if not prompts_path.exists():
-        raise ApprovalRefused(f"no {gg.PROMPTS_NAME} — the routing input is missing")
-    recorded_prompts = plan.get("inputs", {}).get("prompts_sha256")
-    if recorded_prompts != _sha(prompts_path):
-        raise ApprovalRefused(
-            f"{gg.PROMPTS_NAME} has changed since the plan was built. Re-classify, "
-            f"re-plan and read the new plan before approving.")
-
-    review = plan.get("needs_review", [])
-    if review:
-        raise ApprovalRefused(
-            f"the plan still has {len(review)} unresolved review item(s); resolve "
-            f"them and re-plan before approving:\n"
-            + "\n".join(f"  - shot {r.get('shot')}: {r.get('reason')}" for r in review[:8]))
-
+    # 8 (route failures). A failure means the routes document no longer
+    # describes what can be produced; the approval it would authorise could
+    # never actually execute cleanly.
     outstanding = route_failures.unresolved(project_dir)
     if outstanding:
         raise ApprovalRefused(
-            f"{len(outstanding)} unresolved route failure(s). Resolve them with "
-            f"route_failures.py, re-plan, then approve:\n"
-            + "\n".join(f"  - {f['visual_asset_id']}: {f['reason']}" for f in outstanding[:8]))
-
+            f"{len(outstanding)} unresolved route failure(s). Resolve them "
+            f"with route_failures.py before approving:\n"
+            + "\n".join(f"  - {f['visual_asset_id']}: {f['reason']}"
+                        for f in outstanding[:8]))
     current_rev = route_failures.revision(project_dir)
-    if plan.get("failure_revision") != current_rev:
-        raise ApprovalRefused(
-            f"the plan was built at failure revision {plan.get('failure_revision')!r} "
-            f"and the record is now at {current_rev} — re-run plan_visuals.py")
 
-    # Every executable entry must be identifiable as artwork and reconcile with
-    # the manifest, or an approval could authorise work nobody can attribute.
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    known = {s.get("visual_asset_id") for s in manifest.get("scenes", [])}
-    ids = [s.get("visual_asset_id") for s in plan.get("shots", [])]
-    if not ids:
-        raise ApprovalRefused("the plan contains no shots")
-    if not all(ids):
+    # 6. Recompute the renderer registry projection/hash — never trusted
+    # from any stored value, live against the CURRENT registry.
+    try:
+        rids = visual_routes.referenced_renderer_ids(doc.get("routes", []))
+        fresh_registry_sha256 = visual_routes.compute_renderer_registry_sha256(
+            rids, renderers.RENDERERS)
+    except Exception as e:
         raise ApprovalRefused(
-            f"{sum(1 for i in ids if not i)} plan entr(ies) have no visual_asset_id; "
-            f"approved work must be identified by persistent artwork identity")
-    dupes = sorted({i for i in ids if ids.count(i) > 1})
-    if dupes:
-        raise ApprovalRefused(f"duplicate visual_asset_id in the plan: {dupes}")
-    orphans = [i for i in ids if i not in known]
-    if orphans:
-        raise ApprovalRefused(f"plan entries do not reconcile with the manifest: {orphans[:6]}")
+            f"could not recompute the renderer registry projection: "
+            f"{type(e).__name__}: {e}")
 
-    planned = plan.get("manifest_identity", {})
-    want_ids = sorted(s.get("shot_instance_id") for s in manifest.get("scenes", []))
-    if (planned.get("scenes") != len(manifest.get("scenes", []))
-            or planned.get("shot_instance_ids") != want_ids):
-        raise ApprovalRefused("the plan was built against a different split — "
-                              "re-run plan_visuals.py before approving")
+    # 7. Recompute the strict paid-generation summary. Refuses on any
+    # unknown/malformed renderer or cost category (8) rather than silently
+    # omitting or approximating a spend figure.
+    try:
+        paid_summary = gg.canonical_paid_generation_summary(doc)
+    except gg.CanonicalSummaryError as e:
+        raise ApprovalRefused(
+            f"could not derive a strict paid-generation summary: {e}")
+
+    routes_path = routes_load.routes_path
+    routes_md_path = routes_load.routes_md_path
+    if not routes_md_path.exists():
+        raise ApprovalRefused(
+            f"no {visual_routes.ROUTES_MD_NAME} — the reviewed document is missing")
+
+    # Fresh, exact-byte hashes. Never trusted from any stored derived value —
+    # the routes document's own self-reported routes_content_sha256 is not
+    # read here, exactly like visual_routes.validate_contract() itself never
+    # trusts it.
+    routes_file_sha256 = visual_routes.file_sha256(routes_path)
+    routes_md_sha256 = visual_routes.file_sha256(routes_md_path)
+    manifest_sha256 = visual_routes.file_sha256(manifest_path)
+    fresh_content_sha256 = visual_routes.compute_routes_content_sha256(doc)
+
+    routes_id = doc.get("routes_id")
+    if not routes_id:
+        raise ApprovalRefused("visual_routes.json has no routes_id")
+
+    # 9. Require the exact approval confirmation expected by the existing
+    # contract — the same phrase generation_gate._check_approval_v3() checks
+    # against, computed by the one shared implementation
+    # (canonical_confirmation_phrase) so the two can never drift apart.
+    expected = gg.canonical_confirmation_phrase(project_dir.name, str(routes_id))
+    if (confirmation or "").strip() != expected:
+        raise ApprovalRefused(
+            f"confirmation phrase does not match. Expected exactly:\n  {expected}\n"
+            f"(if you typed the phrase for an earlier routes document, re-read "
+            f"the current one first — it has changed)")
 
     record = {
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": gg.APPROVAL_V3_SCHEMA_VERSION,
         "project": project_dir.name,
-        "plan_id": plan_id,
+        "routes_id": routes_id,
+        "routes_file_sha256": routes_file_sha256,
+        "routes_md_sha256": routes_md_sha256,
+        "routes_content_sha256": fresh_content_sha256,
+        "renderer_registry_sha256": fresh_registry_sha256,
+        "manifest_sha256": manifest_sha256,
         "channel": expected_binding,
-        "manifest_sha256": _sha(manifest_path),
-        "visual_plan_sha256": _sha(plan_path),
-        "visual_plan_md_sha256": _sha(md_path),
-        "prompts_sha256": _sha(prompts_path),
         "failure_revision": current_rev,
         "approved_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "approved_by": approver.strip(),
         "confirmation": expected,
-        "paid_generation": plan.get("paid_generation", {}),
-        "approved_mix": plan.get("mix", {}),
-        "host_presence_pct": plan.get("host_presence_pct"),
-        "approved_visual_asset_ids": sorted(ids),
-        "_note": "Binds this approval to the exact bytes of the manifest, the "
-                 "executable plan, the document that was read, and the routing "
-                 "input. Editing any of them invalidates it; so does any route "
-                 "failure or resolution. Re-running plan_visuals.py cannot "
-                 "restore it.",
+        "paid_generation": paid_summary,
+        "_note": "Binds this approval to the exact bytes of visual_routes.json, "
+                 "visual_routes.md and manifest.json, plus a freshly recomputed "
+                 "content hash, renderer-registry hash and paid-generation "
+                 "summary. Editing any bound file, changing the live renderer "
+                 "registry, or any route failure or resolution invalidates it. "
+                 "There is no way to rebuild visual_routes.json and have this "
+                 "approval carry over — canonical route authoring/rebuilding "
+                 "is a separate, not-yet-available milestone, and any rebuild "
+                 "requires a fresh approval.",
     }
     out = project_dir / gg.APPROVAL_NAME
     _write_atomic(out, record)
@@ -298,7 +271,8 @@ def main() -> int:
     ap.add_argument("--confirm", default=None,
                     help="Exact confirmation phrase (printed by --show)")
     ap.add_argument("--show", action="store_true",
-                    help="Show the current approval state and the required phrase")
+                    help="Show the current canonical routing and approval state, "
+                         "and the required confirmation phrase")
     ap.add_argument("--revoke", action="store_true",
                     help="Delete the approval record")
     args = ap.parse_args()
@@ -309,54 +283,42 @@ def main() -> int:
     approval = project_dir / gg.APPROVAL_NAME
 
     if args.show:
-        # Everything the approver needs in order to decide, and the exact phrase
-        # for the plan currently on disk — so the confirmation they type cannot
-        # belong to a plan they are no longer looking at.
-        plan_path = project_dir / gg.VISUAL_PLAN_NAME
-        plan = (json.loads(plan_path.read_text(encoding="utf-8"))
-                if plan_path.exists() else {})
+        load = visual_routes.inspect_project_routes(project_dir, operation="approval --show")
         print(f"project        : {project_dir.name}")
-        if not plan:
-            print(f"plan           : none — run plan_visuals.py first")
+        if load.execution_blockers:
+            print(f"routes         : NOT executable —")
+            for b in load.execution_blockers:
+                print(f"                 - {b}")
             return 1
-        ch = plan.get("channel") or {}
+        doc = load.doc
+        ch = doc.get("channel") or {}
         print(f"channel        : {ch.get('channel_id') or 'UNRESOLVED'} "
               f"(DNA v{ch.get('channel_dna_version')})")
-        print(f"voice profile  : "
-              + (str(ch.get('voice_profile_sha256'))[:16] + "…"
-                 if ch.get("voice_profile_sha256")
-                 else "none approved — approval will be refused"))
-        print(f"plan id        : {plan.get('plan_id')}")
-        print(f"generated      : {plan.get('generated_at')}")
-        print(f"routing input  : {str(plan.get('inputs', {}).get('prompts_sha256'))[:16]}…")
-        print(f"failure rev    : {plan.get('failure_revision')}")
-        print(f"shots          : {len(plan.get('shots', []))}")
-        print(f"mix            : "
-              + ", ".join(f"{k} {v}" for k, v in plan.get("mix", {}).items()))
-        print(f"host presence  : {plan.get('host_presence_pct')}%")
-        pg = plan.get("paid_generation", {})
-        print(f"paid shots     : {pg.get('shots')}"
-              + (f"  (~${pg['estimate_usd']})" if pg.get("estimate_usd") is not None
-                 else "  (not priced)"))
-        print(f"needs review   : {len(plan.get('needs_review', []))}")
-        for r in plan.get("needs_review", [])[:8]:
-            print(f"                 - shot {r.get('shot')}: {r.get('reason')}")
+        print(f"routes id      : {doc.get('routes_id')}")
+        print(f"routes         : {len(doc.get('routes', []))} route(s)")
+        try:
+            summary = gg.canonical_paid_generation_summary(doc)
+            print(f"paid routes    : {summary['shots']}")
+        except gg.CanonicalSummaryError as e:
+            print(f"paid routes    : could not be determined — {e}")
 
         print(f"\napproval       : {'present' if approval.exists() else 'none'}")
         if approval.exists():
             rec = json.loads(approval.read_text(encoding="utf-8"))
             print(f"approved by    : {rec.get('approved_by')} at {rec.get('approved_at')}")
-            print(f"for plan       : {rec.get('plan_id')}")
-            rep = gg.require_generation_ready(project_dir, "approval check",
-                                              raise_on_block=False)
+            print(f"for routes     : {rec.get('routes_id')}")
+            rep = gg._canonical_execution_problems(project_dir, "approval check")
             print(f"still valid    : {'yes' if not rep.blockers else 'NO'}")
             for b in rep.blockers:
                 print(f"                 - {b}")
 
-        print(f"\nRead {gg.VISUAL_PLAN_MD_NAME} first. Then, to approve this plan:\n"
+        expected = gg.canonical_confirmation_phrase(
+            project_dir.name, str(doc.get("routes_id") or ""))
+        print(f"\nRead {visual_routes.ROUTES_MD_NAME} first. Then, to approve this "
+              f"routes document:\n"
               f"  python approve_checkpoint.py --project {project_dir.name} \\\n"
               f"    --approver \"<your name>\" \\\n"
-              f"    --confirm \"{confirmation_phrase(project_dir.name, plan.get('plan_id', ''))}\"")
+              f"    --confirm \"{expected}\"")
         return 0
 
     if args.revoke:
@@ -368,21 +330,20 @@ def main() -> int:
         return 0
 
     try:
-        out = write_approval(project_dir, args.approver or "", args.confirm or "")
+        out = write_approval_v3(project_dir, args.approver or "", args.confirm or "")
     except ApprovalRefused as e:
         print(f"\napproval refused: {e}", file=sys.stderr)
         print("\nNothing was written.", file=sys.stderr)
         return 1
     rec = json.loads(out.read_text(encoding="utf-8"))
-    print(f"  Checkpoint 3 approved for {rec['project']}, plan {rec['plan_id'][:8]}")
+    print(f"  Checkpoint 3 approved for {rec['project']}, routes {rec['routes_id'][:8]}")
     print(f"    manifest        {rec['manifest_sha256'][:16]}…")
-    print(f"    plan (json)     {rec['visual_plan_sha256'][:16]}…")
-    print(f"    plan (md)       {rec['visual_plan_md_sha256'][:16]}…")
-    print(f"    routing input   {rec['prompts_sha256'][:16]}…")
+    print(f"    routes (json)   {rec['routes_file_sha256'][:16]}…")
+    print(f"    routes (md)     {rec['routes_md_sha256'][:16]}…")
     print(f"    failure rev     {rec['failure_revision']}")
     print(f"    paid shots      {rec['paid_generation'].get('shots')}")
-    print(f"\n  Editing any of those files invalidates this approval, as does any "
-          f"route failure or resolution.")
+    print(f"\n  Editing any of those files, or the live renderer registry, "
+          f"invalidates this approval, as does any route failure or resolution.")
     return 0
 
 

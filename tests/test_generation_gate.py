@@ -324,8 +324,10 @@ def build_canonical_baseline(*, approval_tamper=None):
 
 
 def run_canonical(root, proj, **kw):
-    """The unwired canonical validator, called directly — never through
-    require_canonical_visual_execution_ready(), which still always raises."""
+    """The canonical validator itself (a GateReport), called directly rather
+    than through require_canonical_visual_execution_ready() — which now
+    (Task 2B-B2b-3) calls this internally and, on success, additionally
+    seals the result into a DispatchSnapshot and returns that instead."""
     a, b, c, d = patched(root)
     with a, b, c, d:
         return gate._canonical_execution_problems(proj, "test", **kw)
@@ -911,25 +913,40 @@ try:
         "the channel's current approved voice differing from what was narrated is refused",
         root, proj)
 
-    # ── 22. the universal refusal remains ─────────────────────────────────────
-    print("\n22. the universal canonical refusal is untouched by any of the above")
+    # ── 22. activation (Task 2B-B2b-3) ────────────────────────────────────────
+    print("\n22. require_canonical_visual_execution_ready() is now the real v3 gate")
     root, proj, ctx, doc = build_canonical_baseline()
     direct = run_canonical(root, proj)
     check("the direct canonical validator passes this fixture", not direct.blockers,
           str(direct.blockers))
     a, b, c, d = patched(root)
     with a, b, c, d:
+        snapshot = gate.require_canonical_visual_execution_ready(proj)
+    check("a fully valid v3 baseline passes the activated gate",
+          isinstance(snapshot, vr.DispatchSnapshot))
+    check("the returned snapshot is bound to this exact routes document",
+          snapshot.routes_id == doc["routes_id"]
+          and snapshot.routes_file_sha256 == vr.file_sha256(proj / vr.ROUTES_NAME))
+    check("the returned snapshot is genuinely sealed",
+          isinstance(snapshot._seal, vr._SnapshotSeal))
+
+    print("\n22a. a project with no v3 approval at all is blocked")
+    root2, proj2 = build_fixture()
+    install_canonical_channel(root2)
+    a, b, c, d = patched(root2)
+    with a, b, c, d:
+        ctx2 = cc.load_channel_for_project(proj2)
+        install_canonical_routes(proj2, ctx2)          # routes, but no approval
         try:
-            gate.require_canonical_visual_execution_ready(proj)
+            gate.require_canonical_visual_execution_ready(proj2)
             refused, err = False, ""
         except gate.GateBlocked as e:
             refused, err = True, str(e)
-    check("require_canonical_visual_execution_ready still refuses even when every "
-          "direct canonical check passes", refused, err[:200])
-    check("the refusal is the intentional temporary-disable message, not a real check "
-          "failing", "remains disabled" in err)
+    check("no v3 approval on disk is refused", refused, err[:200])
+    check("the refusal names the missing approval",
+          "v3 approval exists" in err, err[:400])
 
-    print("\n22a. all six canonical adapters remain universally blocked")
+    print("\n22b. all six canonical adapters are registered against the (now-live) gate")
     canonical_entry = gate.entry_point("images.canonical_adapters")
     registered_fns = {g["function"] for g in canonical_entry["gates"]}
     check("exactly the six documented adapters are gated",
@@ -1180,18 +1197,36 @@ try:
              rep, "v3 approval paid-generation summary matches the approved routes"),
           str(rep.blockers))
 
-    # ── 28. universal refusal reconfirmed ─────────────────────────────────────
-    print("\n28. the universal canonical refusal still holds after the micro-fix")
+    # ── 28. TOCTOU closure — expected_snapshot substitution detection ────────
+    print("\n28. a stale/substituted expected_snapshot is refused, not silently accepted")
     root, proj, ctx, doc = build_canonical_baseline()
     a, b, c, d = patched(root)
     with a, b, c, d:
+        stale_snapshot = gate.require_canonical_visual_execution_ready(proj)
+        # Re-issue a completely different, but self-consistently approved,
+        # routes document + v3 approval for the SAME project — the underlying
+        # _canonical_execution_problems() check passes cleanly against this
+        # new state (it is a genuinely valid baseline in its own right), so
+        # only the expected_snapshot identity/hash comparison can catch that
+        # `stale_snapshot` no longer describes what is on disk.
+        doc2 = install_canonical_routes(proj, ctx)
+        build_v3_approval(proj, doc2, ctx)
+        check("the reissued routes document really is a different routes_id",
+              doc2["routes_id"] != stale_snapshot.routes_id)
+        fresh_direct = run_canonical(root, proj)
+        check("the reissued baseline is independently valid on its own",
+              not fresh_direct.blockers, str(fresh_direct.blockers))
         try:
-            gate.require_canonical_visual_execution_ready(proj)
-            refused, err = False, ""
+            gate.require_canonical_visual_execution_ready(
+                proj, expected_snapshot=stale_snapshot)
+            stale_refused, stale_err = False, ""
         except gate.GateBlocked as e:
-            refused, err = True, str(e)
-    check("require_canonical_visual_execution_ready still refuses unconditionally",
-          refused and "remains disabled" in err, err[:200])
+            stale_refused, stale_err = True, str(e)
+    check("a stale expected_snapshot from before the reissue is refused",
+          stale_refused, stale_err[:300])
+    check("the refusal names the substitution, not an ordinary artifact problem",
+          "substituted" in stale_err or "changed" in stale_err, stale_err[:300])
+
     canonical_entry = gate.entry_point("images.canonical_adapters")
     check("all six canonical adapters are still gated by it",
           {g["function"] for g in canonical_entry["gates"]}

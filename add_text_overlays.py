@@ -599,8 +599,13 @@ def overlay_snapshot_canonical(snapshot: "visual_routes.DispatchSnapshot") -> in
         raise RuntimeError(
             f"overlay_snapshot_canonical() requires a visual_routes.DispatchSnapshot, "
             f"got {type(snapshot).__name__}")
-    generation_gate.require_canonical_visual_execution_ready(
-        snapshot.project_dir, operation="text overlay (canonical visual execution)")
+    # expected_snapshot=snapshot (Task 2B-B2b-3): the gate revalidates
+    # everything fresh and refuses unless its own fresh read still matches
+    # this exact snapshot — catching a mutation/substitution between when
+    # `snapshot` was built and this overlay pass actually running.
+    snapshot = generation_gate.require_canonical_visual_execution_ready(
+        snapshot.project_dir, operation="text overlay (canonical visual execution)",
+        expected_snapshot=snapshot)
 
     images_dir = snapshot.project_dir / "images"
     targets = _preflight_overlay_targets(snapshot, images_dir)
@@ -641,12 +646,12 @@ def apply_overlays_canonical(project_dir) -> int:
     check and loads its own sealed snapshot, then delegates to
     `overlay_snapshot_canonical()`."""
     import generation_gate
-    import visual_routes as _visual_routes
 
-    generation_gate.require_canonical_visual_execution_ready(
+    # The gate itself both validates and builds the snapshot (Task
+    # 2B-B2b-3) — never an independent second read of visual_routes.json
+    # after the gate already validated one.
+    snapshot = generation_gate.require_canonical_visual_execution_ready(
         project_dir, operation="text overlay (canonical visual execution)")
-    result = _visual_routes.require_executable_routes(project_dir, operation="overlay")
-    snapshot = _visual_routes.build_dispatch_snapshot(result)
     return overlay_snapshot_canonical(snapshot)
 
 

@@ -182,10 +182,23 @@ def canonical_png(path: Path):
 
 
 def patched_gate():
-    """Patches the universal canonical gate through to a no-op — the only
-    way any code in this file below the gate is ever exercised."""
+    """Patches the universal canonical gate through to a controlled pass
+    (Task 2B-B2b-3: the real gate now performs real v3 validation, which
+    this file's fixtures mostly do not build — they exercise dispatch/
+    review/overlay/orchestration behavior, not approval validation, which
+    is generation_gate's own test file's job). When called with
+    `expected_snapshot=<snapshot>`, returns that exact snapshot back,
+    mirroring the real gate's own post-match behavior; when called with no
+    `expected_snapshot`, builds and returns a genuine sealed snapshot from
+    whatever routes are currently on disk for that project."""
+    def _fake(project=None, operation="test", *, expected_snapshot=None):
+        if expected_snapshot is not None:
+            return expected_snapshot
+        result = vr.require_executable_routes(project, operation=operation)
+        return vr.build_dispatch_snapshot(result)
+
     return mock.patch.object(gate, "require_canonical_visual_execution_ready",
-                             return_value=None)
+                             side_effect=_fake)
 
 
 REPO_BEFORE = {p.relative_to(ROOT).as_posix(): sha(p)
@@ -207,25 +220,33 @@ try:
                 check(f"{label} raises GateBlocked (guard not patched)", False, "returned instead")
             except gate.GateBlocked as e:
                 check(f"{label} raises GateBlocked (guard not patched)", True)
-                check(f"{label}'s message names canonical visual execution as disabled",
-                     "canonical visual execution" in str(e).lower(), str(e))
+                check(f"{label}'s message names this as a canonical-execution operation "
+                     "and no v3 approval exists for this unapproved fixture",
+                     "canonical" in str(e).lower() and "v3 approval exists" in str(e),
+                     str(e))
     check("no images directory was created", not (proj / "images").exists())
 
-    print("\n1a. the universal gate is textually and behaviorally an unconditional refusal")
-    import ast as _ast
-    gate_tree = _ast.parse((ROOT / "generation_gate.py").read_text(encoding="utf-8"))
-    gate_fn = next(n for n in _ast.walk(gate_tree)
-                  if isinstance(n, _ast.FunctionDef)
-                  and n.name == "require_canonical_visual_execution_ready")
-    has_branch = any(isinstance(n, (_ast.If, _ast.Try, _ast.While))
-                     for n in _ast.walk(gate_fn))
-    check("the function body contains no conditional branch before raising",
-         not has_branch)
+    print("\n1a. the gate is now the real v3 validator (Task 2B-B2b-3 activation) — "
+         "obsolete: it is no longer textually an unconditional refusal (that was "
+         "Task 2B-B2a/B2b-1's placeholder), so the old AST no-branch check no longer "
+         "applies; replaced with a behavioral check that it still refuses a project "
+         "with no v3 approval, and returns a genuine sealed snapshot once one is valid")
     try:
         gate.require_canonical_visual_execution_ready("anything")
-        check("require_canonical_visual_execution_ready always raises", False, "did not raise")
+        check("an unresolvable project is refused", False, "did not raise")
     except gate.GateBlocked:
-        check("require_canonical_visual_execution_ready always raises", True)
+        check("an unresolvable project is refused", True)
+
+    root_v3, proj_v3 = build_fixture()
+    with World(root_v3):
+        ctx_v3 = cc.load_channel_for_project(proj_v3)
+        manifest_v3 = json.loads((proj_v3 / "manifest.json").read_text(encoding="utf-8"))
+        install_canonical_routes(proj_v3, ctx_v3, route_all_scenes(manifest_v3))
+        try:
+            gate.require_canonical_visual_execution_ready(proj_v3)
+            check("routes with no v3 approval are refused", False, "did not raise")
+        except gate.GateBlocked as e:
+            check("routes with no v3 approval are refused", True)
 
     print("\n1b. all six canonical adapters remain universally blocked")
     route = map_route({"visual_asset_id": "VIS-001-A", "source_ids": ["S"],

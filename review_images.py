@@ -772,8 +772,13 @@ def review_snapshot_canonical(snapshot: "visual_routes.DispatchSnapshot") -> lis
             f"review_snapshot_canonical() requires a visual_routes.DispatchSnapshot, "
             f"got {type(snapshot).__name__}")
     import generation_gate
-    generation_gate.require_canonical_visual_execution_ready(
-        snapshot.project_dir, operation="canonical image review")
+    # expected_snapshot=snapshot (Task 2B-B2b-3): the gate revalidates
+    # everything fresh and refuses unless its own fresh read still matches
+    # this exact snapshot — catching a mutation/substitution between when
+    # `snapshot` was built and this review actually running.
+    snapshot = generation_gate.require_canonical_visual_execution_ready(
+        snapshot.project_dir, operation="canonical image review",
+        expected_snapshot=snapshot)
 
     images_dir = snapshot.project_dir / "images"
     results = []
@@ -804,12 +809,12 @@ def review_project_canonical(project_dir) -> list:
     body is exercised only in tests with that guard explicitly patched.
     """
     import generation_gate
-    import visual_routes as _visual_routes
 
-    generation_gate.require_canonical_visual_execution_ready(
+    # The gate itself both validates and builds the snapshot (Task
+    # 2B-B2b-3) — never an independent second read of visual_routes.json
+    # after the gate already validated one.
+    snapshot = generation_gate.require_canonical_visual_execution_ready(
         project_dir, operation="canonical image review")
-    result = _visual_routes.require_executable_routes(project_dir, operation="review")
-    snapshot = _visual_routes.build_dispatch_snapshot(result)
     return review_snapshot_canonical(snapshot)
 
 

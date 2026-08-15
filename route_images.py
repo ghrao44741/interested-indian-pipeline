@@ -850,18 +850,18 @@ def dispatch_routes(project_dir: Path, *, overwrite: bool = False) -> int:
     (Task 2B-B2b-3) activates that guard — no code here changes when that
     happens.
 
-    A thin public wrapper: performs its own gate check and loads its own
-    snapshot, then delegates to `dispatch_snapshot_routes()`. A caller that
-    already holds a sealed snapshot for this same project (Task 2B-B2b-2b's
-    in-process orchestration, which must stay bound to ONE snapshot across
-    dispatch/review/overlay stages rather than re-deriving one per stage)
-    calls `dispatch_snapshot_routes()` directly instead of this function.
+    A thin public wrapper: the gate itself both validates and builds the
+    snapshot (Task 2B-B2b-3), so this never independently re-reads
+    visual_routes.json after the gate already validated a read of it — that
+    second read would be exactly the TOCTOU gap Task 2B-B2b-3 closes. A
+    caller that already holds a sealed snapshot for this same project (Task
+    2B-B2b-2b's in-process orchestration, which must stay bound to ONE
+    snapshot across dispatch/review/overlay stages rather than re-deriving
+    one per stage) calls `dispatch_snapshot_routes()` directly instead of
+    this function.
     """
-    generation_gate.require_canonical_visual_execution_ready(
+    snapshot = generation_gate.require_canonical_visual_execution_ready(
         project_dir, operation="route dispatch (canonical visual execution)")
-
-    result = visual_routes.require_executable_routes(project_dir, operation="dispatch")
-    snapshot = visual_routes.build_dispatch_snapshot(result)
     return dispatch_snapshot_routes(snapshot, overwrite=overwrite)
 
 
@@ -883,14 +883,21 @@ def dispatch_snapshot_routes(snapshot: "visual_routes.DispatchSnapshot", *,
     enforced deeper down by build_dispatch_context() on every route) —
     never accepts a caller-assembled route list or a directly-constructed
     DispatchSnapshot as dispatch authority.
+
+    Passes `snapshot` back to the gate as `expected_snapshot` (Task
+    2B-B2b-3): the gate revalidates everything fresh and refuses unless the
+    routes document it just re-read still matches this exact snapshot byte
+    for byte — catching a routes-document mutation or substitution between
+    when `snapshot` was built and this dispatch actually running.
     """
     import visual_routes as _visual_routes
     if not isinstance(snapshot, _visual_routes.DispatchSnapshot):
         raise RouteError(
             f"dispatch_snapshot_routes() requires a visual_routes.DispatchSnapshot, "
             f"got {type(snapshot).__name__}")
-    generation_gate.require_canonical_visual_execution_ready(
-        snapshot.project_dir, operation="route dispatch (canonical visual execution)")
+    snapshot = generation_gate.require_canonical_visual_execution_ready(
+        snapshot.project_dir, operation="route dispatch (canonical visual execution)",
+        expected_snapshot=snapshot)
 
     images_dir = snapshot.project_dir / "images"
     targets = _preflight_targets(snapshot, images_dir, overwrite)

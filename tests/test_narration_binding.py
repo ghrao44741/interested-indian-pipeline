@@ -209,11 +209,85 @@ def plan(root, proj) -> dict:
     return p
 
 
+def _v2_confirmation_phrase(project: str, plan_id: str = "") -> str:
+    return f"I approve paid generation for {project} plan {(plan_id or '')[:8]}".strip()
+
+
+def _write_v2_approval(project_dir: Path, approver: str, confirmation: str) -> Path:
+    """Local replica of approve_checkpoint.py's former legacy-v2 writer,
+    removed in Task 2B-B2b-3 when approve_checkpoint.py was converted into
+    the schema-v3 canonical writer (it may no longer call
+    plan_visuals.render_md() or otherwise use plan_visuals.py as an
+    authority producer, v2 included). Kept here only so this file can still
+    build genuine, fully validated legacy-v2 approval fixtures to
+    regression-test generation_gate.require_generation_ready(), including
+    its narration-binding check — unchanged and structurally isolated from
+    the v3 cutover."""
+    import route_failures as _route_failures
+    from datetime import datetime as _dt, timezone as _tz
+
+    if not (approver or "").strip():
+        raise ac.ApprovalRefused("--approver must name the person approving")
+    rep = gate.require_identity_ready(project_dir, "Checkpoint 3 approval",
+                                      raise_on_block=False)
+    if rep.blockers:
+        raise ac.ApprovalRefused("identity is not ready:\n"
+                                 + "\n".join(f"  - {b}" for b in rep.blockers))
+    plan_path = project_dir / gate.VISUAL_PLAN_NAME
+    md_path = project_dir / gate.VISUAL_PLAN_MD_NAME
+    manifest_path = project_dir / "manifest.json"
+    prompts_path = project_dir / gate.PROMPTS_NAME
+    p = json.loads(plan_path.read_text(encoding="utf-8"))
+    context = cc.load_channel_for_project(project_dir)
+    expected_binding = context.plan_binding()
+    if p.get("channel") != expected_binding:
+        raise ac.ApprovalRefused("the plan was built against a different channel state")
+    if not context.voice_approved:
+        raise ac.ApprovalRefused("no approved voice profile")
+    early_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    narration_problems = gate.narration_binding_problems(project_dir, early_manifest, context)
+    if narration_problems:
+        raise ac.ApprovalRefused("narration binding is not verified:\n"
+                                 + "\n".join(narration_problems))
+    plan_id = p.get("plan_id")
+    expected = _v2_confirmation_phrase(project_dir.name, plan_id)
+    if (confirmation or "").strip() != expected:
+        raise ac.ApprovalRefused(
+            f"confirmation phrase does not match. Expected exactly:\n  {expected}")
+    fresh = plan_visuals.render_md(p)
+    if md_path.read_text(encoding="utf-8") != fresh:
+        raise ac.ApprovalRefused(f"{gate.VISUAL_PLAN_MD_NAME} does not match a fresh render")
+    if p.get("inputs", {}).get("prompts_sha256") != sha(prompts_path):
+        raise ac.ApprovalRefused(f"{gate.PROMPTS_NAME} has changed")
+    if p.get("needs_review"):
+        raise ac.ApprovalRefused("the plan still has unresolved review item(s)")
+    if _route_failures.unresolved(project_dir):
+        raise ac.ApprovalRefused("unresolved route failure(s)")
+    current_rev = _route_failures.revision(project_dir)
+    if p.get("failure_revision") != current_rev:
+        raise ac.ApprovalRefused("the plan was built at a stale failure revision")
+    ids = [s.get("visual_asset_id") for s in p.get("shots", [])]
+    record = {
+        "schema_version": 2, "project": project_dir.name, "plan_id": plan_id,
+        "channel": expected_binding, "manifest_sha256": sha(manifest_path),
+        "visual_plan_sha256": sha(plan_path), "visual_plan_md_sha256": sha(md_path),
+        "prompts_sha256": sha(prompts_path), "failure_revision": current_rev,
+        "approved_at": _dt.now(_tz.utc).isoformat(timespec="seconds"),
+        "approved_by": approver.strip(), "confirmation": expected,
+        "paid_generation": p.get("paid_generation", {}),
+        "approved_mix": p.get("mix", {}), "host_presence_pct": p.get("host_presence_pct"),
+        "approved_visual_asset_ids": sorted(ids),
+    }
+    out = project_dir / gate.APPROVAL_NAME
+    out.write_text(json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8")
+    return out
+
+
 def approve(root, proj, approver="Reviewer"):
     p = json.loads((proj / plan_visuals.PLAN_JSON).read_text(encoding="utf-8"))
     with World(root):
-        return ac.write_approval(proj, approver,
-                                 ac.confirmation_phrase(proj.name, p["plan_id"]))
+        return _write_v2_approval(proj, approver,
+                                  _v2_confirmation_phrase(proj.name, p["plan_id"]))
 
 
 def verdict(root, proj):

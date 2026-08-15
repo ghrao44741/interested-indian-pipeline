@@ -1,24 +1,30 @@
 """
-plan_visuals.py — read-only visual plan. Never calls a paid API.
+plan_visuals.py — RETIRED as an executable authoring path (Task 2B-B2b-3).
 
-Produces `{project}/visual_plan.json` (machine-readable, consumed by the
-generation gate) and `{project}/visual_plan.md` (for a human to read before
-authorising spend). It plans; it does not generate, and it holds no API client.
+`visual_routes.json` is now the canonical artifact that generation_gate,
+route_images.py, review_images.py, add_text_overlays.py and
+pipeline_agents.py all execute against. This module's CLI (`main()`) no
+longer writes `visual_plan.json` / `visual_plan.md` into any project — it is
+a refusal shim; see `main()` below for the exact message it prints.
 
-If the project's identity is blocked it writes the report anyway — the report is
-the diagnosis — and exits nonzero. It never continues into routing or
-generation, because a plan built on uncertain identity would authorise artwork
-against the wrong words.
+Automatic canonical route authoring/rebuilding (producing or refreshing
+visual_routes.json itself) is not yet available — that is a future,
+separately authorized authoring milestone. `migrate_routes_from_markdown.py`
+is only a one-time, human-run migration bridge, not a replacement authoring
+path, and is never invoked implicitly by anything in this pipeline.
+Rebuilding routes for a project will require that future milestone, followed
+by a fresh Checkpoint 3 v3 approval (approve_checkpoint.py).
 
-    python plan_visuals.py --project test_2min
-
-Semantic routing (MAP/CHART/TIMELINE/DOCUMENT/REENACTMENT selection by meaning,
-host ratio targets) is Task 3. This plan reports the routing that the current
-prompts already declare, and queues anything undeclared for review rather than
-guessing.
+`build_plan()`, `reconcile()` and `render_md()` below remain as read-only,
+side-effect-free library functions (never a paid API call, never a write) —
+kept only because existing tests still construct legacy-v2 visual_plan.json
+fixtures directly through them, to exercise generation_gate's still-supported
+`_check_approval_v2()` / `require_generation_ready()` legacy validator
+(structurally isolated from — and unaffected by — the v3 cutover). Nothing
+in this pipeline calls them as an authoring path anymore; only `main()`, the
+actual CLI entry point, is retired.
 """
 
-import argparse
 import hashlib
 import json
 import sys
@@ -323,36 +329,21 @@ def render_md(plan: dict) -> str:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--project", required=True)
-    ap.add_argument("--stdout", action="store_true", help="Print the report instead of writing")
-    args = ap.parse_args()
-
-    project_dir = Path(args.project)
-    if not project_dir.is_absolute():
-        project_dir = (PIPELINE_DIR / args.project).resolve()
-    if not project_dir.is_dir():
-        print(f"project folder not found: {project_dir}", file=sys.stderr)
-        return 2
-
-    plan = build_plan(project_dir)
-    md = render_md(plan)
-    if args.stdout:
-        print(md)
-    else:
-        (project_dir / PLAN_JSON).write_text(
-            json.dumps(plan, indent=2, ensure_ascii=False), encoding="utf-8")
-        (project_dir / PLAN_MD).write_text(md, encoding="utf-8")
-        print(f"  wrote {PLAN_JSON} and {PLAN_MD} in {project_dir.name}")
-
-    blocked = plan["identity"]["gate_blockers"] or plan["needs_review"]
-    if blocked:
-        print(f"\n  BLOCKED: {len(plan['identity']['gate_blockers'])} identity "
-              f"blocker(s), {len(plan['needs_review'])} item(s) needing review. "
-              f"No paid generation may run.", file=sys.stderr)
-        return 1
-    return 0
+    """Refusal shim (Task 2B-B2b-3). plan_visuals.py's project-authoring CLI
+    is retired — it writes nothing, reads nothing project-scoped, and calls
+    no API. Every invocation shape refuses identically; there is no flag
+    that reaches the old authoring behavior."""
+    print("plan_visuals.py is retired.")
+    print("visual_routes.json is now the canonical artifact — the one every")
+    print("canonical stage (route_images.py, review_images.py,")
+    print("add_text_overlays.py, pipeline_agents.py) executes against.")
+    print("Automatic canonical route authoring/rebuilding is not yet")
+    print("available; migrate_routes_from_markdown.py is only a one-time,")
+    print("human-run migration bridge, not a replacement for this command.")
+    print("Rebuilding routes for a project requires the future canonical")
+    print("authoring milestone, followed by a fresh Checkpoint 3 v3 approval")
+    print("(approve_checkpoint.py).")
+    return 1
 
 
 if __name__ == "__main__":
